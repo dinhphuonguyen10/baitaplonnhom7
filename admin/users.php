@@ -191,7 +191,6 @@ $adminCurrentPage = 'users.php';
 
         <!-- Form tạo tài khoản mới -->
         <section class="prototype-panel">
-            <h2>+ Tạo tài khoản mới</h2>
             <form method="post" class="prototype-form">
                 <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['staff_management_csrf']); ?>">
                 <input type="hidden" name="action" value="create">
@@ -214,9 +213,6 @@ $adminCurrentPage = 'users.php';
         <!-- Danh sách tài khoản & Đổi mật khẩu -->
         <section class="prototype-panel">
             <h2>Danh sách tài khoản nội bộ & Đổi mật khẩu</h2>
-            <p style="color: #667085; font-size: 0.9rem; margin-top: -6px; margin-bottom: 16px;">
-                💡 Khi nhân viên quên mật khẩu, quản trị viên có thể bấm <strong>"🔑 Đổi mật khẩu"</strong> để cấp lại mật khẩu mới ngay lập tức.
-            </p>
             <table class="prototype-table">
                 <thead>
                     <tr>
