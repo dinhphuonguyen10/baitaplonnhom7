@@ -1271,7 +1271,7 @@ function initAuth() {
                 return;
             }
             const isValidPassword = (pwd) => {
-                return pwd.length === 8 &&
+                return pwd.length >= 8 &&
                     /[a-z]/.test(pwd) &&
                     /[A-Z]/.test(pwd) &&
                     /[0-9]/.test(pwd) &&
@@ -1279,7 +1279,7 @@ function initAuth() {
             };
 
             if (!isValidPassword(password)) {
-                showRegMsg('Mật khẩu phải đúng 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).');
+                showRegMsg('Mật khẩu phải có tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).');
                 return;
             }
             if (password !== confirmPassword) {

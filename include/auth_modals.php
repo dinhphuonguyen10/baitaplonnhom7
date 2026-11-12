@@ -32,10 +32,10 @@
                     style="padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
                 <input type="tel" id="register-phone" placeholder="Số điện thoại (10 số, dùng để lấy lại mật khẩu)" autocomplete="tel" maxlength="10" required
                     style="padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
-                <input type="password" id="register-password" placeholder="Tạo mật khẩu (ví dụ: Abc@1234)" autocomplete="new-password" minlength="8" maxlength="8" required
+                <input type="password" id="register-password" placeholder="Tạo mật khẩu (ví dụ: Abc@1234)" autocomplete="new-password" minlength="8" required
                     style="padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
-                <small style="font-size: 0.78rem; color: #666; margin-top: -8px; margin-bottom: 2px; line-height: 1.3;">* Yêu cầu đúng 8 ký tự: gồm chữ hoa, thường, số và ký tự đặc biệt</small>
-                <input type="password" id="register-confirm-password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" minlength="8" maxlength="8" required
+                <small style="font-size: 0.78rem; color: #666; margin-top: -8px; margin-bottom: 2px; line-height: 1.3;">* Yêu cầu tối thiểu 8 ký tự: gồm chữ hoa, thường, số và ký tự đặc biệt</small>
+                <input type="password" id="register-confirm-password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" minlength="8" required
                     style="padding: 10px; border: 1px solid #ccc; border-radius: 8px;">
                 <button id="submit-register"
                     style="padding: 12px; background: #fff; color: var(--navy); border: 2px solid var(--gold); border-radius: 8px; font-weight: bold; cursor: pointer;">Đăng ký</button>
