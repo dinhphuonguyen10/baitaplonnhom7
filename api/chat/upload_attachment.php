@@ -135,7 +135,8 @@ if ($sender === 'admin') {
     if (!$userId || $userId < 1) {
         attachmentJsonResponse(['status' => 'error', 'message' => 'Cuộc trò chuyện không hợp lệ.'], 400);
     }
-    $customer = $conn->prepare("SELECT username FROM users WHERE id = ? AND role = 'customer' LIMIT 1");
+    // Tác dụng: Xác minh khách hàng tồn tại trong bảng users (chỉ chứa tài khoản khách hàng)
+    $customer = $conn->prepare("SELECT username FROM users WHERE id = ? LIMIT 1");
     if (!$customer) {
         attachmentJsonResponse(['status' => 'error', 'message' => 'Không thể kiểm tra khách hàng.'], 500);
     }

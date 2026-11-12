@@ -46,8 +46,8 @@ if (
 ) {
     respond(400, ['status' => 'error', 'message' => 'Mật khẩu phải có tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).']);
 }
-// Kiểm tra SĐT đã được dùng chưa
-$stmt = $conn->prepare("SELECT id FROM users WHERE phone = ? AND role = 'customer' LIMIT 1");
+// Kiểm tra SĐT đã được dùng chưa (trong bảng users — khách hàng)
+$stmt = $conn->prepare("SELECT id FROM users WHERE phone = ? LIMIT 1");
 if (!$stmt) {
     respond(500, ['status' => 'error', 'message' => 'Không thể xử lý yêu cầu lúc này.']);
 }
@@ -58,9 +58,9 @@ if ($stmt->get_result()->fetch_assoc()) {
     respond(409, ['status' => 'error', 'message' => 'Số điện thoại đã được liên kết với tài khoản khác.']);
 }
 $stmt->close();
-// Tạo tài khoản
+// Tạo tài khoản khách hàng vào bảng users
 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-$stmt = $conn->prepare("INSERT INTO users (username, password, phone, role) VALUES (?, ?, ?, 'customer')");
+$stmt = $conn->prepare("INSERT INTO users (username, password, phone) VALUES (?, ?, ?)");
 if (!$stmt) {
     error_log('Customer registration: failed to prepare insert: ' . $conn->error);
     respond(500, ['status' => 'error', 'message' => 'Không thể tạo tài khoản lúc này.']);

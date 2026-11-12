@@ -30,7 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($username === '' || $password === '') {
         $error = 'Vui lòng nhập tên đăng nhập và mật khẩu.';
     } else {
-        $stmt = $conn->prepare('SELECT id, username, password, role FROM users WHERE username = ? LIMIT 1');
+        // Tác dụng: Query bảng admins (tài khoản nội bộ) thay vì bảng users (khách hàng)
+        $stmt = $conn->prepare('SELECT id, username, password, role FROM admins WHERE username = ? LIMIT 1');
 
         if (!$stmt) {
             $error = 'Không thể đăng nhập lúc này. Vui lòng thử lại sau.';
@@ -44,16 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$user || !isAdminAreaRole($user['role'] ?? null) || !password_verify($password, $user['password'])) {
                 $error = 'Thông tin đăng nhập không đúng hoặc tài khoản không có quyền quản trị.';
             } else {
-                $role = $user['role'] === 'admin' ? 'manager' : $user['role'];
                 session_regenerate_id(true);
 
                 // Tác dụng: Thiết lập phiên đăng nhập quản trị độc lập, tách biệt hoàn toàn với phiên mua sắm của khách hàng
                 $_SESSION['admin_user_id']  = $user['id'];
                 $_SESSION['admin_username'] = $user['username'];
-                $_SESSION['admin_role']     = $role;
+                $_SESSION['admin_role']     = $user['role'];
                 unset($_SESSION['admin_login_csrf']);
 
-                header('Location: ' . adminRoleHomeUrl($role));
+                header('Location: ' . adminRoleHomeUrl($user['role']));
                 exit;
             }
         }

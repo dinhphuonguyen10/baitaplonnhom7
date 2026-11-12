@@ -16,19 +16,19 @@ if (!isset($data->username) || !isset($data->password)) {
 $username = trim($data->username);
 $password = $data->password;
 
-// Tìm tài khoản theo username (cho phép cả customer, staff, manager, admin đăng nhập)
-$stmt = $conn->prepare("SELECT id, username, password, role FROM users WHERE username = ? LIMIT 1");
+// ─── Bước 1: Tìm trong bảng users (khách hàng) ───────────────────────────
+$stmt = $conn->prepare("SELECT id, username, password FROM users WHERE username = ? LIMIT 1");
 $stmt->bind_param('s', $username);
 $stmt->execute();
 $result = $stmt->get_result();
+$user = $result->fetch_assoc();
+$stmt->close();
 
-if ($result->num_rows > 0) {
-    $user = $result->fetch_assoc();
-
+if ($user) {
     $isMatch = password_verify($password, $user['password']) || $password === $user['password'];
 
     if ($isMatch) {
-        // Tự động nâng cấp mật khẩu sang hash chuẩn nếu trong DB đang lưu dạng plain-text
+        // Tự động nâng cấp mật khẩu plain-text lên hash
         if ($password === $user['password']) {
             $newHash = password_hash($password, PASSWORD_DEFAULT);
             $upStmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
@@ -41,32 +41,71 @@ if ($result->num_rows > 0) {
 
         session_regenerate_id(true);
 
-        // Tác dụng: Phân luồng lưu trữ phiên làm việc theo vai trò - Khách hàng lưu phiên mua sắm riêng, Quản trị viên lưu phiên quản lý riêng
-        if ($user['role'] === 'customer') {
-            $_SESSION['user_id']  = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role']     = 'customer';
-        } else {
-            $_SESSION['admin_user_id']  = $user['id'];
-            $_SESSION['admin_username'] = $user['username'];
-            $_SESSION['admin_role']     = ($user['role'] === 'admin') ? 'manager' : $user['role'];
-        }
+        // Phiên khách hàng mua sắm
+        $_SESSION['user_id']  = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['role']     = 'customer';
 
         http_response_code(200);
         echo json_encode([
             'status'   => 'success',
             'message'  => 'Đăng nhập thành công!',
-            'role'     => $user['role'],
+            'role'     => 'customer',
             'username' => $user['username'],
         ], JSON_UNESCAPED_UNICODE);
-    } else {
-        http_response_code(401);
-        echo json_encode(['status' => 'error', 'message' => 'Tên đăng nhập hoặc mật khẩu không đúng.'], JSON_UNESCAPED_UNICODE);
+        $conn->close();
+        exit;
     }
-} else {
+
+    // Username trùng nhưng sai mật khẩu → trả lỗi luôn, không tìm tiếp admins
     http_response_code(401);
     echo json_encode(['status' => 'error', 'message' => 'Tên đăng nhập hoặc mật khẩu không đúng.'], JSON_UNESCAPED_UNICODE);
+    $conn->close();
+    exit;
 }
 
+// ─── Bước 2: Tìm trong bảng admins (staff / manager) ─────────────────────
+$stmt = $conn->prepare("SELECT id, username, password, role FROM admins WHERE username = ? LIMIT 1");
+$stmt->bind_param('s', $username);
+$stmt->execute();
+$result = $stmt->get_result();
+$admin = $result->fetch_assoc();
 $stmt->close();
+
+if ($admin) {
+    $isMatch = password_verify($password, $admin['password']) || $password === $admin['password'];
+
+    if ($isMatch) {
+        // Tự động nâng cấp mật khẩu plain-text lên hash
+        if ($password === $admin['password']) {
+            $newHash = password_hash($password, PASSWORD_DEFAULT);
+            $upStmt = $conn->prepare("UPDATE admins SET password = ? WHERE id = ?");
+            if ($upStmt) {
+                $upStmt->bind_param('si', $newHash, $admin['id']);
+                $upStmt->execute();
+                $upStmt->close();
+            }
+        }
+
+        session_regenerate_id(true);
+
+        // Phiên quản trị viên
+        $_SESSION['admin_user_id']  = $admin['id'];
+        $_SESSION['admin_username'] = $admin['username'];
+        $_SESSION['admin_role']     = $admin['role'];
+
+        http_response_code(200);
+        echo json_encode([
+            'status'   => 'success',
+            'message'  => 'Đăng nhập thành công!',
+            'role'     => $admin['role'],
+            'username' => $admin['username'],
+        ], JSON_UNESCAPED_UNICODE);
+        $conn->close();
+        exit;
+    }
+}
+
+http_response_code(401);
+echo json_encode(['status' => 'error', 'message' => 'Tên đăng nhập hoặc mật khẩu không đúng.'], JSON_UNESCAPED_UNICODE);
 $conn->close();

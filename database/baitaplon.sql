@@ -5,16 +5,32 @@ CREATE DATABASE IF NOT EXISTS baitaplon
     COLLATE utf8mb4_unicode_ci;
 
 USE baitaplon;
+
+-- =====================================================
+-- Bảng users: lưu tài khoản KHÁCH HÀNG
+-- =====================================================
 CREATE TABLE IF NOT EXISTS users (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     username VARCHAR(100) NOT NULL,
     password VARCHAR(255) NOT NULL,
     phone VARCHAR(20) NULL,
-    role ENUM('customer', 'staff', 'manager') NOT NULL DEFAULT 'customer',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_users_username (username),
-    UNIQUE KEY uq_users_phone_role (phone, role)
+    UNIQUE KEY uq_users_phone (phone)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- Bảng admins: lưu tài khoản NỘI BỘ (staff, manager)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS admins (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    username VARCHAR(100) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('staff', 'manager') NOT NULL DEFAULT 'staff',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_admins_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -43,6 +59,7 @@ CREATE TABLE IF NOT EXISTS products (
         ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- addresses.user_id → users(id) [khách hàng]
 CREATE TABLE IF NOT EXISTS addresses (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
@@ -57,6 +74,7 @@ CREATE TABLE IF NOT EXISTS addresses (
         ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- orders.user_id → users(id) [khách hàng, nullable]
 CREATE TABLE IF NOT EXISTS orders (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id INT UNSIGNED NULL,
@@ -101,9 +119,7 @@ CREATE TABLE IF NOT EXISTS order_items (
         ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- A user row represents either a customer or a staff/manager account via users.role.
--- This keeps the ERD's customer/admin accounts in the existing authentication table.
-
+-- reviews.user_id → users(id) [khách hàng]
 CREATE TABLE IF NOT EXISTS reviews (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     product_id INT UNSIGNED NOT NULL,
@@ -122,6 +138,7 @@ CREATE TABLE IF NOT EXISTS reviews (
         ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- carts.user_id → users(id) [khách hàng]
 CREATE TABLE IF NOT EXISTS carts (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
@@ -151,7 +168,7 @@ CREATE TABLE IF NOT EXISTS cart_items (
         ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Matches the chat_messages columns used by api/chat/chat_helpers.php and chat APIs.
+-- chat_messages.user_id → users(id) [khách hàng]
 CREATE TABLE IF NOT EXISTS chat_messages (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
@@ -312,6 +329,7 @@ ORDER BY id DESC
 LIMIT 12;
 
 -- Tài khoản admin mặc định (username: admin / password: password)
-INSERT INTO users (username, password, role) VALUES
+-- Lưu vào bảng admins với role = 'manager'
+INSERT INTO admins (username, password, role) VALUES
     ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager')
 ON DUPLICATE KEY UPDATE password = VALUES(password), role = VALUES(role);

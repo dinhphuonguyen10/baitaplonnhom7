@@ -27,7 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (strlen($newPassword) < 8) {
             $error = 'Mật khẩu mới phải có tối thiểu 8 ký tự.';
         } else {
-            $stmt = $conn->prepare("SELECT id, username, role FROM users WHERE id = ? AND role IN ('admin', 'manager', 'staff') LIMIT 1");
+            // Tác dụng: Tìm tài khoản trong bảng admins (nhân viên/quản lý)
+            $stmt = $conn->prepare("SELECT id, username, role FROM admins WHERE id = ? LIMIT 1");
             $stmt->bind_param('i', $targetUserId);
             $stmt->execute();
             $targetUser = $stmt->get_result()->fetch_assoc();
@@ -37,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Không tìm thấy tài khoản nhân viên.';
             } else {
                 $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+                $stmt = $conn->prepare("UPDATE admins SET password = ? WHERE id = ?");
                 $stmt->bind_param('si', $passwordHash, $targetUserId);
                 if ($stmt->execute()) {
                     $success = "Đã cập nhật mật khẩu mới cho tài khoản '{$targetUser['username']}' thành công!";
@@ -58,7 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (strlen($password) < 8) {
             $error = 'Mật khẩu phải có tối thiểu 8 ký tự.';
         } else {
-            $stmt = $conn->prepare('SELECT id FROM users WHERE username = ? LIMIT 1');
+            // Kiểm tra username đã tồn tại trong bảng admins chưa
+            $stmt = $conn->prepare('SELECT id FROM admins WHERE username = ? LIMIT 1');
             $stmt->bind_param('s', $username);
             $stmt->execute();
             $exists = $stmt->get_result()->fetch_assoc();
@@ -68,7 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Tên đăng nhập đã được sử dụng.';
             } else {
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare('INSERT INTO users (username, password, phone, role) VALUES (?, ?, NULL, ?)');
+                // Tác dụng: Tạo tài khoản nhân viên/quản lý vào bảng admins
+                $stmt = $conn->prepare('INSERT INTO admins (username, password, role) VALUES (?, ?, ?)');
                 $stmt->bind_param('sss', $username, $passwordHash, $role);
                 if ($stmt->execute()) {
                     $roleLabel = $role === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Staff)';
@@ -82,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$staffResult = $conn->query("SELECT id, username, role, created_at FROM users WHERE role IN ('admin', 'manager', 'staff') ORDER BY id DESC");
+// Tác dụng: Lấy danh sách tài khoản nội bộ từ bảng admins
+$staffResult = $conn->query("SELECT id, username, role, created_at FROM admins ORDER BY id DESC");
 
 // Tác dụng: Phân quyền quản trị tài khoản nội bộ cho cấp quản lý từ phiên admin
 $isManager = isManagerRole($_SESSION['admin_role'] ?? $_SESSION['role'] ?? null);

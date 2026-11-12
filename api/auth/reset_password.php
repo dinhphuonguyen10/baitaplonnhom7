@@ -32,6 +32,7 @@ if ($phone !== '' && !preg_match('/^0[0-9]{9}$/', $phone)) {
 
 // =============================================
 // BƯỚC 1: Xác minh username + SĐT
+// (Chỉ áp dụng cho bảng users — tài khoản khách hàng)
 // =============================================
 if ($action === 'verify') {
     if ($username === '' || $phone === '') {
@@ -39,7 +40,7 @@ if ($action === 'verify') {
     }
 
     $stmt = $conn->prepare(
-        "SELECT id FROM users WHERE username = ? AND phone = ? AND role = 'customer' LIMIT 1"
+        "SELECT id FROM users WHERE username = ? AND phone = ? LIMIT 1"
     );
     if (!$stmt) {
         respond(500, ['status' => 'error', 'message' => 'Lỗi hệ thống.']);
@@ -80,9 +81,9 @@ if ($action === 'reset') {
         respond(400, ['status' => 'error', 'message' => 'Mật khẩu xác nhận không khớp.']);
     }
 
-    // Kiểm tra lại tài khoản trước khi đổi
+    // Kiểm tra lại tài khoản khách hàng trước khi đổi
     $stmt = $conn->prepare(
-        "SELECT id FROM users WHERE username = ? AND phone = ? AND role = 'customer' LIMIT 1"
+        "SELECT id FROM users WHERE username = ? AND phone = ? LIMIT 1"
     );
     if (!$stmt) {
         respond(500, ['status' => 'error', 'message' => 'Lỗi hệ thống.']);

@@ -185,7 +185,7 @@ $reviewSummaryQuery = $conn->prepare(
         COALESCE(SUM(r.rating = 2), 0) AS two_star_count,
         COALESCE(SUM(r.rating = 1), 0) AS one_star_count
      FROM reviews r
-     INNER JOIN users u ON u.id = r.user_id AND u.role = 'customer'
+     INNER JOIN users u ON u.id = r.user_id
      WHERE r.product_id = ?
        AND r.rating BETWEEN 1 AND 5
        AND EXISTS (
@@ -238,7 +238,7 @@ $currentReviewPage = ($requestedReviewPage !== false && $requestedReviewPage !==
 $reviewOffset = ($currentReviewPage - 1) * $reviewPageSize;
 $reviewListSql = "SELECT r.rating, r.comment, r.created_at, u.username
                   FROM reviews r
-                  INNER JOIN users u ON u.id = r.user_id AND u.role = 'customer'
+                  INNER JOIN users u ON u.id = r.user_id
                   WHERE r.product_id = ?
                     AND r.rating BETWEEN 1 AND 5
                     AND EXISTS (
