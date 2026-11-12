@@ -38,13 +38,13 @@ if (!preg_match('/^0[0-9]{9}$/', $phone)) {
     respond(400, ['status' => 'error', 'message' => 'Số điện thoại không hợp lệ (phải đúng 10 số, ví dụ: 0901234567).']);
 }
 if (
-    strlen($password) !== 8 ||
+    strlen($password) < 8 ||
     !preg_match('/[a-z]/', $password) ||
     !preg_match('/[A-Z]/', $password) ||
     !preg_match('/[0-9]/', $password) ||
     !preg_match('/[^a-zA-Z0-9]/', $password)
 ) {
-    respond(400, ['status' => 'error', 'message' => 'Mật khẩu phải đúng 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).']);
+    respond(400, ['status' => 'error', 'message' => 'Mật khẩu phải có tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).']);
 }
 // Kiểm tra SĐT đã được dùng chưa
 $stmt = $conn->prepare("SELECT id FROM users WHERE phone = ? AND role = 'customer' LIMIT 1");
