@@ -63,7 +63,10 @@ $descriptionByCategory = [
             ? $imagePath
             : $appBaseUrl . '/' . ltrim($imagePath, '/');
         $stock = (int) $product['stock'];
-        $description = $descriptionByCategory[$product['category']] ?? 'Một thiết kế được ÉCRIN tuyển chọn để bạn dễ dàng tìm thấy món trang sức phù hợp với phong cách của mình.';
+        $rawDescription = trim((string)($product['description'] ?? ''));
+        $description = $rawDescription !== ''
+            ? $rawDescription
+            : ($descriptionByCategory[$product['category']] ?? 'Một thiết kế được ÉCRIN tuyển chọn để bạn dễ dàng tìm thấy món trang sức phù hợp với phong cách của mình.');
         ?>
         <section class="product-detail-card product-card" data-db-id="<?php echo (int) $product['id']; ?>" aria-labelledby="product-name">
             <!-- CỘT TRÁI: HÌNH ẢNH SẢN PHẨM VUÔNG KHÍT KHUNG -->

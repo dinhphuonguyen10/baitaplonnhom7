@@ -66,3 +66,18 @@ if ($storesTable && $storesTable->num_rows > 0) {
         }
     }
 }
+
+// Tự đồng bộ cột description của bảng products và VIEW view_product_details nếu database chưa cập nhật
+$prodDescCol = $conn->query("SHOW COLUMNS FROM products LIKE 'description'");
+if ($prodDescCol && $prodDescCol->num_rows === 0) {
+    $conn->query("ALTER TABLE products ADD COLUMN description TEXT NULL AFTER category_id");
+    $conn->query("CREATE OR REPLACE VIEW view_product_details AS
+        SELECT
+            p.id, p.name, p.category_id, p.price_sale, p.price_original, p.stock, p.image, p.description,
+            c.name AS category_name, c.slug AS category,
+            COALESCE(SUM(oi.quantity), 0) AS sold_count
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
+        LEFT JOIN order_items oi ON p.id = oi.product_id
+        GROUP BY p.id");
+}

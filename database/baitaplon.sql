@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS products (
     image VARCHAR(500) NOT NULL,
     stock INT UNSIGNED NOT NULL DEFAULT 0,
     category_id INT UNSIGNED NOT NULL,
+    description TEXT NULL,
     PRIMARY KEY (id),
     KEY idx_products_category (category_id),
     CONSTRAINT fk_products_category
@@ -324,6 +325,7 @@ SELECT
     p.image,
     p.stock,
     p.category_id,
+    p.description,
     c.slug AS category,
     c.name AS category_name,
     COALESCE(SUM(oi.quantity), 0) AS sold_count

@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $categoryId  = (int)($_POST['category_id'] ?? 0);
         $price       = (float)($_POST['price'] ?? 0);
         $stock       = max(0, (int)($_POST['stock'] ?? 0));
+        $description = trim($_POST['description'] ?? '');
         $imagePath   = 'assets/banner/logo.png'; // Ảnh mặc định
 
         if ($name === '' || $categoryId <= 0) {
@@ -49,8 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $imagePath = trim($_POST['image_url']);
             }
 
-            $stmt = $conn->prepare("INSERT INTO products (name, category_id, price_sale, stock, image) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sidis", $name, $categoryId, $price, $stock, $imagePath);
+            $stmt = $conn->prepare("INSERT INTO products (name, category_id, price_sale, stock, image, description) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("sidiss", $name, $categoryId, $price, $stock, $imagePath, $description);
             if ($stmt->execute()) {
                 $message = "Đã thêm sản phẩm '{$name}' thành công!";
                 $messageType = 'success';
@@ -69,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $categoryId  = (int)($_POST['category_id'] ?? 0);
         $price       = (float)($_POST['price'] ?? 0);
         $stock       = max(0, (int)($_POST['stock'] ?? 0));
+        $description = trim($_POST['description'] ?? '');
 
         if ($id <= 0 || $name === '' || $categoryId <= 0) {
             $message = 'Dữ liệu chỉnh sửa không hợp lệ!';
@@ -93,11 +95,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($hasNewImage) {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, image = ? WHERE id = ?");
-                $stmt->bind_param("sidisi", $name, $categoryId, $price, $stock, $newImagePath, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, image = ?, description = ? WHERE id = ?");
+                $stmt->bind_param("sidissi", $name, $categoryId, $price, $stock, $newImagePath, $description, $id);
             } else {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ? WHERE id = ?");
-                $stmt->bind_param("sidii", $name, $categoryId, $price, $stock, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, description = ? WHERE id = ?");
+                $stmt->bind_param("sidisi", $name, $categoryId, $price, $stock, $description, $id);
             }
 
             if ($stmt->execute()) {
@@ -195,8 +197,9 @@ if ($prodRes) {
         .form-grid { display: grid; gap: 14px; }
         .form-field { display: grid; gap: 6px; }
         .form-field label { font-weight: 600; font-size: 13px; color: var(--navy); }
-        .form-field input, .form-field select { padding: 9px 12px; border: 1px solid #cbd4df; border-radius: 8px; font: inherit; outline: none; }
-        .form-field input:focus, .form-field select:focus { border-color: var(--navy); }
+        .form-field input, .form-field select, .form-field textarea { padding: 9px 12px; border: 1px solid #cbd4df; border-radius: 8px; font: inherit; outline: none; }
+        .form-field input:focus, .form-field select:focus, .form-field textarea:focus { border-color: var(--navy); }
+        .form-field textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
         .form-field small { color: var(--muted); font-size: 11px; }
 
         /* Khung nhập thêm hàng */
@@ -350,6 +353,11 @@ if ($prodRes) {
                 </div>
 
                 <div class="form-field">
+                    <label>Mô tả chi tiết sản phẩm:</label>
+                    <textarea name="description" rows="3" placeholder="Nhập mô tả sản phẩm, chất liệu đá/bạc, cảm hứng thiết kế..."></textarea>
+                </div>
+
+                <div class="form-field">
                     <label>Số lượng tồn kho ban đầu (*):</label>
                     <input type="number" name="stock" value="10" min="0" required>
                 </div>
@@ -398,6 +406,11 @@ if ($prodRes) {
                     <input type="number" name="price" id="edit-price" min="0" step="1000" required>
                 </div>
 
+                <div class="form-field">
+                    <label>Mô tả chi tiết sản phẩm:</label>
+                    <textarea name="description" id="edit-description" rows="3" placeholder="Nhập mô tả sản phẩm, chất liệu đá/bạc..."></textarea>
+                </div>
+
                 <!-- KHU VỰC QUẢN LÝ SỐ LƯỢNG / NHẬP THÊM HÀNG -->
                 <div class="form-field">
                     <label>Số lượng tồn kho:</label>
@@ -443,11 +456,12 @@ function closeAddModal() {
 let originalStock = 0;
 
 function openEditModal(prod, imgSrc) {
-    document.getElementById('edit-id').value       = prod.id;
-    document.getElementById('edit-name').value     = prod.name;
-    document.getElementById('edit-category').value = prod.category_id;
-    document.getElementById('edit-price').value    = prod.price_sale;
-    document.getElementById('edit-stock').value    = prod.stock;
+    document.getElementById('edit-id').value          = prod.id;
+    document.getElementById('edit-name').value        = prod.name;
+    document.getElementById('edit-category').value    = prod.category_id;
+    document.getElementById('edit-price').value       = prod.price_sale;
+    document.getElementById('edit-stock').value       = prod.stock;
+    document.getElementById('edit-description').value = prod.description || '';
     originalStock = parseInt(prod.stock, 10) || 0;
 
     // Reset ô nhập thêm hàng
