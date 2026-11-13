@@ -17,6 +17,19 @@ $adminCurrentPage = 'chat.php';
     <style>
         .page-content { padding-top:14px; padding-bottom:10px; }
         .welcome-row { margin-bottom:14px; }
+        .chat-workspace,
+        .chat-inbox,
+        .chat-thread,
+        .chat-messages,
+        .chat-bubble,
+        .chat-compose,
+        .chat-compose textarea,
+        .chat-conversation,
+        .chat-conversation-main,
+        .chat-conversation-preview,
+        .chat-thread-empty {
+            font-family:'Roboto', Arial, sans-serif;
+        }
         .chat-workspace { display:grid; grid-template-columns:minmax(245px,315px) minmax(0,1fr); min-height:420px; height:calc(100vh - 200px); max-height:850px; overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); }
         .chat-inbox { display:flex; min-height:0; flex-direction:column; border-right:1px solid var(--line); }
         .chat-inbox-head { padding:20px 18px 14px; }
@@ -25,7 +38,7 @@ $adminCurrentPage = 'chat.php';
         .chat-search { width:100%; height:39px; padding:0 12px; border:1px solid var(--line); border-radius:8px; outline:0; color:var(--text); background:#F8F9FB; }
         .chat-search:focus { border-color:#B99A5C; box-shadow:0 0 0 3px rgba(196,164,90,.12); }
         .chat-conversations { min-height:0; overflow-y:auto; }
-        .chat-conversation { display:flex; width:100%; gap:11px; align-items:center; padding:14px 16px; border:0; border-top:1px solid #F1F3F5; background:#fff; text-align:left; cursor:pointer; }
+        .chat-conversation { display:flex; width:100%; gap:11px; align-items:center; padding:14px 16px; border:0; border-top:1px solid #F1F3F5; background:#fff; text-align:left; cursor:pointer; font-size:14px; line-height:1.5; }
         .chat-conversation:hover { background:#FAF8F3; }
         .chat-conversation.is-active { background:#F6F2E9; box-shadow:inset 3px 0 #C4A45A; }
         .chat-avatar { display:grid; width:42px; height:42px; flex:0 0 42px; place-items:center; border-radius:50%; background:#EAE3D3; color:#5F4D2B; font-weight:700; }
@@ -48,7 +61,7 @@ $adminCurrentPage = 'chat.php';
         .chat-messages { display:flex; min-height:0; flex:1; flex-direction:column; gap:12px; overflow-y:auto; padding:22px; background:#F7F7F5; }
         .chat-thread-empty[hidden],.chat-messages[hidden] { display:none !important; }
         .chat-day { align-self:center; padding:5px 10px; border-radius:20px; background:#ECEBE7; color:#7E8790; font-size:10px; }
-        .chat-bubble { align-self:flex-start; max-width:min(76%,540px); padding:11px 14px 8px; border-radius:14px 14px 14px 4px; background:white; color:#334155; box-shadow:0 2px 9px rgba(16,35,56,.06); overflow-wrap:anywhere; white-space:pre-wrap; }
+        .chat-bubble { align-self:flex-start; max-width:min(76%,540px); padding:11px 14px 8px; border-radius:14px 14px 14px 4px; background:white; color:#334155; box-shadow:0 2px 9px rgba(16,35,56,.06); overflow-wrap:anywhere; white-space:pre-wrap; font-size:14px; line-height:1.6; }
         .chat-bubble.is-admin { align-self:flex-end; border-radius:14px 14px 4px 14px; background:var(--navy); color:#fff; }
         .chat-bubble-time { display:block; margin-top:6px; color:#9CA3AF; font-size:10px; text-align:right; }
         .chat-bubble.is-admin .chat-bubble-time { color:#C5CFDA; }
@@ -58,7 +71,7 @@ $adminCurrentPage = 'chat.php';
         .chat-thread-empty { display:flex; box-sizing:border-box; flex:1; align-items:center; justify-content:center; padding:25px; background:#F7F7F5; color:var(--muted); text-align:center; }
         .chat-compose { padding:9px 14px 10px; border-top:1px solid var(--line); background:white; }
         .chat-compose-entry { display:flex; align-items:center; gap:6px; }
-        .chat-compose-entry textarea { display:block; box-sizing:border-box; width:100%; min-width:0; height:56px; min-height:56px; max-height:110px; flex:1; resize:vertical; padding:18px 12px; border:1px solid var(--line); border-radius:9px; outline:0; font:inherit; line-height:18px; }
+        .chat-compose-entry textarea { display:block; box-sizing:border-box; width:100%; min-width:0; height:56px; min-height:56px; max-height:110px; flex:1; resize:vertical; padding:18px 12px; border:1px solid var(--line); border-radius:9px; outline:0; font:14px 'Roboto', Arial, sans-serif; line-height:18px; }
         .chat-compose textarea:focus { border-color:#B99A5C; box-shadow:0 0 0 3px rgba(196,164,90,.1); }
         .chat-compose-bottom { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:5px; }
         .chat-attach { display:grid; width:36px; height:36px; padding:0; place-items:center; border:0; border-radius:50%; background:transparent; color:#98A2AF; cursor:pointer; }

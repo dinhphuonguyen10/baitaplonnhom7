@@ -107,7 +107,9 @@ if ($method === 'POST') {
         chatJsonResponse(['status' => 'error', 'message' => 'Tin nhắn cần có nội dung và không quá 2.000 ký tự.'], 400);
     }
 
-    $customer = $conn->prepare('SELECT username FROM users WHERE id = ? AND role = \'customer\' LIMIT 1');
+    // Tác dụng: Xác minh khách hàng tồn tại trong users.
+    // users không có cột role, nên không được kiểm tra role = 'customer' ở đây.
+    $customer = $conn->prepare('SELECT username FROM users WHERE id = ? LIMIT 1');
     if (!$customer) {
         chatJsonResponse(['status' => 'error', 'message' => 'Không thể kiểm tra khách hàng.'], 500);
     }
