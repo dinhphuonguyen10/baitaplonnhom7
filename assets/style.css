@@ -2392,49 +2392,70 @@ section, main {
     outline-offset: 3px;
 }
 
+/* ==================== PRODUCT DETAIL PAGE (BOUTIQUE LUXURY) ==================== */
 .product-detail-page {
-    max-width: 1280px;
-    margin: 0 auto 64px;
-    padding: 0 48px;
+    max-width: 1060px;
+    margin: 0 auto 60px;
+    padding: 0 24px;
 }
 
 .product-detail-card {
     display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    grid-template-columns: 440px 1fr;
+    gap: 36px;
     width: 100%;
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: 18px;
     background: var(--white);
-    box-shadow: 0 12px 36px rgba(13, 27, 42, 0.08);
+    border: 1px solid rgba(228, 227, 223, 0.9);
+    box-shadow: 0 8px 32px rgba(13, 27, 42, 0.05);
+    padding: 30px;
+    align-items: center;
 }
 
 .product-detail-card:hover {
     transform: none;
+    box-shadow: 0 8px 32px rgba(13, 27, 42, 0.05);
+    border-color: rgba(228, 227, 223, 0.9);
 }
 
+/* CỘT TRÁI: HÌNH ẢNH VUÔNG KHÍT KHUNG */
 .product-detail-image-wrap {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-radius: 14px;
+    background: #fbf9f5;
+    position: relative;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 18px rgba(13, 27, 42, 0.04);
     display: flex;
-    height: clamp(340px, 40vw, 460px);
     align-items: center;
     justify-content: center;
-    padding: 28px;
-    background: var(--cream-dark);
+    padding: 0;
 }
 
 .product-detail-image {
     display: block;
     width: 100%;
     height: 100%;
-    min-height: 0;
-    object-fit: contain;
+    object-fit: cover;
+    transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.product-detail-image-wrap:hover .product-detail-image {
+    transform: scale(1.05);
+}
+
+/* CỘT PHẢI: THÔNG TIN CHI TIẾT SẢN PHẨM */
 .product-detail-info {
-    padding: clamp(24px, 4vw, 52px);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .product-detail-eyebrow {
-    margin: 0 0 12px;
+    margin: 0 0 8px;
     color: var(--gold);
     font-size: 0.78rem;
     font-weight: 700;
@@ -2444,45 +2465,62 @@ section, main {
 
 .product-detail-info h1,
 .product-detail-not-found h1 {
-    margin: 0 0 18px;
+    margin: 0 0 12px;
     color: var(--navy);
     font-family: 'Playfair Display', serif;
-    font-size: clamp(1.7rem, 3vw, 2.4rem);
+    font-size: clamp(1.6rem, 2.3vw, 2.1rem);
     line-height: 1.25;
+    font-weight: 700;
 }
 
 .product-detail-price {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0 0 14px;
     flex-wrap: wrap;
-    margin: 0 0 20px;
 }
 
 .product-detail-price .price-sale {
-    font-size: 1.55rem;
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.01em;
+}
+
+.product-detail-price .price-original {
+    font-size: 0.95rem;
+    color: var(--text-light);
+    text-decoration: line-through;
 }
 
 .product-detail-description {
-    color: var(--text-mid);
-    font-size: 1rem;
-    line-height: 1.75;
+    color: #556271;
+    font-size: 0.92rem;
+    line-height: 1.65;
+    margin: 0 0 16px;
 }
 
 .product-detail-facts {
     display: grid;
     gap: 0;
-    margin: 24px 0;
+    margin: 0 0 16px;
     border-top: 1px solid var(--border);
 }
 
 .product-detail-facts > div {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 16px;
-    padding: 13px 0;
+    padding: 10px 0;
     border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
 }
 
 .product-detail-facts dt {
     color: var(--text-mid);
+    font-weight: 500;
 }
 
 .product-detail-facts dd {
@@ -2494,62 +2532,134 @@ section, main {
 
 .product-detail-facts .product-detail-stock {
     color: #21844b;
+    font-weight: 600;
 }
 
 .product-detail-facts .product-detail-out-of-stock {
     color: #c0392b;
+    font-weight: 600;
 }
 
 .product-detail-gift {
-    padding: 12px 14px;
-    border: 1px solid rgba(201, 168, 76, 0.3);
-    border-radius: 6px;
-    background: rgba(201, 168, 76, 0.06);
+    padding: 8px 12px;
+    border: 1px solid rgba(196, 164, 90, 0.35);
+    border-radius: 8px;
+    background: rgba(196, 164, 90, 0.08);
     color: var(--gold);
+    font-size: 0.82rem;
+    margin: 0 0 14px;
 }
 
+/* CẶP NÚT HÀNH ĐỘNG SONG SONG */
 .product-detail-actions {
     display: grid;
-    gap: 12px;
-    margin-top: 24px;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 10px;
+    margin: 4px 0 16px;
 }
 
 .product-detail-actions .add-to-cart {
-    min-height: 48px;
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    letter-spacing: 0.06em;
+    border-radius: 8px;
+    margin: 0;
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
+    box-shadow: 0 3px 10px rgba(11, 32, 51, 0.18);
+}
+
+.product-detail-actions .add-to-cart:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--gold) 0%, #b89345 100%);
+    border-color: var(--gold);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(196, 164, 90, 0.35);
+}
+
+/* NÚT CHAT TƯ VẤN SANG TRỌNG */
+.btn-chat-consult {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #faf8f5;
+    color: var(--navy);
+    border: 1.5px solid rgba(196, 164, 90, 0.6);
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+}
+
+.btn-chat-consult:hover {
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(11, 32, 51, 0.2);
+}
+
+.btn-chat-icon {
+    stroke: currentColor;
+    flex-shrink: 0;
+}
+
+/* KHỐI ĐẶC QUYỀN GỌN GÀNG */
+.product-detail-trust-strip {
+    background: #faf8f5;
+    border-radius: 10px;
+    padding: 11px 14px;
+    border: 1px solid rgba(228, 227, 223, 0.85);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.trust-strip-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #475569;
+    line-height: 1.35;
+}
+
+.trust-strip-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: rgba(196, 164, 90, 0.2);
+    color: var(--gold);
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
 }
 
 .product-detail-back {
-    color: var(--navy);
-    font-weight: 600;
+    color: var(--text-mid);
+    font-weight: 500;
+    font-size: 0.85rem;
     text-align: center;
     text-decoration: none;
+    transition: color 0.2s;
+    margin-top: 2px;
 }
 
-.product-detail-back:hover,
-.product-detail-note a:hover {
+.product-detail-back:hover {
     color: var(--gold);
-}
-
-.product-detail-note {
-    margin-top: 28px;
-    padding: 18px;
-    border-radius: 8px;
-    background: var(--cream);
-    color: var(--text-mid);
-    line-height: 1.6;
-}
-
-.product-detail-note strong {
-    color: var(--navy);
-}
-
-.product-detail-note p {
-    margin: 6px 0;
-}
-
-.product-detail-note a {
-    color: var(--navy);
-    font-weight: 600;
 }
 
 .product-detail-not-found {
@@ -2905,8 +3015,8 @@ section, main {
     .footer-container { grid-template-columns: 1fr; }
     .combo-card { width: 180px; }
     .product-card { width: 180px; }
-    .product-detail-card { grid-template-columns: 1fr; width: 100%; }
-    .product-detail-image-wrap { height: clamp(300px, 60vw, 420px); }
+    .product-detail-card { grid-template-columns: 1fr; gap: 28px; padding: 24px 20px; width: 100%; }
+    .product-detail-image-wrap { width: 100%; aspect-ratio: 1 / 1; height: auto; max-width: 440px; margin: 0 auto; }
 }
 
 @media (max-width: 680px) {
@@ -2939,8 +3049,9 @@ section, main {
     .section-title { font-size: 1.6rem; }
     .combo-card, .product-card { width: 165px; }
     .product-detail-page { padding: 0 16px; }
-    .product-detail-card { width: 100%; }
-    .product-detail-image-wrap { height: min(82vw, 340px); padding: 18px; }
+    .product-detail-card { width: 100%; padding: 18px 14px; gap: 20px; }
+    .product-detail-image-wrap { width: 100%; aspect-ratio: 1 / 1; height: auto; padding: 0; }
+    .product-detail-actions { grid-template-columns: 1fr; }
     .pagination-controls { gap: 4px; margin: 24px 0 12px; }
     .pagination-btn { min-width: 34px; height: 34px; font-size: 0.85rem; }
     .pagination-prev, .pagination-next { font-size: 1.1rem; padding: 0 8px; }

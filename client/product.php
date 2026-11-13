@@ -66,6 +66,7 @@ $descriptionByCategory = [
         $description = $descriptionByCategory[$product['category']] ?? 'Một thiết kế được ÉCRIN tuyển chọn để bạn dễ dàng tìm thấy món trang sức phù hợp với phong cách của mình.';
         ?>
         <section class="product-detail-card product-card" data-db-id="<?php echo (int) $product['id']; ?>" aria-labelledby="product-name">
+            <!-- CỘT TRÁI: HÌNH ẢNH SẢN PHẨM VUÔNG KHÍT KHUNG -->
             <div class="product-detail-image-wrap">
                 <img
                     class="product-detail-image product-image"
@@ -74,6 +75,8 @@ $descriptionByCategory = [
                     onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';"
                 >
             </div>
+
+            <!-- CỘT PHẢI: THÔNG TIN CHI TIẾT SẢN PHẨM & MUA HÀNG -->
             <div class="product-detail-info">
                 <p class="product-detail-eyebrow"><?php echo $escape($product['category_name']); ?> · ÉCRIN JEWELRY</p>
                 <h1 id="product-name"><?php echo $escape($product['name']); ?></h1>
@@ -113,20 +116,38 @@ $descriptionByCategory = [
                     <p class="product-detail-gift">🎁 <?php echo $escape($product['gift']); ?></p>
                 <?php endif; ?>
 
+                <!-- CẶP NÚT MUA HÀNG & CHAT TƯ VẤN SANG TRỌNG -->
                 <div class="product-detail-actions">
                     <button class="add-to-cart" <?php echo $stock <= 0 ? 'disabled' : ''; ?>>
-                        <?php echo $stock > 0 ? 'Thêm vào giỏ hàng' : 'Tạm hết hàng'; ?>
+                        <?php echo $stock > 0 ? 'Thêm vào giỏ' : 'Tạm hết hàng'; ?>
                     </button>
-                    <a class="product-detail-back" href="<?php echo $escape($appBaseUrl . '/client/category.php?slug=' . rawurlencode($product['category'])); ?>">
-                        Tiếp tục xem danh mục
+                    <a class="btn-chat-consult" href="<?php echo $escape($appBaseUrl . '/client/chat.php'); ?>" title="Chat trực tiếp với cửa hàng">
+                        <svg class="btn-chat-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"></path>
+                        </svg>
+                        <span>Chat tư vấn</span>
                     </a>
                 </div>
 
-                <div class="product-detail-note">
-                    <strong>ÉCRIN đồng hành cùng bạn</strong>
-                    <p>Liên hệ cửa hàng nếu bạn cần tư vấn thêm về sản phẩm hoặc đơn hàng.</p>
-                    <a href="<?php echo $escape($appBaseUrl . '/client/chat.php'); ?>">Chat với cửa hàng</a>
+                <!-- ĐẶC QUYỀN TIN CẬY NHẸ NHÀNG GỌN GÀNG -->
+                <div class="product-detail-trust-strip">
+                    <div class="trust-strip-item">
+                        <span class="trust-strip-check">✓</span>
+                        <span>Trang sức chuẩn bạc &amp; đá quý cao cấp 100%</span>
+                    </div>
+                    <div class="trust-strip-item">
+                        <span class="trust-strip-check">✓</span>
+                        <span>Bảo hành làm sáng, đánh bóng trọn đời miễn phí</span>
+                    </div>
+                    <div class="trust-strip-item">
+                        <span class="trust-strip-check">✓</span>
+                        <span>Hỗ trợ đổi sản phẩm trong 7 ngày nếu có lỗi</span>
+                    </div>
                 </div>
+
+                <a class="product-detail-back" href="<?php echo $escape($appBaseUrl . '/client/category.php?slug=' . rawurlencode($product['category'])); ?>">
+                    ← Tiếp tục xem danh mục
+                </a>
             </div>
         </section>
         <?php include __DIR__ . '/danhgia.php'; ?>
