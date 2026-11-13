@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../include/admin_guard.php';
+requireManagerRole();
+require_once __DIR__ . '/../config/db.php';
 $appBaseUrl = applicationBaseUrl();
 $escape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 // Tác dụng: Xác thực phiên và cấp quyền quản trị hệ thống cửa hàng
@@ -8,14 +10,57 @@ $roleLabel  = $isManager ? 'Quản lý' : 'Nhân viên';
 $adminUsername = $_SESSION['admin_username'] ?? $_SESSION['username'] ?? '';
 $adminCurrentPage = 'stores.php';
 
-// Dữ liệu cửa hàng (có thể kết nối database sau)
-$stores = [
-    ['id' => 1, 'name' => 'ÉCRIN JEWELRY Cầu Giấy',  'address' => '123 Xuân Thủy, Dịch Vọng, Cầu Giấy, Hà Nội',           'phone' => '024.1234.5678', 'hours' => '08:00 - 22:00', 'status' => 'active'],
-    ['id' => 2, 'name' => 'ÉCRIN JEWELRY Hoàn Kiếm', 'address' => '45 Hàng Đào, Hoàn Kiếm, Hà Nội',                        'phone' => '024.8888.9999', 'hours' => '08:00 - 22:00', 'status' => 'active'],
-    ['id' => 3, 'name' => 'ÉCRIN JEWELRY Quận 1',    'address' => '89 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. HCM',       'phone' => '028.1111.2222', 'hours' => '08:00 - 22:00', 'status' => 'active'],
-    ['id' => 4, 'name' => 'ÉCRIN JEWELRY Quận 10',   'address' => '256 Sư Vạn Hạnh, Phường 12, Quận 10, TP. HCM',          'phone' => '028.4444.5555', 'hours' => '08:00 - 22:00', 'status' => 'active'],
-    ['id' => 5, 'name' => 'ÉCRIN JEWELRY Đà Nẵng',   'address' => '12 Lê Duẩn, Hải Châu, Đà Nẵng',                         'phone' => '0236.777.888',  'hours' => '08:00 - 22:00', 'status' => 'active'],
-];
+$error = '';
+$success = '';
+
+if (empty($_SESSION['stores_csrf'])) {
+    $_SESSION['stores_csrf'] = bin2hex(random_bytes(32));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $token = $_POST['csrf_token'] ?? '';
+    $action = $_POST['action'] ?? '';
+
+    if (!is_string($token) || !hash_equals($_SESSION['stores_csrf'], $token)) {
+        $error = 'Phiên làm việc không hợp lệ. Vui lòng tải lại trang.';
+    } elseif ($action === 'delete') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $stmt = $conn->prepare('DELETE FROM stores WHERE id = ?');
+        $stmt->bind_param('i', $id);
+        $success = $stmt->execute() ? 'Đã xóa cửa hàng thành công.' : 'Không thể xóa cửa hàng.';
+        $stmt->close();
+    } elseif ($action === 'save') {
+        $id = (int) ($_POST['id'] ?? 0);
+        $name = trim((string) ($_POST['name'] ?? ''));
+        $address = trim((string) ($_POST['address'] ?? ''));
+        $phone = trim((string) ($_POST['phone'] ?? ''));
+        $hours = trim((string) ($_POST['hours'] ?? ''));
+        $status = in_array($_POST['status'] ?? '', ['active', 'inactive'], true) ? $_POST['status'] : 'active';
+
+        if ($name === '' || $address === '') {
+            $error = 'Vui lòng nhập tên và địa chỉ cửa hàng.';
+        } elseif ($id > 0) {
+            $stmt = $conn->prepare('UPDATE stores SET name = ?, address = ?, phone = ?, hours = ?, status = ? WHERE id = ?');
+            $stmt->bind_param('sssssi', $name, $address, $phone, $hours, $status, $id);
+            $success = $stmt->execute() ? 'Đã cập nhật cửa hàng thành công.' : 'Không thể cập nhật cửa hàng.';
+            $stmt->close();
+        } else {
+            $stmt = $conn->prepare('INSERT INTO stores (name, address, phone, hours, status) VALUES (?, ?, ?, ?, ?)');
+            $stmt->bind_param('sssss', $name, $address, $phone, $hours, $status);
+            $success = $stmt->execute() ? 'Đã thêm cửa hàng thành công.' : 'Không thể thêm cửa hàng.';
+            $stmt->close();
+        }
+    }
+}
+
+$stores = [];
+$storeResult = $conn->query('SELECT id, name, address, phone, hours, status FROM stores ORDER BY id ASC');
+if ($storeResult) {
+    while ($store = $storeResult->fetch_assoc()) {
+        $stores[] = $store;
+    }
+}
+$firstStore = $stores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'address' => '', 'phone' => '', 'hours' => '', 'status' => 'inactive'];
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -55,13 +100,17 @@ $stores = [
         .mgmt-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
         .mgmt-panel h2 { margin: 0 0 16px; font-size: 1.1rem; color: var(--navy); }
         .mgmt-actions { display: flex; gap: 10px; margin-bottom: 16px; }
-        .mgmt-actions button { padding: 9px 16px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font: 600 13px inherit; cursor: not-allowed; opacity: .7; }
+        .mgmt-actions button { padding: 9px 16px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font: 600 13px inherit; cursor: pointer; }
         .mgmt-table { width: 100%; border-collapse: collapse; }
         .mgmt-table th, .mgmt-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
         .mgmt-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; background: #FAFBFC; }
         .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
         .status-active { background: #EDF6F1; color: #027a48; }
-        .mgmt-table button { padding: 6px 12px; border: 0; border-radius: 6px; background: #d7dce2; color: #657180; font: inherit; cursor: not-allowed; font-size: 12px; }
+        .mgmt-table button { padding: 6px 12px; border: 0; border-radius: 6px; background: #d7dce2; color: #657180; font: inherit; cursor: pointer; font-size: 12px; }
+        .mgmt-form { display: grid; grid-template-columns: 1.2fr 2fr 1fr 1fr .8fr auto; gap: 10px; margin-bottom: 18px; }
+        .mgmt-form input, .mgmt-form select { min-width: 0; padding: 9px 10px; border: 1px solid #d5dbe2; border-radius: 7px; font: inherit; }
+        .mgmt-form button { padding: 9px 14px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font-weight: 700; cursor: pointer; }
+        @media (max-width: 1000px) { .mgmt-form { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 820px) { .store-container-admin { grid-template-columns: 1fr; } .store-sidebar-admin { border-right: 0; border-bottom: 1px solid var(--line); } }
     </style>
 </head>
@@ -119,11 +168,11 @@ $stores = [
                                     loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
                             </div>
                             <div class="store-detail-info" aria-live="polite">
-                                <h2 id="detail-name"><?php echo $escape($stores[0]['name']); ?></h2>
+                                <h2 id="detail-name"><?php echo $escape($firstStore['name']); ?></h2>
                                 <div class="info-grid">
-                                    <div class="info-box"><h3>Địa chỉ</h3><p id="detail-address"><?php echo $escape($stores[0]['address']); ?></p></div>
-                                    <div class="info-box"><h3>Điện thoại</h3><p id="detail-phone"><?php echo $escape($stores[0]['phone']); ?></p></div>
-                                    <div class="info-box"><h3>Giờ mở cửa</h3><p id="detail-hours"><?php echo $escape($stores[0]['hours']); ?></p></div>
+                                    <div class="info-box"><h3>Địa chỉ</h3><p id="detail-address"><?php echo $escape($firstStore['address']); ?></p></div>
+                                    <div class="info-box"><h3>Điện thoại</h3><p id="detail-phone"><?php echo $escape($firstStore['phone']); ?></p></div>
+                                    <div class="info-box"><h3>Giờ mở cửa</h3><p id="detail-hours"><?php echo $escape($firstStore['hours']); ?></p></div>
                                 </div>
                             </div>
                         </div>
@@ -135,9 +184,19 @@ $stores = [
             <div id="tab-manage" hidden>
                 <div class="mgmt-panel">
                     <h2>Danh sách cửa hàng</h2>
-                    <div class="mgmt-actions">
-                        <button type="button" disabled>+ Thêm cửa hàng</button>
-                    </div>
+                    <?php if ($error !== ''): ?><p class="notice error"><?php echo $escape($error); ?></p><?php endif; ?>
+                    <?php if ($success !== ''): ?><p class="notice success"><?php echo $escape($success); ?></p><?php endif; ?>
+                    <form method="post" class="mgmt-form" id="store-form">
+                        <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['stores_csrf']); ?>">
+                        <input type="hidden" name="action" value="save">
+                        <input type="hidden" name="id" id="store-id" value="">
+                        <input type="text" name="name" id="store-name" placeholder="Tên cửa hàng" required>
+                        <input type="text" name="address" id="store-address" placeholder="Địa chỉ" required>
+                        <input type="text" name="phone" id="store-phone" placeholder="Điện thoại">
+                        <input type="text" name="hours" id="store-hours" value="08:00 - 22:00" placeholder="Giờ mở cửa">
+                        <select name="status" id="store-status"><option value="active">Hoạt động</option><option value="inactive">Tạm đóng</option></select>
+                        <button type="submit" id="store-submit">+ Thêm</button>
+                    </form>
                     <div style="overflow-x:auto">
                         <table class="mgmt-table">
                             <thead>
@@ -151,8 +210,16 @@ $stores = [
                                     <td><?php echo $escape($s['address']); ?></td>
                                     <td><?php echo $escape($s['phone']); ?></td>
                                     <td><?php echo $escape($s['hours']); ?></td>
-                                    <td><span class="status-badge status-active">● Hoạt động</span></td>
-                                    <td><button type="button" disabled>Sửa</button> <button type="button" disabled>Xóa</button></td>
+                                    <td><span class="status-badge <?php echo $s['status'] === 'active' ? 'status-active' : ''; ?>"><?php echo $s['status'] === 'active' ? '● Hoạt động' : '● Tạm đóng'; ?></span></td>
+                                    <td>
+                                        <button type="button" class="edit-store" data-id="<?php echo (int)$s['id']; ?>" data-name="<?php echo $escape($s['name']); ?>" data-address="<?php echo $escape($s['address']); ?>" data-phone="<?php echo $escape($s['phone']); ?>" data-hours="<?php echo $escape($s['hours']); ?>" data-status="<?php echo $escape($s['status']); ?>">Sửa</button>
+                                        <form method="post" style="display:inline" onsubmit="return confirm('Bạn có chắc muốn xóa cửa hàng này không?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['stores_csrf']); ?>">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="id" value="<?php echo (int)$s['id']; ?>">
+                                            <button type="submit">Xóa</button>
+                                        </form>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -198,6 +265,23 @@ searchInput.addEventListener('input', () => {
         if (match) count++;
     });
     emptyMsg.style.display = count === 0 ? 'block' : 'none';
+});
+
+document.querySelectorAll('.edit-store').forEach(button => {
+    button.addEventListener('click', () => {
+        document.getElementById('tab-preview').hidden = true;
+        document.getElementById('tab-manage').hidden = false;
+        document.querySelectorAll('.store-tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelector('.store-tab[onclick*="manage"]').classList.add('active');
+        document.getElementById('store-id').value = button.dataset.id;
+        document.getElementById('store-name').value = button.dataset.name;
+        document.getElementById('store-address').value = button.dataset.address;
+        document.getElementById('store-phone').value = button.dataset.phone;
+        document.getElementById('store-hours').value = button.dataset.hours;
+        document.getElementById('store-status').value = button.dataset.status;
+        document.getElementById('store-submit').textContent = 'Lưu thay đổi';
+        document.getElementById('store-name').focus();
+    });
 });
 </script>
 </body>

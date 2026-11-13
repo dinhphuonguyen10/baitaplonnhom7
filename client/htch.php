@@ -1,5 +1,14 @@
 <?php
 $pageTitle = 'Hệ thống cửa hàng - ÉCRIN JEWELRY';
+require_once __DIR__ . '/../config/db.php';
+$clientStores = [];
+$storeResult = $conn->query("SELECT id, name, address, phone, hours FROM stores WHERE status = 'active' ORDER BY id ASC");
+if ($storeResult) {
+    while ($store = $storeResult->fetch_assoc()) {
+        $clientStores[] = $store;
+    }
+}
+$firstClientStore = $clientStores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'address' => '', 'phone' => '', 'hours' => ''];
 include __DIR__ . '/../include/header.php';
 ?>
     <style>
@@ -151,26 +160,12 @@ include __DIR__ . '/../include/header.php';
                 <input type="search" placeholder="Ví dụ: Cầu Giấy" id="store-search">
             </div>
             <div class="store-list" id="store-list">
-                <button class="store-item active" type="button" data-id="1">
-                    <h3>ÉCRIN JEWELRY Cầu Giấy</h3>
-                    <p>123 Xuân Thủy, Dịch Vọng, Cầu Giấy, Hà Nội</p>
+                <?php foreach ($clientStores as $i => $store): ?>
+                <button class="store-item<?php echo $i === 0 ? ' active' : ''; ?>" type="button" data-id="<?php echo (int) $store['id']; ?>">
+                    <h3><?php echo htmlspecialchars($store['name'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <p><?php echo htmlspecialchars($store['address'], ENT_QUOTES, 'UTF-8'); ?></p>
                 </button>
-                <button class="store-item" type="button" data-id="2">
-                    <h3>ÉCRIN JEWELRY Hoàn Kiếm</h3>
-                    <p>45 Hàng Đào, Hoàn Kiếm, Hà Nội</p>
-                </button>
-                <button class="store-item" type="button" data-id="3">
-                    <h3>ÉCRIN JEWELRY Quận 1</h3>
-                    <p>89 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. HCM</p>
-                </button>
-                <button class="store-item" type="button" data-id="4">
-                    <h3>ÉCRIN JEWELRY Quận 10</h3>
-                    <p>256 Sư Vạn Hạnh, Phường 12, Quận 10, TP. HCM</p>
-                </button>
-                <button class="store-item" type="button" data-id="5">
-                    <h3>ÉCRIN JEWELRY Đà Nẵng</h3>
-                    <p>12 Lê Duẩn, Hải Châu, Đà Nẵng</p>
-                </button>
+                <?php endforeach; ?>
                 <p class="store-empty" id="store-empty">Không tìm thấy cửa hàng phù hợp.</p>
             </div>
         </aside>
@@ -182,19 +177,19 @@ include __DIR__ . '/../include/header.php';
                     loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
             </div>
             <div class="store-detail-card" aria-live="polite">
-                <h2 id="detail-name">ÉCRIN JEWELRY Cầu Giấy</h2>
+                <h2 id="detail-name"><?php echo htmlspecialchars($firstClientStore['name'], ENT_QUOTES, 'UTF-8'); ?></h2>
                 <div class="store-info-grid">
                     <div class="info-box">
                         <h3>Địa chỉ</h3>
-                        <p id="detail-address">123 Xuân Thủy, Dịch Vọng, Cầu Giấy, Hà Nội</p>
+                        <p id="detail-address"><?php echo htmlspecialchars($firstClientStore['address'], ENT_QUOTES, 'UTF-8'); ?></p>
                     </div>
                     <div class="info-box">
                         <h3>Điện thoại</h3>
-                        <p id="detail-phone">024.1234.5678</p>
+                        <p id="detail-phone"><?php echo htmlspecialchars($firstClientStore['phone'], ENT_QUOTES, 'UTF-8'); ?></p>
                     </div>
                     <div class="info-box">
                         <h3>Giờ mở cửa</h3>
-                        <p>08:00 - 22:00 (Hàng ngày)</p>
+                        <p id="detail-hours"><?php echo htmlspecialchars($firstClientStore['hours'], ENT_QUOTES, 'UTF-8'); ?></p>
                     </div>
                 </div>
             </div>
@@ -202,13 +197,7 @@ include __DIR__ . '/../include/header.php';
     </main>
 
     <script>
-        const stores = [
-            { id: 1, name: 'ÉCRIN JEWELRY Cầu Giấy', address: '123 Xuân Thủy, Dịch Vọng, Cầu Giấy, Hà Nội', phone: '024.1234.5678' },
-            { id: 2, name: 'ÉCRIN JEWELRY Hoàn Kiếm', address: '45 Hàng Đào, Hoàn Kiếm, Hà Nội', phone: '024.8888.9999' },
-            { id: 3, name: 'ÉCRIN JEWELRY Quận 1', address: '89 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. HCM', phone: '028.1111.2222' },
-            { id: 4, name: 'ÉCRIN JEWELRY Quận 10', address: '256 Sư Vạn Hạnh, Phường 12, Quận 10, TP. HCM', phone: '028.4444.5555' },
-            { id: 5, name: 'ÉCRIN JEWELRY Đà Nẵng', address: '12 Lê Duẩn, Hải Châu, Đà Nẵng', phone: '0236.777.888' }
-        ];
+        const stores = <?php echo json_encode($clientStores, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
         const storeItems = document.querySelectorAll('.store-item');
         const searchInput = document.getElementById('store-search');
@@ -223,6 +212,7 @@ include __DIR__ . '/../include/header.php';
                 document.getElementById('detail-name').textContent = store.name;
                 document.getElementById('detail-address').textContent = store.address;
                 document.getElementById('detail-phone').textContent = store.phone;
+                document.getElementById('detail-hours').textContent = store.hours;
                 document.getElementById('google-map').src =
                     `https://www.google.com/maps?q=${encodeURIComponent(store.address)}&output=embed`;
             });

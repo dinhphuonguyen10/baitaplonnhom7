@@ -209,8 +209,25 @@ CREATE TABLE IF NOT EXISTS stores (
     name VARCHAR(150) NOT NULL,
     address VARCHAR(500) NOT NULL,
     image VARCHAR(500) NULL,
+    phone VARCHAR(30) NOT NULL DEFAULT '',
+    hours VARCHAR(100) NOT NULL DEFAULT '08:00 - 22:00',
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE stores
+    ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS hours VARCHAR(100) NOT NULL DEFAULT '08:00 - 22:00',
+    ADD COLUMN IF NOT EXISTS status ENUM('active', 'inactive') NOT NULL DEFAULT 'active';
+
+INSERT INTO stores (id, name, address, phone, hours, status) VALUES
+    (1, 'ÉCRIN JEWELRY Cầu Giấy', '123 Xuân Thủy, Dịch Vọng, Cầu Giấy, Hà Nội', '024.1234.5678', '08:00 - 22:00', 'active'),
+    (2, 'ÉCRIN JEWELRY Hoàn Kiếm', '45 Hàng Đào, Hoàn Kiếm, Hà Nội', '024.8888.9999', '08:00 - 22:00', 'active'),
+    (3, 'ÉCRIN JEWELRY Quận 1', '89 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. HCM', '028.1111.2222', '08:00 - 22:00', 'active'),
+    (4, 'ÉCRIN JEWELRY Quận 10', '256 Sư Vạn Hạnh, Phường 12, Quận 10, TP. HCM', '028.4444.5555', '08:00 - 22:00', 'active'),
+    (5, 'ÉCRIN JEWELRY Đà Nẵng', '12 Lê Duẩn, Hải Châu, Đà Nẵng', '0236.777.888', '08:00 - 22:00', 'active')
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name), address = VALUES(address), phone = VALUES(phone), hours = VALUES(hours), status = VALUES(status);
 
 INSERT INTO categories (name, slug) VALUES
     ('Combo', 'combo'),
