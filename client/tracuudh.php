@@ -97,7 +97,7 @@ include __DIR__ . '/../include/header.php';
             position: relative;
             z-index: 2;
             text-align: center;
-            width: 25%;
+            width: 16.6667%;
         }
 
         .step-icon {
@@ -278,10 +278,10 @@ include __DIR__ . '/../include/header.php';
                     data.orders.forEach(order => {
                         // Xác định trạng thái của từng bước
                         const status = order.status;
-                        let s1 = 'active', s2 = '', s3 = '', s4 = '';
-                        if (status === 'Đang chuẩn bị' || status === 'Đang giao' || status === 'Đã giao') s2 = 'active';
-                        if (status === 'Đang giao' || status === 'Đã giao') s3 = 'active';
-                        if (status === 'Đã giao') s4 = 'active';
+                        const statusSteps = ['Chờ xác nhận', 'Đã xác nhận', 'Chuẩn bị đơn hàng', 'Đang vận chuyển', 'Đang giao', 'Đã giao hàng'];
+                        const legacyStatusMap = { 'Đang xử lý': 'Đã xác nhận', 'Đang chuẩn bị': 'Chuẩn bị đơn hàng', 'Đã giao': 'Đã giao hàng' };                        const normalizedStatus = legacyStatusMap[status] || status;                        const currentStep = statusSteps.indexOf(normalizedStatus);                        const stepClasses = statusSteps.map((step, index) => index <= currentStep ? 'active' : '');
+
+
 
                         const isCanceled = status === 'Đã hủy';
                         const statusLabelColor = isCanceled ? 'red' : '#c4a45a';
@@ -332,22 +332,22 @@ include __DIR__ . '/../include/header.php';
                             </div>
 
                             <div class="order-status-steps" style="${isCanceled ? 'display: none;' : ''}">
-                                <div class="step ${s1}">
+                                <div class="step ${stepClasses[0]}">
                                     <div class="step-icon">1</div>
-                                    <label>Đã đặt</label>
+                                    <label>Chờ xác nhận</label>
                                 </div>
-                                <div class="step ${s2}">
+                                <div class="step ${stepClasses[1]}">
                                     <div class="step-icon">2</div>
-                                    <label>Chuẩn bị</label>
+                                    <label>Đã xác nhận</label>
                                 </div>
-                                <div class="step ${s3}">
+                                <div class="step ${stepClasses[2]}">
                                     <div class="step-icon">3</div>
-                                    <label>Đang giao</label>
+                                    <label>Chuẩn bị đơn hàng</label>
                                 </div>
-                                <div class="step ${s4}">
+                                <div class="step ${stepClasses[3]}">
                                     <div class="step-icon">4</div>
-                                    <label>Thành công</label>
-                                </div>
+                                    <label>Đang vận chuyển</label>
+                                </div>                                <div class="step ${stepClasses[4]}">                                    <div class="step-icon">5</div>                                    <label>Đang giao</label>                                </div>                                <div class="step ${stepClasses[5]}">                                    <div class="step-icon">6</div>                                    <label>Đã giao hàng</label>                                </div>
                             </div>
 
                             <div class="order-total-bar" style="margin-top: 20px; display:flex; gap:10px; justify-content:space-between; align-items:center;">

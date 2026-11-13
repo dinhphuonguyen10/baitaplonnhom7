@@ -39,7 +39,7 @@ try {
              INNER JOIN order_items oi ON oi.order_id = o.id
              WHERE o.user_id = r.user_id
                AND oi.product_id = r.product_id
-               AND o.status = 'Đã giao'
+               AND o.status IN ('Đã giao hàng', 'Đã giao')
          )
          GROUP BY r.product_id"
     );

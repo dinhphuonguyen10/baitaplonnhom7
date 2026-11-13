@@ -8,6 +8,36 @@ $isManager  = isManagerRole($_SESSION['admin_role'] ?? $_SESSION['role'] ?? null
 $roleLabel  = $isManager ? 'Quản lý' : 'Nhân viên';
 $adminUsername = $_SESSION['admin_username'] ?? $_SESSION['username'] ?? '';
 $adminCurrentPage = 'orders.php';
+$orderStatuses = ['Chờ xác nhận', 'Đã xác nhận', 'Chuẩn bị đơn hàng', 'Đang vận chuyển', 'Đang giao', 'Đã giao hàng', 'Đã hủy'];
+$legacyStatusMap = [
+    'Đang xử lý' => 'Đã xác nhận',
+    'Đang chuẩn bị' => 'Chuẩn bị đơn hàng',
+    'Đang giao' => 'Đang giao',
+    'Đã giao' => 'Đã giao hàng',
+];
+$orderNotice = '';
+
+if (empty($_SESSION['orders_csrf'])) {
+    $_SESSION['orders_csrf'] = bin2hex(random_bytes(32));
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_status') {
+    $token = $_POST['csrf_token'] ?? '';
+    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $newStatus = trim((string) ($_POST['status'] ?? ''));
+    if (!is_string($token) || !hash_equals($_SESSION['orders_csrf'], $token)) {
+        $orderNotice = 'Phiên làm việc không hợp lệ. Vui lòng tải lại trang.';
+    } elseif ($orderId < 1 || !in_array($newStatus, $orderStatuses, true)) {
+        $orderNotice = 'Trạng thái đơn hàng không hợp lệ.';
+    } else {
+        $updateStatusStmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+        $updateStatusStmt->bind_param('si', $newStatus, $orderId);
+        $orderNotice = $updateStatusStmt->execute()
+            ? 'Đã cập nhật trạng thái đơn hàng.'
+            : 'Không thể cập nhật trạng thái đơn hàng.';
+        $updateStatusStmt->close();
+    }
+}
 
 $orders = [];
 $ordersError = '';
@@ -56,8 +86,13 @@ if (!$emailColumn) {
 }
 $statusClasses = [
     'Chờ xác nhận' => 'status-pending',
-    'Đang xử lý' => 'status-pending',
+    'Đã xác nhận' => 'status-confirmed',
+    'Chuẩn bị đơn hàng' => 'status-preparing',
+    'Đang vận chuyển' => 'status-shipping',
     'Đang giao' => 'status-shipping',
+    'Đã giao hàng' => 'status-completed',
+    'Đang xử lý' => 'status-confirmed',
+    'Đang chuẩn bị' => 'status-preparing',
     'Đã giao' => 'status-completed',
     'Đã hủy' => 'status-cancelled',
 ];
@@ -82,9 +117,15 @@ $statusClasses = [
 
         .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .status-pending   { background: #fef0c7; color: #b54708; }
+        .status-confirmed { background: #e0e7ff; color: #3730a3; }
+        .status-preparing { background: #f3e8ff; color: #7e22ce; }
         .status-shipping  { background: #e0f2fe; color: #026aa2; }
         .status-completed { background: #ecfdf3; color: #027a48; }
         .status-cancelled { background: #fee4e2; color: #b42318; }
+        .status-update-form { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+        .status-update-form select { min-width: 150px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 12px; }
+        .status-update-form button { padding: 6px 9px; border: 0; border-radius: 6px; background: var(--navy); color: #fff; font-size: 12px; cursor: pointer; }
+        .status-update-form button:hover { background: #234d70; }
         .order-details { margin: 0; }
         .order-details summary { color: var(--navy); font-weight: 600; cursor: pointer; }
         .order-details-content { min-width: 290px; padding: 12px 0 4px; color: var(--text); white-space: normal; }
@@ -113,14 +154,12 @@ $statusClasses = [
                 </div>
             </div>
             <section class="proto-panel" aria-labelledby="orders-title">
+                <?php if ($orderNotice !== ''): ?><p class="notice success" role="status"><?php echo $escape($orderNotice); ?></p><?php endif; ?>
                 <div class="proto-actions">
                     <input type="search" id="orders-search" placeholder="Tìm mã đơn, tên, số điện thoại...">
                     <select id="orders-status-filter">
                         <option>Tất cả trạng thái</option>
-                        <option>Chờ xác nhận</option>
-                        <option>Đang giao</option>
-                        <option>Đã giao</option>
-                        <option>Đã hủy</option>
+                        <?php foreach ($orderStatuses as $statusOption): ?><option><?php echo $escape($statusOption); ?></option><?php endforeach; ?>
                     </select>
                 </div>
                 <div class="proto-table-wrap">
@@ -150,7 +189,7 @@ $statusClasses = [
                             ?>
                             <tr data-order-id="<?php echo $escape($o['id']); ?>"
                                 data-search="<?php echo $escape($searchText); ?>"
-                                data-status="<?php echo $escape($o['status']); ?>">
+                                data-status="<?php echo $escape($legacyStatusMap[$o['status']] ?? $o['status']); ?>">
                                 <td><strong>#<?php echo $escape($o['id']); ?></strong></td>
                                 <td><?php echo $escape($o['customer']); ?></td>
                                 <td><?php echo $escape($o['phone']); ?></td>
@@ -158,8 +197,19 @@ $statusClasses = [
                                 <td style="color: var(--muted); font-size: 13px;"><?php echo $date ? $escape(date('d/m/Y H:i', $date)) : '—'; ?></td>
                                 <td>
                                     <span class="status-badge <?php echo $statusClass; ?>">
-                                        <?php echo $escape($o['status']); ?>
+                                        <?php echo $escape($legacyStatusMap[$o['status']] ?? $o['status']); ?>
                                     </span>
+                                    <form method="post" class="status-update-form">
+                                        <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['orders_csrf']); ?>">
+                                        <input type="hidden" name="action" value="update_status">
+                                        <input type="hidden" name="order_id" value="<?php echo (int) $o['id']; ?>">
+                                        <select name="status" aria-label="Cập nhật trạng thái đơn #<?php echo (int) $o['id']; ?>">
+                                            <?php foreach ($orderStatuses as $statusOption): ?>
+                                                <option value="<?php echo $escape($statusOption); ?>" <?php echo ($legacyStatusMap[$o['status']] ?? $o['status']) === $statusOption ? 'selected' : ''; ?>><?php echo $escape($statusOption); ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button type="submit">Lưu</button>
+                                    </form>
                                 </td>
                                 <td>
                                     <details class="order-details">
