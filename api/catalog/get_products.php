@@ -31,7 +31,7 @@ try {
     $ratingResult = $conn->query(
         "SELECT r.product_id, AVG(r.rating) AS average_rating, COUNT(*) AS review_count
          FROM reviews r
-         INNER JOIN users u ON u.id = r.user_id AND u.role = 'customer'
+         INNER JOIN users u ON u.id = r.user_id
          WHERE r.rating BETWEEN 1 AND 5
            AND EXISTS (
              SELECT 1

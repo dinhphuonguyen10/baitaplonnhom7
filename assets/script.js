@@ -1513,9 +1513,17 @@ function initStickyHeader() {
             spacer.className = 'sticky-header-spacer';
             wrapper.parentNode.insertBefore(spacer, wrapper.nextSibling);
             const updateSpacer = () => {
-                spacer.style.height = `${wrapper.offsetHeight}px`;
+                window.requestAnimationFrame(() => {
+                    spacer.style.height = `${wrapper.getBoundingClientRect().height}px`;
+                });
             };
             updateSpacer();
+            if ('ResizeObserver' in window) {
+                new ResizeObserver(updateSpacer).observe(wrapper);
+            }
+            wrapper.querySelectorAll('img').forEach(image => {
+                image.addEventListener('load', updateSpacer, { once: true });
+            });
             window.addEventListener('resize', updateSpacer);
         }
     }
