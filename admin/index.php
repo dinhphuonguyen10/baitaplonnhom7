@@ -32,11 +32,6 @@ if ($orderStatsResult) {
         .dash-card span { display: block; color: var(--muted); font-size: 13px; }
         .dash-card strong { display: block; margin-top: 12px; color: var(--navy); font-size: 1.5rem; }
         .dash-card small { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
-        .quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; }
-        .quick-link { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #fff; transition: .2s; }
-        .quick-link:hover { border-color: #B09060; background: #FBF8F3; }
-        .quick-link strong { display: block; margin-bottom: 7px; color: var(--navy); }
-        .quick-link span { color: var(--muted); line-height: 1.5; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -67,14 +62,6 @@ if ($orderStatsResult) {
                 <article class="dash-card"><span>Sản phẩm</span><strong>—</strong></article>
                 <article class="dash-card"><span>Khách hàng</span><strong>—</strong></article>
             </section>
-            <h2>Các khu vực quản lý</h2>
-            <div class="quick-links">
-                <a class="quick-link" href="<?php echo $escape($appBaseUrl . '/admin/products.php'); ?>"><strong>Quản lý sản phẩm</strong><span>Xem danh sách và thêm mới sản phẩm.</span></a>
-                <a class="quick-link" href="<?php echo $escape($appBaseUrl . '/admin/orders.php'); ?>"><strong>Quản lý đơn hàng</strong><span>Theo dõi và xử lý đơn hàng của khách.</span></a>
-                <a class="quick-link" href="<?php echo $escape($appBaseUrl . '/admin/chat.php'); ?>"><strong>Chat khách hàng</strong><span>Xem và trả lời hội thoại khách hàng.</span></a>
-                <a class="quick-link" href="<?php echo $escape($appBaseUrl . '/admin/stores.php'); ?>"><strong>Cửa hàng</strong><span>Xem bản đồ và quản lý hệ thống cửa hàng.</span></a>
-                <a class="quick-link" href="<?php echo $escape($appBaseUrl . '/admin/payments.php'); ?>"><strong>Thanh toán</strong><span>Tra cứu và quản lý giao dịch thanh toán.</span></a>
-            </div>
         </section>
     </main>
 </div>

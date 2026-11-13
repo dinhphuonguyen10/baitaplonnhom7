@@ -25,6 +25,7 @@ $sideMenu = [
     ['icon' => '▣', 'label' => 'Quản lý thanh toán',           'href' => '/admin/payments.php',  'file' => 'payments.php'],
     ['icon' => '▥', 'label' => 'Báo cáo và thống kê',          'href' => '/admin/reports.php',   'file' => 'reports.php', 'manager_only' => true],
     ['icon' => '⌖', 'label' => 'Cửa hàng',                     'href' => '/admin/stores.php',    'file' => 'stores.php'],
+    ['icon' => '⌂', 'label' => 'Về cửa hàng chính',           'href' => '/index.php',           'file' => 'storefront-home'],
 ];
 ?>
 <aside class="sidebar" id="sidebar">
