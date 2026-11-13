@@ -2731,6 +2731,7 @@ section, main {
     .category-layout { flex-direction: column; }
     .filter-sidebar { width: 100%; }
     .category-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
     .footer-container { grid-template-columns: 1fr; }
     .combo-card { width: 180px; }
     .product-card { width: 180px; }
@@ -2739,7 +2740,7 @@ section, main {
 }
 
 @media (max-width: 680px) {
-    .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .category-grid { gap: 14px; }
     .announcement-bar {
         flex-wrap: wrap;
         gap: 4px 10px;

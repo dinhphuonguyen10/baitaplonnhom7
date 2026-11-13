@@ -848,69 +848,212 @@ function normalizeVietnamese(str) {
         .trim();
 }
 
-// Global function to render database products in a dynamic grid
-function renderDbProducts(dbProducts, container) {
-    container.innerHTML = '';
-    if (!dbProducts || dbProducts.length === 0) {
-        container.innerHTML = '<p class="empty-cart" style="grid-column: 1/-1; text-align: center; padding: 40px; font-size: 1.1rem; color: #7a7a7a;">Không có sản phẩm nào được tìm thấy! 😢</p>';
+// ==================== PAGINATION SYSTEM ====================
+const PRODUCTS_PER_PAGE = 9; // 3 cột × 3 dòng
+let _paginationCurrentPage = 1;
+let _paginationAllProducts = []; // Lưu toàn bộ sản phẩm đã fetch (dùng cho phân trang)
+
+function buildProductCardHTML(product) {
+    const badgeHTML = product.discount ? `<div class="product-badge">${product.discount}</div>` : '';
+    const giftHTML = (product.gift && product.gift.trim() !== '') ? `<p class="product-gift" style="font-size: 0.8rem; color: var(--gold); margin: 5px 0;">🎁 ${product.gift}</p>` : '';
+
+    const priceSaleFormatted = formatDbPrice(product.price_sale);
+    const priceOriginalHTML = product.price_original && parsePrice(product.price_original) > 0
+        ? `<span class="price-original" style="text-decoration: line-through; color: #999; margin-left: 10px; font-size: 0.9rem;">${formatDbPrice(product.price_original)}<sup>đ</sup></span>`
+        : '';
+
+    const stock = parseInt(product.stock, 10) || 0;
+    const soldCount = parseInt(product.sold_count, 10) || 0;
+
+    const stockHTML = stock > 0
+        ? `<span class="product-stock" style="font-size: 0.85rem; color: #27ae60;">Kho: <strong>${stock}</strong></span>`
+        : `<span class="product-stock" style="font-size: 0.85rem; color: #e74c3c; font-weight: 600;">Hết hàng</span>`;
+
+    const soldHTML = soldCount > 0
+        ? `<span class="sold" style="font-size: 0.85rem; color: #e67e22; font-weight: 500;">Đã bán ${soldCount}</span>`
+        : '';
+
+    const metaHTML = `
+        <div class="product-meta" style="display: flex; justify-content: space-between; align-items: center; margin: 6px 0 8px;">
+            ${stockHTML}
+            ${soldHTML}
+        </div>
+    `;
+
+    const priceSaleRaw = (typeof product.price_sale_raw !== 'undefined') ? product.price_sale_raw : parsePrice(product.price_sale);
+    const hasDiscount = Boolean((product.discount && product.discount.trim() !== '') || (product.price_original_raw > product.price_sale_raw));
+    const hasGift = Boolean(product.gift && product.gift.trim() !== '');
+
+    return `
+        <div class="product-card" data-category="${product.category || ''}" data-db-id="${product.id}" data-price="${priceSaleRaw}" data-stock="${stock}" data-discount="${hasDiscount ? '1' : '0'}" data-gift="${hasGift ? '1' : '0'}" data-sold="${soldCount}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id)}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
+            ${badgeHTML}
+            <button class="wishlist-btn" title="Yêu thích">♡</button>
+            <img src="${getProductImageUrl(product.image)}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
+            <div class="product-info">
+                <h3>${product.name}</h3>
+                <div class="product-price">
+                    <span class="price-sale">${priceSaleFormatted}<sup>đ</sup></span>
+                    ${priceOriginalHTML}
+                </div>
+                ${renderProductRating(product)}
+                ${metaHTML}
+                ${giftHTML}
+                <button class="add-to-cart"${stock <= 0 ? ' disabled style="background:#bbb;cursor:not-allowed;"' : ''}>${stock <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</button>
+            </div>
+        </div>
+    `;
+}
+
+// Tạo hoặc lấy container phân trang
+function getOrCreatePaginationContainer() {
+    let paginationEl = document.getElementById('pagination-controls');
+    if (!paginationEl) {
+        paginationEl = document.createElement('div');
+        paginationEl.id = 'pagination-controls';
+        paginationEl.className = 'pagination-controls';
+        // Chèn sau product-grid, trước filter-empty-state
+        const gridContainer = document.getElementById('category-products-container');
+        if (gridContainer && gridContainer.parentNode) {
+            const emptyState = document.getElementById('filter-empty-state');
+            if (emptyState) {
+                gridContainer.parentNode.insertBefore(paginationEl, emptyState);
+            } else {
+                gridContainer.parentNode.appendChild(paginationEl);
+            }
+        }
+    }
+    return paginationEl;
+}
+
+// Render phân trang UI
+function renderPaginationUI(totalItems, currentPage, onPageChange) {
+    const paginationEl = getOrCreatePaginationContainer();
+    const totalPages = Math.ceil(totalItems / PRODUCTS_PER_PAGE);
+
+    if (totalPages <= 1) {
+        paginationEl.style.display = 'none';
         return;
     }
 
-    dbProducts.forEach(product => {
-        const badgeHTML = product.discount ? `<div class="product-badge">${product.discount}</div>` : '';
-        const giftHTML = (product.gift && product.gift.trim() !== '') ? `<p class="product-gift" style="font-size: 0.8rem; color: var(--gold); margin: 5px 0;">🎁 ${product.gift}</p>` : '';
+    paginationEl.style.display = 'flex';
+    paginationEl.innerHTML = '';
 
-        const priceSaleFormatted = formatDbPrice(product.price_sale);
-        const priceOriginalHTML = product.price_original && parsePrice(product.price_original) > 0
-            ? `<span class="price-original" style="text-decoration: line-through; color: #999; margin-left: 10px; font-size: 0.9rem;">${formatDbPrice(product.price_original)}<sup>đ</sup></span>`
-            : '';
+    // Nút Trước
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pagination-btn pagination-prev' + (currentPage <= 1 ? ' disabled' : '');
+    prevBtn.innerHTML = '‹';
+    prevBtn.title = 'Trang trước';
+    prevBtn.disabled = currentPage <= 1;
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) onPageChange(currentPage - 1);
+    });
+    paginationEl.appendChild(prevBtn);
 
-        const stock = parseInt(product.stock, 10) || 0;
-        const soldCount = parseInt(product.sold_count, 10) || 0;
+    // Tính toán dải số trang hiển thị
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    if (endPage - startPage + 1 < maxVisible) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
 
-        const stockHTML = stock > 0
-            ? `<span class="product-stock" style="font-size: 0.85rem; color: #27ae60;">Kho: <strong>${stock}</strong></span>`
-            : `<span class="product-stock" style="font-size: 0.85rem; color: #e74c3c; font-weight: 600;">Hết hàng</span>`;
+    // Trang đầu + dấu ...
+    if (startPage > 1) {
+        paginationEl.appendChild(createPageBtn(1, currentPage, onPageChange));
+        if (startPage > 2) {
+            const dots = document.createElement('span');
+            dots.className = 'pagination-dots';
+            dots.textContent = '...';
+            paginationEl.appendChild(dots);
+        }
+    }
 
-        // Chỉ hiển thị lượt bán khi có đơn hàng (sold_count > 0)
-        const soldHTML = soldCount > 0
-            ? `<span class="sold" style="font-size: 0.85rem; color: #e67e22; font-weight: 500;">Đã bán ${soldCount}</span>`
-            : '';
+    // Các nút trang
+    for (let i = startPage; i <= endPage; i++) {
+        paginationEl.appendChild(createPageBtn(i, currentPage, onPageChange));
+    }
 
-        const metaHTML = `
-            <div class="product-meta" style="display: flex; justify-content: space-between; align-items: center; margin: 6px 0 8px;">
-                ${stockHTML}
-                ${soldHTML}
-            </div>
-        `;
+    // Dấu ... + trang cuối
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const dots = document.createElement('span');
+            dots.className = 'pagination-dots';
+            dots.textContent = '...';
+            paginationEl.appendChild(dots);
+        }
+        paginationEl.appendChild(createPageBtn(totalPages, currentPage, onPageChange));
+    }
 
-        // Dữ liệu phục vụ bộ lọc & sắp xếp chuẩn xác
-        const priceSaleRaw = (typeof product.price_sale_raw !== 'undefined') ? product.price_sale_raw : parsePrice(product.price_sale);
-        const hasDiscount = Boolean((product.discount && product.discount.trim() !== '') || (product.price_original_raw > product.price_sale_raw));
-        const hasGift = Boolean(product.gift && product.gift.trim() !== '');
+    // Nút Sau
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pagination-btn pagination-next' + (currentPage >= totalPages ? ' disabled' : '');
+    nextBtn.innerHTML = '›';
+    nextBtn.title = 'Trang sau';
+    nextBtn.disabled = currentPage >= totalPages;
+    nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) onPageChange(currentPage + 1);
+    });
+    paginationEl.appendChild(nextBtn);
+}
 
-        const itemHTML = `
-            <div class="product-card" data-category="${product.category || ''}" data-db-id="${product.id}" data-price="${priceSaleRaw}" data-stock="${stock}" data-discount="${hasDiscount ? '1' : '0'}" data-gift="${hasGift ? '1' : '0'}" data-sold="${soldCount}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id)}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
-                ${badgeHTML}
-                <button class="wishlist-btn" title="Yêu thích">♡</button>
-                <img src="${getProductImageUrl(product.image)}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
-                <div class="product-info">
-                    <h3>${product.name}</h3>
-                    <div class="product-price">
-                        <span class="price-sale">${priceSaleFormatted}<sup>đ</sup></span>
-                        ${priceOriginalHTML}
-                    </div>
-                    ${renderProductRating(product)}
-                    ${metaHTML}
-                    ${giftHTML}
-                    <button class="add-to-cart"${stock <= 0 ? ' disabled style="background:#bbb;cursor:not-allowed;"' : ''}>${stock <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</button>
-                </div>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', itemHTML);
+function createPageBtn(pageNum, currentPage, onPageChange) {
+    const btn = document.createElement('button');
+    btn.className = 'pagination-btn pagination-page' + (pageNum === currentPage ? ' active' : '');
+    btn.textContent = pageNum;
+    btn.addEventListener('click', () => {
+        if (pageNum !== currentPage) onPageChange(pageNum);
+    });
+    return btn;
+}
+
+// Hàm chuyển trang
+function goToPage(page) {
+    _paginationCurrentPage = page;
+    const container = document.getElementById('category-products-container');
+    if (!container) return;
+
+    renderDbProducts(_paginationAllProducts, container, page);
+    applyUserRole();
+
+    // Cuộn lên đầu lưới sản phẩm
+    const categoryMain = document.querySelector('.category-main');
+    if (categoryMain) {
+        categoryMain.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// Global function to render database products in a dynamic grid (with pagination)
+function renderDbProducts(dbProducts, container, page) {
+    container.innerHTML = '';
+    const paginationEl = document.getElementById('pagination-controls');
+
+    if (!dbProducts || dbProducts.length === 0) {
+        container.innerHTML = '<p class="empty-cart" style="grid-column: 1/-1; text-align: center; padding: 40px; font-size: 1.1rem; color: #7a7a7a;">Không có sản phẩm nào được tìm thấy! 😢</p>';
+        if (paginationEl) paginationEl.style.display = 'none';
+        return;
+    }
+
+    // Lưu toàn bộ sản phẩm vào biến global
+    _paginationAllProducts = dbProducts;
+
+    // Xác định trang hiện tại
+    const currentPage = page || 1;
+    _paginationCurrentPage = currentPage;
+    const totalPages = Math.ceil(dbProducts.length / PRODUCTS_PER_PAGE);
+
+    // Cắt mảng sản phẩm theo trang
+    const startIdx = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    const endIdx = startIdx + PRODUCTS_PER_PAGE;
+    const pageProducts = dbProducts.slice(startIdx, endIdx);
+
+    pageProducts.forEach(product => {
+        container.insertAdjacentHTML('beforeend', buildProductCardHTML(product));
     });
 
-    // Danh mục hiển thị đầy đủ sản phẩm đã tải.
+    // Render phân trang
+    renderPaginationUI(dbProducts.length, currentPage, goToPage);
+
+    // Danh mục hiển thị sản phẩm theo trang.
     const loadMoreContainer = document.querySelector('.load-more-container');
     if (loadMoreContainer) loadMoreContainer.style.display = 'none';
 }
