@@ -21,6 +21,11 @@ include __DIR__ . '/../include/header.php';
             gap: 30px;
         }
 
+        .store-breadcrumb {
+            grid-column: 1 / -1;
+            margin: -18px 0 0;
+        }
+
         .store-sidebar,
         .store-map-area {
             background: #fff;
@@ -191,6 +196,11 @@ include __DIR__ . '/../include/header.php';
         }
     </style>
     <main class="store-container">
+        <nav class="breadcrumb-container store-breadcrumb" aria-label="Điều hướng đường dẫn">
+            <a href="<?php echo htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>">Trang chủ</a>
+            <span class="separator">&gt;</span>
+            <strong class="current" aria-current="page">Hệ thống cửa hàng</strong>
+        </nav>
         <aside class="store-sidebar">
             <h1>Tìm cửa hàng</h1>
             <div class="search-store">
