@@ -111,9 +111,16 @@ $statusClasses = [
         .proto-actions button, .proto-panel button { padding: 9px 14px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
         .proto-panel input, .proto-panel select { padding: 9px; border: 1px solid #d5dbe2; border-radius: 7px; font: inherit; }
         .proto-table-wrap { overflow-x: auto; }
-        .proto-table { width: 100%; border-collapse: collapse; }
-        .proto-table th, .proto-table td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
-        .proto-table th { color: var(--muted); font-size: .85rem; }
+        .proto-table { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: collapse; }
+        .proto-table th, .proto-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; font-weight: 600; }
+        .proto-table th { color: var(--muted); font-size: .85rem; font-weight: 800; }
+        .proto-table th:nth-child(1), .proto-table td:nth-child(1) { width: 9%; }
+        .proto-table th:nth-child(2), .proto-table td:nth-child(2) { width: 13%; }
+        .proto-table th:nth-child(3), .proto-table td:nth-child(3) { width: 15%; }
+        .proto-table th:nth-child(4), .proto-table td:nth-child(4) { width: 13%; }
+        .proto-table th:nth-child(5), .proto-table td:nth-child(5) { width: 14%; }
+        .proto-table th:nth-child(6), .proto-table td:nth-child(6) { width: 24%; }
+        .proto-table th:nth-child(7), .proto-table td:nth-child(7) { width: 12%; }
 
         .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .status-pending   { background: #fef0c7; color: #b54708; }
@@ -122,7 +129,8 @@ $statusClasses = [
         .status-shipping  { background: #e0f2fe; color: #026aa2; }
         .status-completed { background: #ecfdf3; color: #027a48; }
         .status-cancelled { background: #fee4e2; color: #b42318; }
-        .status-update-form { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+        .status-cell { white-space: nowrap; min-width: 390px; }
+        .status-update-form { display: inline-flex; vertical-align: middle; align-items: center; gap: 6px; margin: 0 0 0 8px; }
         .status-update-form select { min-width: 150px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 12px; }
         .status-update-form button { padding: 6px 9px; border: 0; border-radius: 6px; background: var(--navy); color: #fff; font-size: 12px; cursor: pointer; }
         .status-update-form button:hover { background: #234d70; }
@@ -183,7 +191,6 @@ $statusClasses = [
                         <?php else: ?>
                         <?php foreach ($orders as $o): ?>
                             <?php
-                            $statusClass = $statusClasses[$o['status']] ?? 'status-pending';
                             $date = strtotime($o['date']);
                             $searchText = strtolower($o['customer'] . ' ' . $o['phone'] . ' ' . $o['id']);
                             ?>
@@ -195,10 +202,7 @@ $statusClasses = [
                                 <td><?php echo $escape($o['phone']); ?></td>
                                 <td><strong><?php echo $escape(number_format($o['total'], 0, ',', '.')); ?>đ</strong></td>
                                 <td style="color: var(--muted); font-size: 13px;"><?php echo $date ? $escape(date('d/m/Y H:i', $date)) : '—'; ?></td>
-                                <td>
-                                    <span class="status-badge <?php echo $statusClass; ?>">
-                                        <?php echo $escape($legacyStatusMap[$o['status']] ?? $o['status']); ?>
-                                    </span>
+                                <td class="status-cell">
                                     <form method="post" class="status-update-form">
                                         <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['orders_csrf']); ?>">
                                         <input type="hidden" name="action" value="update_status">
