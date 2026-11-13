@@ -69,13 +69,13 @@ if ($action === 'reset') {
         respond(400, ['status' => 'error', 'message' => 'Thiếu thông tin tài khoản.']);
     }
     if (
-        strlen($newPassword) !== 8 ||
+        strlen($newPassword) < 8 ||
         !preg_match('/[a-z]/', $newPassword) ||
         !preg_match('/[A-Z]/', $newPassword) ||
         !preg_match('/[0-9]/', $newPassword) ||
         !preg_match('/[^a-zA-Z0-9]/', $newPassword)
     ) {
-        respond(400, ['status' => 'error', 'message' => 'Mật khẩu mới phải đúng 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).']);
+        respond(400, ['status' => 'error', 'message' => 'Mật khẩu mới phải có tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).']);
     }
     if ($newPassword !== $confirmPassword) {
         respond(400, ['status' => 'error', 'message' => 'Mật khẩu xác nhận không khớp.']);

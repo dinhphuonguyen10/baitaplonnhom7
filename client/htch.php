@@ -2,7 +2,7 @@
 $pageTitle = 'Hệ thống cửa hàng - ÉCRIN JEWELRY';
 require_once __DIR__ . '/../config/db.php';
 $clientStores = [];
-$storeResult = $conn->query("SELECT id, name, address, phone, hours FROM stores WHERE status = 'active' ORDER BY id ASC");
+$storeResult = $conn->query("SELECT id, name, address, phone, hours FROM stores WHERE status = 'active' ORDER BY id DESC");
 if ($storeResult) {
     while ($store = $storeResult->fetch_assoc()) {
         $clientStores[] = $store;

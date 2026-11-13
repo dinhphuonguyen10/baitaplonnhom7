@@ -228,11 +228,11 @@ $homeUrl    = htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8');
 
     <!-- FORM BƯỚC 2: Đặt mật khẩu mới (ẩn ban đầu) -->
     <form id="form-reset" hidden>
-        <label for="new-password">Mật khẩu mới (đúng 8 ký tự: hoa, thường, số, ký tự đặc biệt)</label>
-        <input id="new-password" type="password" name="password" placeholder="Ví dụ: Abc@1234 (đúng 8 ký tự)" autocomplete="new-password" minlength="8" maxlength="8" required>
+        <label for="new-password">Mật khẩu mới (tối thiểu 8 ký tự: hoa, thường, số, ký tự đặc biệt)</label>
+        <input id="new-password" type="password" name="password" placeholder="Ví dụ: Abc@1234 (tối thiểu 8 ký tự)" autocomplete="new-password" minlength="8" required>
 
-        <label for="confirm-password">Nhập lại mật khẩu mới (8 ký tự)</label>
-        <input id="confirm-password" type="password" name="confirm_password" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" minlength="8" maxlength="8" required>
+        <label for="confirm-password">Nhập lại mật khẩu mới (tối thiểu 8 ký tự)</label>
+        <input id="confirm-password" type="password" name="confirm_password" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" minlength="8" required>
 
         <button type="submit" id="btn-reset">Đặt lại mật khẩu</button>
         <p class="msg" id="msg-reset" role="alert"></p>
@@ -311,7 +311,7 @@ document.getElementById('form-reset').addEventListener('submit', async (e) => {
     const confirm  = document.getElementById('confirm-password').value;
 
     const isValidPassword = (pwd) => {
-        return pwd.length === 8 &&
+        return pwd.length >= 8 &&
             /[a-z]/.test(pwd) &&
             /[A-Z]/.test(pwd) &&
             /[0-9]/.test(pwd) &&
@@ -319,7 +319,7 @@ document.getElementById('form-reset').addEventListener('submit', async (e) => {
     };
 
     if (!isValidPassword(password)) {
-        return setMsg(msg, 'Mật khẩu phải đúng 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).', 'error');
+        return setMsg(msg, 'Mật khẩu phải có tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).', 'error');
     }
     if (password !== confirm) {
         return setMsg(msg, 'Mật khẩu xác nhận không khớp.', 'error');
