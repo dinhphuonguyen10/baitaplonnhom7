@@ -6,7 +6,7 @@ function customerPurchasedProduct(mysqli $conn, int $userId, int $productId): bo
         "SELECT 1
          FROM orders o
          INNER JOIN order_items oi ON oi.order_id = o.id
-         WHERE o.user_id = ? AND oi.product_id = ? AND o.status = 'Đã giao'
+ WHERE o.user_id = ? AND oi.product_id = ? AND o.status IN ('Đã giao hàng', 'Đã giao')
          LIMIT 1"
     );
     if (!$stmt) {
@@ -194,7 +194,7 @@ $reviewSummaryQuery = $conn->prepare(
            INNER JOIN order_items oi ON oi.order_id = o.id
            WHERE o.user_id = r.user_id
              AND oi.product_id = r.product_id
-             AND o.status = 'Đã giao'
+ AND o.status IN ('Đã giao hàng', 'Đã giao')
        )"
 );
 if (!$reviewSummaryQuery) {
@@ -247,7 +247,7 @@ $reviewListSql = "SELECT r.rating, r.comment, r.created_at, u.username
                         INNER JOIN order_items oi ON oi.order_id = o.id
                         WHERE o.user_id = r.user_id
                           AND oi.product_id = r.product_id
-                          AND o.status = 'Đã giao'
+ AND o.status IN ('Đã giao hàng', 'Đã giao')
                     )";
 if ($reviewFilter > 0) {
     $reviewListSql .= ' AND r.rating = ?';
