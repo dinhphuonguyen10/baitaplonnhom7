@@ -59,6 +59,14 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
                 <span class="auth-btn login-trigger" style="cursor: pointer;">Đăng nhập</span>
             </div>
 
+            <div class="wishlist-wrapper">
+                <a class="wishlist-button" href="<?php echo htmlspecialchars($appBaseUrl . '/client/wishlist.php', ENT_QUOTES, 'UTF-8'); ?>" aria-label="Sản phẩm yêu thích" title="Sản phẩm yêu thích">
+                    <svg class="wishlist-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                    <span class="wishlist-text">Yêu thích</span>
+                    <span class="wishlist-count" style="display: none;">0</span>
+                </a>
+            </div>
+
             <div class="cart-wrapper">
                 <a class="cart-button" href="<?php echo htmlspecialchars($appBaseUrl . '/client/cart.php', ENT_QUOTES, 'UTF-8'); ?>" aria-label="Mở giỏ hàng">
                     <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 1.9-1.4L22 8H6" /><circle cx="10" cy="20" r="1.3" /><circle cx="18" cy="20" r="1.3" /></svg>

@@ -81,3 +81,20 @@ if ($prodDescCol && $prodDescCol->num_rows === 0) {
         LEFT JOIN order_items oi ON p.id = oi.product_id
         GROUP BY p.id");
 }
+
+// Tự đồng bộ bảng wishlists (danh sách yêu thích / thả tim) nếu chưa tồn tại
+$wishlistTable = $conn->query("SHOW TABLES LIKE 'wishlists'");
+if ($wishlistTable && $wishlistTable->num_rows === 0) {
+    $conn->query("CREATE TABLE IF NOT EXISTS wishlists (
+        id int(10) unsigned NOT NULL AUTO_INCREMENT,
+        user_id int(10) unsigned NOT NULL,
+        product_id int(10) unsigned NOT NULL,
+        created_at datetime NOT NULL DEFAULT current_timestamp(),
+        PRIMARY KEY (id),
+        UNIQUE KEY uniq_user_product (user_id, product_id),
+        KEY idx_user (user_id),
+        KEY idx_product (product_id),
+        CONSTRAINT fk_wishlists_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+        CONSTRAINT fk_wishlists_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+}

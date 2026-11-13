@@ -107,7 +107,7 @@ function createSliderItems(container, products) {
         const itemHTML = `
             <div class="product-card" data-db-id="${product.id || ''}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm" style="flex-shrink: 0; width: 240px;">
                 ${discountHTML}
-                <button class="wishlist-btn" title="Yêu thích">♡</button>
+                <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id || ''}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
                 <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
                 <div class="product-info">
                     <h3>${product.name}</h3>
@@ -938,7 +938,7 @@ function buildProductCardHTML(product) {
         <div class="product-card" data-category="${product.category || ''}" data-db-id="${product.id}" data-price="${priceSaleRaw}" data-stock="${stock}" data-discount="${hasDiscount ? '1' : '0'}" data-gift="${hasGift ? '1' : '0'}" data-sold="${soldCount}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id)}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
             <div class="product-image-wrap">
                 ${badgeHTML}
-                <button class="wishlist-btn" title="Yêu thích">♡</button>
+                <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
                 <img src="${getProductImageUrl(product.image)}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
             </div>
             <div class="product-info">

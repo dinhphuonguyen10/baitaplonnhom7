@@ -10,6 +10,14 @@ $roleLabel = $isManager ? 'Quản lý' : 'Nhân viên';
 $adminUsername = $_SESSION['admin_username'] ?? $_SESSION['username'] ?? '';
 $adminCurrentPage = 'products.php';
 
+$descTemplatesByCategory = [
+    2 => 'Lấy cảm hứng từ những đóa hoa tuyết đầu mùa và giọt sương mai thuần khiết, đôi bông tai được chế tác thủ công từ Bạc Ý 925 mạ bạch kim cao cấp, đính kết đá Zirconia đa diện phát sáng rực rỡ dưới mọi góc nhìn. Thiết kế thanh thoát tôn vinh trọn vẹn nét đài các, yêu kiều và là phụ kiện hoàn mỹ giúp nàng tự tin tỏa sáng rạng ngời trong các buổi dạ hội sang trọng lẫn phong cách thường nhật.',
+    3 => 'Mặt dây chuyền được chạm khắc tỉ mỉ với đường nét thanh mảnh, uốn lượn mềm mại ôm trọn viên đá chủ lấp lánh như viên ngọc quý giữa lòng đại dương. Sợi dây bạc Ý 925 mạ rhodium cao cấp nhẹ nhàng tôn vinh xương quai xanh quyến rũ, biểu trưng cho tình yêu vĩnh cửu và phong thái kiêu sa, đài các khó phai.',
+    4 => 'Thiết kế nhẫn solitaire kinh điển kết hợp kỹ thuật nạm đá tinh xảo bậc nhất, nâng niu viên đá chủ Zirconia giác cắt Brilliant Cut phản chiếu ánh hào quang lộng lẫy tựa kim cương tự nhiên. Sự lựa chọn hoàn mỹ biểu trưng cho tình yêu đích thực và khẳng định phong cách vương giả, độc bản của quý cô hiện đại.',
+    5 => 'Chiếc vòng tay ôm khít cổ tay yêu kiều, chế tác công phu từ chất liệu Bạc Ý 925 đúc nguyên khối dày dặn và các hạt charm đính đá vi mô sáng trong vắt. Thiết kế thanh lịch, chống oxy hóa bền lâu, mang lại nguồn năng lượng an lành, duyên dáng và phong thái thượng lưu trong từng cử chỉ tay.',
+    6 => 'Tuyệt phẩm hộp quà tặng ÉCRIN phiên bản giới hạn sang trọng gồm các món trang sức chế tác tinh tuyển đồng điệu, đi kèm thiệp chúc mừng cao cấp. Món quà hoàn hảo trao trọn tình cảm chân thành, biểu tượng cho hạnh phúc viên mãn và những cột mốc kỷ niệm đáng nhớ nhất.'
+];
+
 $message = '';
 $messageType = '';
 
@@ -30,6 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price       = (float)($_POST['price'] ?? 0);
         $stock       = max(0, (int)($_POST['stock'] ?? 0));
         $description = trim($_POST['description'] ?? '');
+        if ($description === '') {
+            $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
+        }
+        if ($description === '') {
+            $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
+        }
         $imagePath   = 'assets/banner/logo.png'; // Ảnh mặc định
 
         if ($name === '' || $categoryId <= 0) {
@@ -71,6 +85,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price       = (float)($_POST['price'] ?? 0);
         $stock       = max(0, (int)($_POST['stock'] ?? 0));
         $description = trim($_POST['description'] ?? '');
+        if ($description === '') {
+            $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
+        }
 
         if ($id <= 0 || $name === '' || $categoryId <= 0) {
             $message = 'Dữ liệu chỉnh sửa không hợp lệ!';
@@ -168,16 +185,27 @@ if ($prodRes) {
         .btn-add:hover { background: #1a3c68; }
 
         .prod-table { width: 100%; border-collapse: collapse; }
-        .prod-table th, .prod-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+        .prod-table th, .prod-table td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
         .prod-table th { background: #fafbfc; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
         .prod-table tr:hover { background: #fafbfc; }
 
         .thumb-img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid var(--line); background: #f7f9fb; display: block; }
-        .cat-badge { display: inline-block; padding: 3px 10px; background: #eef2f6; color: var(--navy); border-radius: 20px; font-size: 12px; font-weight: 600; }
-        .stock-tag { font-weight: 600; font-size: 13px; }
+        .prod-name-cell { min-width: 250px; }
+        .prod-name { font-family: 'Roboto', sans-serif; font-size: 14.5px; font-weight: 600; color: var(--navy); line-height: 1.35; }
+        .prod-desc-preview { font-family: 'Roboto', sans-serif; font-size: 12px; color: #64748b; line-height: 1.45; margin-top: 4px; max-width: 380px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+        .cat-badge { display: inline-block; padding: 4px 11px; background: #eef2f6; color: var(--navy); border-radius: 20px; font-size: 12px; font-weight: 600; font-family: 'Roboto', sans-serif; letter-spacing: 0.02em; }
+        .price-text { font-family: 'Roboto', sans-serif; font-size: 14px; font-weight: 700; color: var(--navy); }
+        .stock-tag { font-weight: 600; font-size: 13px; font-family: 'Roboto', sans-serif; }
         .stock-ok   { color: #027a48; }
         .stock-low  { color: #b54708; }
         .stock-out  { color: #b42318; }
+
+        .btn-suggest-desc { background: #f8fafc; border: 1px solid #cbd5e1; color: var(--navy); font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 6px; cursor: pointer; transition: all .2s; }
+        .btn-suggest-desc:hover { background: #eef2f6; border-color: var(--navy); color: #b58c54; }
+        .desc-hints { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+        .desc-hints small { color: var(--muted); font-size: 11px; }
+        .desc-pill { background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 12px; cursor: pointer; transition: all .15s; }
+        .desc-pill:hover { background: #e2e8f0; color: var(--navy); border-color: #cbd5e1; }
 
         .btn-sm { padding: 6px 14px; border: 0; border-radius: 6px; font: 600 13px inherit; cursor: pointer; transition: .2s; }
         .btn-edit { background: #e0f2fe; color: #026aa2; }
@@ -291,9 +319,14 @@ if ($prodRes) {
                                         <td>
                                             <img src="<?php echo $escape($imgSrc); ?>" alt="" class="thumb-img" onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'">
                                         </td>
-                                        <td><strong><?php echo $escape($p['name']); ?></strong></td>
+                                        <td class="prod-name-cell">
+                                            <div class="prod-name"><?php echo $escape($p['name']); ?></div>
+                                            <?php if (!empty($p['description'])): ?>
+                                                <div class="prod-desc-preview" title="<?php echo $escape($p['description']); ?>"><?php echo $escape($p['description']); ?></div>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><span class="cat-badge"><?php echo $escape($p['category_name']); ?></span></td>
-                                        <td><strong><?php echo number_format((float)$p['price_sale'], 0, ',', '.'); ?>đ</strong></td>
+                                        <td><strong class="price-text"><?php echo number_format((float)$p['price_sale'], 0, ',', '.'); ?>đ</strong></td>
                                         <td>
                                             <span class="stock-tag <?php echo $stockClass; ?>"><?php echo $escape($stockText); ?></span>
                                             <?php if ((int)($p['sold_count'] ?? 0) > 0): ?>
@@ -339,7 +372,7 @@ if ($prodRes) {
 
                 <div class="form-field">
                     <label>Danh mục sản phẩm (*):</label>
-                    <select name="category_id" required>
+                    <select name="category_id" id="add-category" onchange="onAddCategoryChange(this.value)" required>
                         <option value="">-- Chọn danh mục --</option>
                         <?php foreach ($categories as $cat): ?>
                             <option value="<?php echo (int)$cat['id']; ?>"><?php echo $escape($cat['name']); ?></option>
@@ -353,8 +386,19 @@ if ($prodRes) {
                 </div>
 
                 <div class="form-field">
-                    <label>Mô tả chi tiết sản phẩm:</label>
-                    <textarea name="description" rows="3" placeholder="Nhập mô tả sản phẩm, chất liệu đá/bạc, cảm hứng thiết kế..."></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label for="add-description">Mô tả chi tiết sản phẩm:</label>
+                        <button type="button" class="btn-suggest-desc" onclick="generateSampleDescription('add')">✨ Điền mô tả mẫu cuốn hút</button>
+                    </div>
+                    <textarea name="description" id="add-description" rows="4" placeholder="Nhập mô tả sản phẩm...">Lấy cảm hứng từ những đóa hoa tuyết đầu mùa và giọt sương mai thuần khiết, đôi bông tai được chế tác thủ công từ Bạc Ý 925 mạ bạch kim cao cấp, đính kết đá Zirconia đa diện phát sáng rực rỡ dưới mọi góc nhìn. Thiết kế thanh thoát tôn vinh trọn vẹn nét đài các, yêu kiều và là phụ kiện hoàn mỹ giúp nàng tự tin tỏa sáng rạng ngời trong các buổi dạ hội sang trọng lẫn phong cách thường nhật.</textarea>
+                    <div class="desc-hints">
+                        <small>💡 Gợi ý theo danh mục:</small>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('add', 2)">Bông tai</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('add', 3)">Dây chuyền</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('add', 4)">Nhẫn</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('add', 5)">Vòng tay</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('add', 6)">Set quà tặng</button>
+                    </div>
                 </div>
 
                 <div class="form-field">
@@ -407,8 +451,19 @@ if ($prodRes) {
                 </div>
 
                 <div class="form-field">
-                    <label>Mô tả chi tiết sản phẩm:</label>
-                    <textarea name="description" id="edit-description" rows="3" placeholder="Nhập mô tả sản phẩm, chất liệu đá/bạc..."></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label for="edit-description">Mô tả chi tiết sản phẩm:</label>
+                        <button type="button" class="btn-suggest-desc" onclick="generateSampleDescription('edit')">✨ Gợi ý mô tả cuốn hút</button>
+                    </div>
+                    <textarea name="description" id="edit-description" rows="4" placeholder="Nhập mô tả sản phẩm, chất liệu đá/bạc..."></textarea>
+                    <div class="desc-hints">
+                        <small>💡 Gợi ý theo danh mục:</small>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('edit', 2)">Bông tai</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('edit', 3)">Dây chuyền</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('edit', 4)">Nhẫn</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('edit', 5)">Vòng tay</button>
+                        <button type="button" class="desc-pill" onclick="fillCategoryDesc('edit', 6)">Set quà tặng</button>
+                    </div>
                 </div>
 
                 <!-- KHU VỰC QUẢN LÝ SỐ LƯỢNG / NHẬP THÊM HÀNG -->
@@ -444,6 +499,40 @@ if ($prodRes) {
 </div>
 
 <script>
+// Mẫu mô tả cuốn hút theo từng danh mục
+const descTemplates = {
+    2: 'Lấy cảm hứng từ những đóa hoa tuyết đầu mùa và giọt sương mai thuần khiết, đôi bông tai được chế tác thủ công từ Bạc Ý 925 mạ bạch kim cao cấp, đính kết đá Zirconia đa diện phát sáng rực rỡ dưới mọi góc nhìn. Thiết kế thanh thoát tôn vinh trọn vẹn nét đài các, yêu kiều và là phụ kiện hoàn mỹ giúp nàng tự tin tỏa sáng rạng ngời trong các buổi dạ hội sang trọng lẫn phong cách thường nhật.',
+    3: 'Mặt dây chuyền được chạm khắc tỉ mỉ với đường nét thanh mảnh, uốn lượn mềm mại ôm trọn viên đá chủ lấp lánh như viên ngọc quý giữa lòng đại dương. Sợi dây bạc Ý 925 mạ rhodium cao cấp nhẹ nhàng tôn vinh xương quai xanh quyến rũ, biểu trưng cho tình yêu vĩnh cửu và phong thái kiêu sa, đài các khó phai.',
+    4: 'Thiết kế nhẫn solitaire kinh điển kết hợp kỹ thuật nạm đá tinh xảo bậc nhất, nâng niu viên đá chủ Zirconia giác cắt Brilliant Cut phản chiếu ánh hào quang lộng lẫy tựa kim cương tự nhiên. Sự lựa chọn hoàn mỹ biểu trưng cho tình yêu đích thực và khẳng định phong cách vương giả, độc bản của quý cô hiện đại.',
+    5: 'Chiếc vòng tay ôm khít cổ tay yêu kiều, chế tác công phu từ chất liệu Bạc Ý 925 đúc nguyên khối dày dặn và các hạt charm đính đá vi mô sáng trong vắt. Thiết kế thanh lịch, chống oxy hóa bền lâu, mang lại nguồn năng lượng an lành, duyên dáng và phong thái thượng lưu trong từng cử chỉ tay.',
+    6: 'Tuyệt phẩm hộp quà tặng ÉCRIN phiên bản giới hạn sang trọng gồm các món trang sức chế tác tinh tuyển đồng điệu, đi kèm thiệp chúc mừng cao cấp. Món quà hoàn hảo trao trọn tình cảm chân thành, biểu tượng cho hạnh phúc viên mãn và những cột mốc kỷ niệm đáng nhớ nhất.'
+};
+
+function fillCategoryDesc(modalType, catId) {
+    const textareaId = modalType === 'add' ? 'add-description' : 'edit-description';
+    const textarea = document.getElementById(textareaId);
+    if (textarea && descTemplates[catId]) {
+        textarea.value = descTemplates[catId];
+        textarea.focus();
+    }
+}
+
+function generateSampleDescription(modalType) {
+    const catSelectId = modalType === 'add' ? 'add-category' : 'edit-category';
+    const catId = parseInt(document.getElementById(catSelectId).value, 10) || 2;
+    fillCategoryDesc(modalType, catId);
+}
+
+function onAddCategoryChange(catId) {
+    const numId = parseInt(catId, 10);
+    const textarea = document.getElementById('add-description');
+    if (textarea && (!textarea.value.trim() || Object.values(descTemplates).includes(textarea.value.trim()))) {
+        if (descTemplates[numId]) {
+            textarea.value = descTemplates[numId];
+        }
+    }
+}
+
 // Modal Thêm sản phẩm
 function openAddModal() {
     document.getElementById('addModal').classList.add('is-open');
@@ -461,7 +550,7 @@ function openEditModal(prod, imgSrc) {
     document.getElementById('edit-category').value    = prod.category_id;
     document.getElementById('edit-price').value       = prod.price_sale;
     document.getElementById('edit-stock').value       = prod.stock;
-    document.getElementById('edit-description').value = prod.description || '';
+    document.getElementById('edit-description').value = prod.description || descTemplates[prod.category_id] || '';
     originalStock = parseInt(prod.stock, 10) || 0;
 
     // Reset ô nhập thêm hàng

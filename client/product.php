@@ -33,11 +33,12 @@ include __DIR__ . '/../include/header.php';
 
 $escape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $descriptionByCategory = [
-    'bong-tai' => 'Một thiết kế bông tai thanh lịch, dễ kết hợp cùng trang phục thường ngày hoặc những dịp đặc biệt.',
-    'day-chuyen' => 'Mẫu dây chuyền tinh tế giúp hoàn thiện phong cách và là lựa chọn ý nghĩa để dành tặng người thân.',
-    'nhan' => 'Thiết kế nhẫn trang nhã, phù hợp để tạo điểm nhấn cho phong cách riêng hoặc làm quà tặng.',
-    'vong-tay' => 'Mẫu vòng tay duyên dáng, dễ phối cùng nhiều phong cách và thích hợp làm món quà tinh tế.',
-    'set-qua-tang' => 'Set quà tặng được chuẩn bị chỉn chu, phù hợp dành tặng người thân yêu trong những dịp đáng nhớ.',
+    'bong-tai' => 'Lấy cảm hứng từ những đóa hoa tuyết đầu mùa và giọt sương mai thuần khiết, tuyệt phẩm bông tai ÉCRIN được chế tác thủ công tinh xảo từ Bạc Ý 925 mạ bạch kim cao cấp, đính kết đá Zirconia đa diện phát sáng rực rỡ dưới mọi góc nhìn. Thiết kế thanh thoát tôn vinh nét đài các, yêu kiều, là phụ kiện hoàn mỹ giúp nàng tự tin tỏa sáng trong các buổi dạ hội sang trọng lẫn phong cách thường nhật.',
+    'day-chuyen' => 'Mặt dây chuyền được chạm khắc tỉ mỉ với đường nét thanh mảnh, uốn lượn mềm mại ôm trọn viên đá chủ lấp lánh như viên ngọc quý giữa lòng đại dương. Sợi dây bạc Ý 925 mạ rhodium cao cấp nhẹ nhàng tôn vinh xương quai xanh quyến rũ, biểu trưng cho tình yêu vĩnh cửu và phong thái kiêu sa, đài các khó phai.',
+    'nhan' => 'Thiết kế nhẫn solitaire kinh điển kết hợp kỹ thuật nạm đá tinh xảo bậc nhất, nâng niu viên đá chủ Zirconia giác cắt Brilliant Cut phản chiếu ánh hào quang lộng lẫy tựa kim cương tự nhiên. Sự lựa chọn hoàn mỹ biểu trưng cho tình yêu đích thực và khẳng định phong cách vương giả, độc bản của quý cô hiện đại.',
+    'vong-tay' => 'Chiếc vòng tay ôm khít cổ tay yêu kiều, chế tác công phu từ chất liệu Bạc Ý 925 đúc nguyên khối dày dặn và các hạt charm đính đá vi mô sáng trong vắt. Thiết kế thanh lịch, chống oxy hóa bền lâu, mang lại nguồn năng lượng an lành, duyên dáng và phong thái thượng lưu trong từng cử chỉ tay.',
+    'set-qua-tang' => 'Tuyệt phẩm hộp quà tặng ÉCRIN phiên bản giới hạn sang trọng gồm các món trang sức chế tác tinh tuyển đồng điệu, đi kèm thiệp chúc mừng cao cấp. Món quà hoàn hảo trao trọn tình cảm chân thành, biểu tượng cho hạnh phúc viên mãn và những cột mốc kỷ niệm đáng nhớ nhất.',
+    'qua' => 'Tuyệt phẩm hộp quà tặng ÉCRIN phiên bản giới hạn sang trọng gồm các món trang sức chế tác tinh tuyển đồng điệu, đi kèm thiệp chúc mừng cao cấp. Món quà hoàn hảo trao trọn tình cảm chân thành, biểu tượng cho hạnh phúc viên mãn và những cột mốc kỷ niệm đáng nhớ nhất.'
 ];
 ?>
 
@@ -71,6 +72,7 @@ $descriptionByCategory = [
         <section class="product-detail-card product-card" data-db-id="<?php echo (int) $product['id']; ?>" aria-labelledby="product-name">
             <!-- CỘT TRÁI: HÌNH ẢNH SẢN PHẨM VUÔNG KHÍT KHUNG -->
             <div class="product-detail-image-wrap">
+                <button type="button" class="wishlist-btn" data-product-id="<?php echo (int) $product['id']; ?>" title="Yêu thích">♡</button>
                 <img
                     class="product-detail-image product-image"
                     src="<?php echo $escape($imageUrl); ?>"

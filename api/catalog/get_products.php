@@ -2,7 +2,21 @@
 // api/catalog/get_products.php
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../../config/db.php';
+
+$userWishlist = [];
+if (!empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
+    $uid = (int)$_SESSION['user_id'];
+    $wlRes = $conn->query("SELECT product_id FROM wishlists WHERE user_id = {$uid}");
+    if ($wlRes) {
+        while ($wlRow = $wlRes->fetch_assoc()) {
+            $userWishlist[(int)$wlRow['product_id']] = true;
+        }
+    }
+}
 
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
 
@@ -87,6 +101,7 @@ if ($result) {
         // Định dạng giá hiển thị
         $row['price_sale'] = number_format((float)$row['price_sale'], 0, ',', '.');
         $row['price_original'] = $row['price_original_raw'] > 0 ? number_format($row['price_original_raw'], 0, ',', '.') : null;
+        $row['is_favorite'] = isset($userWishlist[(int)$row['id']]);
 
         $products[] = $row;
     }
