@@ -2121,6 +2121,131 @@ async function initDynamicCategoryPages() {
     }
 }
 
+// ==================== WISHLIST ====================
+let wishlistIds = new Set();
+
+function isProductFavorited(productId, isFavoriteFromApi) {
+    return wishlistIds.has(Number(productId)) || isFavoriteFromApi === true;
+}
+
+function updateWishlistBtns(productId, favorited) {
+    document.querySelectorAll(`.wishlist-btn[data-product-id="${productId}"]`).forEach(btn => {
+        btn.classList.toggle('active', favorited);
+        btn.textContent = favorited ? '♥' : '♡';
+        btn.title = favorited ? 'Bỏ yêu thích' : 'Yêu thích';
+    });
+}
+
+function updateWishlistBadge(count) {
+    const badge = document.querySelector('.wishlist-count');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = '';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function saveWishlistToLocal() {
+    localStorage.setItem('ecrin_wishlist', JSON.stringify([...wishlistIds]));
+}
+
+async function syncWishlistToServer() {
+    const localRaw = localStorage.getItem('ecrin_wishlist');
+    const localIds = localRaw ? JSON.parse(localRaw) : [];
+    if (localIds.length === 0) return;
+    try {
+        await fetch(appUrl('/api/catalog/wishlist.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'sync', sync_ids: localIds })
+        });
+    } catch (e) {
+        console.warn('Wishlist sync failed:', e);
+    }
+}
+
+async function initWishlist() {
+    // Load wishlist IDs on startup
+    if (getCurrentCustomer()) {
+        // Logged in: sync localStorage → server then load from server
+        await syncWishlistToServer();
+        try {
+            const res = await fetch(appUrl('/api/catalog/wishlist.php') + '?type=ids');
+            const data = await res.json();
+            if (data.status === 'success' && Array.isArray(data.ids)) {
+                wishlistIds = new Set(data.ids.map(Number));
+                localStorage.setItem('ecrin_wishlist', JSON.stringify([...wishlistIds]));
+                updateWishlistBadge(wishlistIds.size);
+            }
+        } catch (e) {
+            console.warn('Could not load wishlist from server:', e);
+        }
+    } else {
+        // Guest: load from localStorage
+        const localRaw = localStorage.getItem('ecrin_wishlist');
+        const localIds = localRaw ? JSON.parse(localRaw) : [];
+        wishlistIds = new Set(localIds.map(Number));
+        updateWishlistBadge(wishlistIds.size);
+    }
+
+    // Highlight all heart buttons already on page
+    wishlistIds.forEach(id => updateWishlistBtns(id, true));
+
+    // Event delegation for all .wishlist-btn clicks
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.wishlist-btn');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const productId = Number(btn.dataset.productId);
+        if (!productId) return;
+
+        // Pop animation
+        btn.classList.add('animating');
+        setTimeout(() => btn.classList.remove('animating'), 400);
+
+        if (getCurrentCustomer()) {
+            // Server toggle
+            fetch(appUrl('/api/catalog/wishlist.php'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'toggle', product_id: productId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (data.favorited) wishlistIds.add(productId);
+                    else wishlistIds.delete(productId);
+                    updateWishlistBtns(productId, data.favorited);
+                    updateWishlistBadge(data.count);
+                    showToast(data.message);
+                    saveWishlistToLocal();
+                } else if (data.require_login) {
+                    promptCustomerLogin();
+                } else {
+                    showToast(data.message || 'Có lỗi xảy ra!');
+                }
+            })
+            .catch(() => showToast('Lỗi kết nối. Vui lòng thử lại!'));
+        } else {
+            // Guest: toggle in localStorage
+            if (wishlistIds.has(productId)) {
+                wishlistIds.delete(productId);
+                showToast('Đã bỏ yêu thích');
+            } else {
+                wishlistIds.add(productId);
+                showToast('❤️ Đã lưu! Đăng nhập để lưu vào tài khoản.');
+            }
+            updateWishlistBtns(productId, wishlistIds.has(productId));
+            updateWishlistBadge(wishlistIds.size);
+            saveWishlistToLocal();
+        }
+    });
+}
+
 // ==================== INITIALIZE ALL ====================
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 Website đã sẵn sàng!');
