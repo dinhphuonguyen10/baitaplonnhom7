@@ -1,17 +1,68 @@
-<?php
-// config/db.php - Kết nối MySQL, thiết lập charset utf8mb4
-$host = "localhost";
-$user = "root";       // User mặc định của XAMPP
-$pass = "";           // Pass mặc định của XAMPP thường để trống
-$dbname = "baitaplon"; // Tên database bạn cần tạo trong phpMyAdmin
-
-// Kết nối database
-$conn = new mysqli($host, $user, $pass, $dbname);
-
-// Kiểm tra kết nối
-if ($conn->connect_error) {
-    die(json_encode(["status" => "error", "message" => "Kết nối DB thất bại: " . $conn->connect_error]));
-}
-
-// Set charset để không lỗi tiếng Việt
-$conn->set_charset("utf8mb4");
+<?php
+// config/db.php - Kết nối MySQL, thiết lập charset utf8mb4
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "baitaplon";
+
+$conn = new mysqli($host, $user, $pass, $dbname);
+
+if ($conn->connect_error) {
+    die(json_encode(["status" => "error", "message" => "Kết nối DB thất bại: " . $conn->connect_error]));
+}
+
+$conn->set_charset("utf8mb4");
+
+// Tự đồng bộ các cột mới của bảng stores cho database đã tạo từ bản SQL cũ.
+$storesTable = $conn->query("SHOW TABLES LIKE 'stores'");
+if ($storesTable && $storesTable->num_rows > 0) {
+    $storeColumns = [];
+    $storeSchemaChanged = false;
+    $columnsResult = $conn->query("SHOW COLUMNS FROM stores");
+    if ($columnsResult) {
+        while ($column = $columnsResult->fetch_assoc()) {
+            $storeColumns[$column['Field']] = true;
+        }
+    }
+
+    $missingStoreColumns = [
+        'phone' => "ALTER TABLE stores ADD COLUMN phone VARCHAR(30) NOT NULL DEFAULT '' AFTER image",
+        'hours' => "ALTER TABLE stores ADD COLUMN hours VARCHAR(100) NOT NULL DEFAULT '08:00 - 22:00' AFTER phone",
+        'status' => "ALTER TABLE stores ADD COLUMN status ENUM('active', 'inactive') NOT NULL DEFAULT 'active' AFTER hours",
+    ];
+
+    foreach ($missingStoreColumns as $columnName => $alterSql) {
+        if (!isset($storeColumns[$columnName])) {
+            if ($conn->query($alterSql)) {
+                $storeSchemaChanged = true;
+            }
+        }
+    }
+
+    // Khôi phục dữ liệu cửa hàng mặc định từ file SQL cũ khi database chưa có dữ liệu.
+    $storeCountResult = $conn->query("SELECT COUNT(*) AS total FROM stores");
+    $storeCount = $storeCountResult ? (int) $storeCountResult->fetch_assoc()['total'] : 0;
+    if ($storeSchemaChanged || $storeCount === 0) {
+        $defaultStores = [
+            [1, 'ÉCRIN JEWELRY Cầu Giấy', '123 Xuân Thủy, Dịch Vọng, Cầu Giấy, Hà Nội', '024.1234.5678'],
+            [2, 'ÉCRIN JEWELRY Hoàn Kiếm', '45 Hàng Đào, Hoàn Kiếm, Hà Nội', '024.8888.9999'],
+            [3, 'ÉCRIN JEWELRY Quận 1', '89 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. HCM', '028.1111.2222'],
+            [4, 'ÉCRIN JEWELRY Quận 10', '256 Sư Vạn Hạnh, Phường 12, Quận 10, TP. HCM', '028.4444.5555'],
+            [5, 'ÉCRIN JEWELRY Đà Nẵng', '12 Lê Duẩn, Hải Châu, Đà Nẵng', '0236.777.888'],
+        ];
+        $storeStmt = $conn->prepare(
+            "INSERT INTO stores (id, name, address, phone, hours, status)
+             VALUES (?, ?, ?, ?, '08:00 - 22:00', 'active')
+             ON DUPLICATE KEY UPDATE
+                name = VALUES(name), address = VALUES(address), phone = VALUES(phone),
+                hours = VALUES(hours), status = VALUES(status)"
+        );
+        if ($storeStmt) {
+            foreach ($defaultStores as [$id, $name, $address, $phone]) {
+                $storeStmt->bind_param('isss', $id, $name, $address, $phone);
+                $storeStmt->execute();
+            }
+            $storeStmt->close();
+        }
+    }
+}
