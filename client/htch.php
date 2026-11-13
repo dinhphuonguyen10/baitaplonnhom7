@@ -2,7 +2,7 @@
 $pageTitle = 'Hệ thống cửa hàng - ÉCRIN JEWELRY';
 require_once __DIR__ . '/../config/db.php';
 $clientStores = [];
-$storeResult = $conn->query("SELECT id, name, address, phone, hours FROM stores WHERE status = 'active' ORDER BY id ASC");
+$storeResult = $conn->query("SELECT id, name, address, phone, hours FROM stores WHERE status = 'active' ORDER BY id DESC");
 if ($storeResult) {
     while ($store = $storeResult->fetch_assoc()) {
         $clientStores[] = $store;
@@ -19,6 +19,11 @@ include __DIR__ . '/../include/header.php';
             display: grid;
             grid-template-columns: 350px 1fr;
             gap: 30px;
+        }
+
+        .store-breadcrumb {
+            grid-column: 1 / -1;
+            margin: -18px 0 0;
         }
 
         .store-sidebar,
@@ -146,6 +151,44 @@ include __DIR__ . '/../include/header.php';
             text-align: center;
         }
 
+        .store-pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 7px;
+            margin-top: 18px;
+        }
+
+        .store-pagination button {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 9px;
+            border: 1px solid #d8dee6;
+            border-radius: 8px;
+            background: #fff;
+            color: var(--navy);
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .store-pagination button:hover:not(:disabled),
+        .store-pagination button.is-active {
+            border-color: var(--navy);
+            background: var(--navy);
+            color: #fff;
+        }
+
+        .store-pagination button:disabled {
+            cursor: not-allowed;
+            opacity: .45;
+        }
+
+        .store-page-count {
+            color: #667085;
+            font-size: .8rem;
+            font-weight: 600;
+        }
+
         @media (max-width: 992px) {
             .store-container {
                 grid-template-columns: 1fr;
@@ -153,6 +196,11 @@ include __DIR__ . '/../include/header.php';
         }
     </style>
     <main class="store-container">
+        <nav class="breadcrumb-container store-breadcrumb" aria-label="Điều hướng đường dẫn">
+            <a href="<?php echo htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>">Trang chủ</a>
+            <span class="separator">&gt;</span>
+            <strong class="current" aria-current="page">Hệ thống cửa hàng</strong>
+        </nav>
         <aside class="store-sidebar">
             <h1>Tìm cửa hàng</h1>
             <div class="search-store">
@@ -168,6 +216,7 @@ include __DIR__ . '/../include/header.php';
                 <?php endforeach; ?>
                 <p class="store-empty" id="store-empty">Không tìm thấy cửa hàng phù hợp.</p>
             </div>
+            <nav class="store-pagination" id="store-pagination" aria-label="Phân trang cửa hàng"></nav>
         </aside>
 
         <section class="store-map-area" aria-label="Bản đồ và thông tin cửa hàng">
@@ -199,9 +248,13 @@ include __DIR__ . '/../include/header.php';
     <script>
         const stores = <?php echo json_encode($clientStores, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 
-        const storeItems = document.querySelectorAll('.store-item');
+        const storeItems = Array.from(document.querySelectorAll('.store-item'));
         const searchInput = document.getElementById('store-search');
         const emptyMessage = document.getElementById('store-empty');
+        const pagination = document.getElementById('store-pagination');
+        const storesPerPage = 4;
+        let filteredStoreItems = [...storeItems];
+        let currentStorePage = 1;
 
         storeItems.forEach(item => {
             item.addEventListener('click', () => {
@@ -218,18 +271,77 @@ include __DIR__ . '/../include/header.php';
             });
         });
 
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim().toLocaleLowerCase('vi');
-            let visibleCount = 0;
+        function renderStorePagination() {
+            const totalPages = Math.ceil(filteredStoreItems.length / storesPerPage);
+            pagination.innerHTML = '';
+            pagination.hidden = totalPages <= 1;
+            if (totalPages <= 1) return;
+
+            const previous = document.createElement('button');
+            previous.type = 'button';
+            previous.textContent = '‹';
+            previous.disabled = currentStorePage === 1;
+            previous.setAttribute('aria-label', 'Trang trước');
+            previous.addEventListener('click', () => {
+                currentStorePage -= 1;
+                renderStores();
+            });
+            pagination.appendChild(previous);
+
+            for (let page = 1; page <= totalPages; page += 1) {
+                const pageButton = document.createElement('button');
+                pageButton.type = 'button';
+                pageButton.textContent = String(page);
+                pageButton.className = page === currentStorePage ? 'is-active' : '';
+                pageButton.setAttribute('aria-label', `Trang ${page}`);
+                pageButton.setAttribute('aria-current', page === currentStorePage ? 'page' : 'false');
+                pageButton.addEventListener('click', () => {
+                    currentStorePage = page;
+                    renderStores();
+                });
+                pagination.appendChild(pageButton);
+            }
+
+            const next = document.createElement('button');
+            next.type = 'button';
+            next.textContent = '›';
+            next.disabled = currentStorePage === totalPages;
+            next.setAttribute('aria-label', 'Trang sau');
+            next.addEventListener('click', () => {
+                currentStorePage += 1;
+                renderStores();
+            });
+            pagination.appendChild(next);
+
+            const pageCount = document.createElement('span');
+            pageCount.className = 'store-page-count';
+            pageCount.textContent = `${currentStorePage}/${totalPages}`;
+            pagination.appendChild(pageCount);
+        }
+
+        function renderStores() {
+            const totalPages = Math.max(1, Math.ceil(filteredStoreItems.length / storesPerPage));
+            currentStorePage = Math.min(currentStorePage, totalPages);
+            const firstIndex = (currentStorePage - 1) * storesPerPage;
 
             storeItems.forEach(item => {
-                const visible = item.textContent.toLocaleLowerCase('vi').includes(query);
-                item.hidden = !visible;
-                if (visible) visibleCount += 1;
+                item.hidden = !filteredStoreItems.includes(item) ||
+                    filteredStoreItems.indexOf(item) < firstIndex ||
+                    filteredStoreItems.indexOf(item) >= firstIndex + storesPerPage;
             });
 
-            emptyMessage.style.display = visibleCount === 0 ? 'block' : 'none';
+            emptyMessage.style.display = filteredStoreItems.length === 0 ? 'block' : 'none';
+            renderStorePagination();
+        }
+
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim().toLocaleLowerCase('vi');
+            filteredStoreItems = storeItems.filter(item => item.textContent.toLocaleLowerCase('vi').includes(query));
+            currentStorePage = 1;
+            renderStores();
         });
+
+        renderStores();
     </script>
 
 <?php include __DIR__ . '/../include/footer.php'; ?>

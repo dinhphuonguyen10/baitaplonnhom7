@@ -77,6 +77,23 @@ try {
     );
     $user_id = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
     $address_id = null;
+
+    // Session cũ có thể còn giữ ID tài khoản đã bị xóa hoặc sau khi đổi database.
+    // Khi đó không được ghi ID không tồn tại vào orders vì sẽ vi phạm khóa ngoại.
+    if ($user_id !== null) {
+        $user_stmt = $conn->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
+        if (!$user_stmt) {
+            throw new RuntimeException('Không thể kiểm tra tài khoản đặt hàng.');
+        }
+        $user_stmt->bind_param('i', $user_id);
+        $user_stmt->execute();
+        $valid_user = $user_stmt->get_result()->fetch_assoc();
+        $user_stmt->close();
+        if (!$valid_user) {
+            $user_id = null;
+        }
+    }
+
     if ($user_id !== null) {
         $address_stmt = $conn->prepare(
             'SELECT id FROM addresses WHERE user_id = ? AND recipient_name = ? AND address = ? AND phone = ? LIMIT 1'
@@ -90,10 +107,22 @@ try {
         $address_stmt->close();
     }
 
-    $order_stmt = $conn->prepare(
-        "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'COD')"
-    );
+    if ($user_id === null) {
+        $order_stmt = $conn->prepare(
+            "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
+             VALUES (NULL, NULL, ?, ?, ?, ?, ?, 'COD')"
+        );
+    } elseif ($address_id === null) {
+        $order_stmt = $conn->prepare(
+            "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
+             VALUES (?, NULL, ?, ?, ?, ?, ?, 'COD')"
+        );
+    } else {
+        $order_stmt = $conn->prepare(
+            "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'COD')"
+        );
+    }
     $item_stmt = $conn->prepare(
         'INSERT INTO order_items (order_id, product_id, product_name, quantity, price, image)
          VALUES (?, ?, ?, ?, ?, ?)'
@@ -119,7 +148,13 @@ try {
     }
 
     $total_price = round($total_price, 2);
-    $order_stmt->bind_param('iissssd', $user_id, $address_id, $full_name, $phone, $email, $address, $total_price);
+    if ($user_id === null) {
+        $order_stmt->bind_param('ssssd', $full_name, $phone, $email, $address, $total_price);
+    } elseif ($address_id === null) {
+        $order_stmt->bind_param('issssd', $user_id, $full_name, $phone, $email, $address, $total_price);
+    } else {
+        $order_stmt->bind_param('iissssd', $user_id, $address_id, $full_name, $phone, $email, $address, $total_price);
+    }
     $order_stmt->execute();
     $order_id = $conn->insert_id;
 
