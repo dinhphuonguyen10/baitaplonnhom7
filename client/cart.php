@@ -1,4 +1,12 @@
 <?php
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'customer') {
+    header('Location: ../index.php?login_required=cart');
+    exit;
+}
+
 $pageTitle = "Giỏ hàng - ÉCRIN JEWELRY";
 $bodyClass = 'cart-page';
 include __DIR__ . '/../include/header.php';

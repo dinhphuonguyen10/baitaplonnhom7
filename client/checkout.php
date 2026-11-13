@@ -1,4 +1,10 @@
 <?php
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+$customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
+    ? (string) $_SESSION['username']
+    : null;
 $pageTitle = "Đặt hàng - ÉCRIN JEWELRY";
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
@@ -12,6 +18,7 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
     <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
     <link rel="stylesheet" href="<?php echo htmlspecialchars($appBaseUrl . '/assets/style.css?v=' . filemtime(__DIR__ . '/../assets/style.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <script>window.APP_BASE_URL = <?php echo json_encode($appBaseUrl, JSON_UNESCAPED_SLASHES); ?>;</script>
+    <script>window.CUSTOMER_USERNAME = <?php echo json_encode($customerUsername, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
 </head>
 <body class="checkout-page">
     <header class="checkout-brandbar">
@@ -45,11 +52,11 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                         </div>
                         <div class="checkout-field">
                             <label for="checkout-phone">Số điện thoại <span>*</span></label>
-                            <input id="checkout-phone" name="phone" type="tel" autocomplete="tel" maxlength="20" placeholder="Ví dụ: 0912345678" required>
+                            <input id="checkout-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" minlength="10" maxlength="20" pattern="0[0-9]{9}" title="Nhập đúng 10 chữ số, bắt đầu bằng số 0." placeholder="Ví dụ: 0912345678" required>
                         </div>
                         <div class="checkout-field">
                             <label for="checkout-email">Email <span>*</span></label>
-                            <input id="checkout-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="email@example.com" required>
+                            <input id="checkout-email" name="email" type="email" autocomplete="email" maxlength="254" pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}" title="Nhập địa chỉ email hợp lệ, ví dụ: ten@example.com." placeholder="email@example.com" required>
                         </div>
                         <div class="checkout-field">
                             <label for="checkout-province">Tỉnh / thành phố <span>*</span></label>

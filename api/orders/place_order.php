@@ -34,8 +34,11 @@ if ($full_name === '' || $phone === '' || $email === '' || $address === '') {
 if (strlen($full_name) > 150 || strlen($phone) > 20 || strlen($email) > 254 || strlen($address) > 500) {
     respondWithError('Thông tin đặt hàng vượt quá độ dài cho phép.');
 }
+if (!preg_match('/^0[0-9]{9}$/', $phone)) {
+    respondWithError('Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0.');
+}
 if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-    respondWithError('Địa chỉ email không hợp lệ.');
+    respondWithError('Vui lòng nhập địa chỉ email hợp lệ.');
 }
 
 $quantities = [];

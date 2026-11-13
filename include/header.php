@@ -1,8 +1,15 @@
 <?php
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
 $appBaseUrl = rtrim($appBaseUrl, '/');
 $bodyClass = isset($bodyClass) && is_string($bodyClass) ? $bodyClass : '';
+$customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
+    ? (string) $_SESSION['username']
+    : null;
+$isCustomerLoggedIn = $customerUsername !== null && $customerUsername !== '';
 
 // Lấy danh mục sản phẩm từ CSDL để đồng nhất với Admin
 $navCategories = [];
@@ -27,6 +34,7 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
     <title><?php echo isset($pageTitle) ? $pageTitle : "ÉCRIN JEWELRY"; ?></title>
     <link rel="stylesheet" href="<?php echo htmlspecialchars($appBaseUrl . '/assets/style.css?v=' . filemtime(__DIR__ . '/../assets/style.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <script>window.APP_BASE_URL = <?php echo json_encode($appBaseUrl, JSON_UNESCAPED_SLASHES); ?>;</script>
+    <script>window.CUSTOMER_USERNAME = <?php echo json_encode($customerUsername, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
 </head>
 
 <body class="<?php echo htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8'); ?>">
@@ -55,7 +63,7 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
                 <a class="cart-button" href="<?php echo htmlspecialchars($appBaseUrl . '/client/cart.php', ENT_QUOTES, 'UTF-8'); ?>" aria-label="Mở giỏ hàng">
                     <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.2a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 1.9-1.4L22 8H6" /><circle cx="10" cy="20" r="1.3" /><circle cx="18" cy="20" r="1.3" /></svg>
                     <span class="cart-text">Giỏ hàng</span>
-                    <span class="cart-count">0</span>
+                    <span class="cart-count" <?php echo $isCustomerLoggedIn ? '' : 'style="display:none;" aria-hidden="true"'; ?>><?php echo $isCustomerLoggedIn ? '0' : ''; ?></span>
                 </a>
             </div>
         </div>
