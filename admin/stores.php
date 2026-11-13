@@ -70,11 +70,13 @@ $firstStore = $stores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'addr
     <title>Cửa hàng - ÉCRIN Jewelry</title>
     <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/style.css'); ?>">
     <style>
+        .page-content { padding-top: 18px; }
+        .welcome-row { display: none; }
         /* Tab navigation */
-        .store-tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 2px solid var(--line); }
-        .store-tab { padding: 10px 20px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -2px; background: none; color: var(--muted); font: 600 14px inherit; cursor: pointer; transition: .2s; }
-        .store-tab:hover { color: var(--navy); }
-        .store-tab.active { border-bottom-color: var(--navy); color: var(--navy); }
+        .store-tabs { display: flex; gap: 8px; margin: 0 0 18px; border-bottom: 2px solid var(--line); }
+        .store-tab { padding: 11px 18px; border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; background: none; color: #526173; font: 700 14px inherit; cursor: pointer; transition: .2s; }
+        .store-tab:hover { color: #102a43; background: #f4f6f8; }
+        .store-tab.active { border-bottom-color: #102a43; color: #102a43; background: #f4f6f8; }
 
         /* Store preview (client view) */
         .store-preview-wrap { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
@@ -97,19 +99,27 @@ $firstStore = $stores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'addr
         .info-box p  { margin: 0; color: var(--navy); font-weight: 600; font-size: 13px; }
 
         /* Management table */
-        .mgmt-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+        .mgmt-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
         .mgmt-panel h2 { margin: 0 0 16px; font-size: 1.1rem; color: var(--navy); }
         .mgmt-actions { display: flex; gap: 10px; margin-bottom: 16px; }
         .mgmt-actions button { padding: 9px 16px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font: 600 13px inherit; cursor: pointer; }
         .mgmt-table { width: 100%; border-collapse: collapse; }
         .mgmt-table th, .mgmt-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
-        .mgmt-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; background: #FAFBFC; }
+        .mgmt-table th { color: #34495e; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; background: #eef2f6; font-weight: 800; }
         .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
         .status-active { background: #EDF6F1; color: #027a48; }
-        .mgmt-table button { padding: 6px 12px; border: 0; border-radius: 6px; background: #d7dce2; color: #657180; font: inherit; cursor: pointer; font-size: 12px; }
+        .mgmt-table button { padding: 7px 13px; border: 1px solid #9aa8b8; border-radius: 6px; background: #536b82; color: #fff; font: 700 12px inherit; cursor: pointer; font-size: 12px; }
+        .mgmt-table button:hover { background: #102a43; border-color: #102a43; }
+        .mgmt-table .edit-store { background: #102a43; border-color: #102a43; }
+        .mgmt-table .edit-store:hover { background: #234d70; }
+        .mgmt-table .delete-store { width: 38px; padding: 7px 0; background: #b42318; border-color: #b42318; font-size: 16px; line-height: 1; }
+        .mgmt-table .delete-store:hover { background: #8f1d14; border-color: #8f1d14; }
+        .mgmt-table tr.editing { background: #eef6ff; box-shadow: inset 4px 0 #b09060; }
         .mgmt-form { display: grid; grid-template-columns: 1.2fr 2fr 1fr 1fr .8fr auto; gap: 10px; margin-bottom: 18px; }
         .mgmt-form input, .mgmt-form select { min-width: 0; padding: 9px 10px; border: 1px solid #d5dbe2; border-radius: 7px; font: inherit; }
-        .mgmt-form button { padding: 9px 14px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font-weight: 700; cursor: pointer; }
+        .mgmt-form button { padding: 9px 14px; border: 0; border-radius: 7px; background: #102a43; color: #fff; font-weight: 700; cursor: pointer; }
+        .mgmt-form.editing { padding: 12px; border: 2px solid #b09060; border-radius: 9px; background: #fffaf2; }
+        .mgmt-form .cancel-edit { background: #718096; }
         @media (max-width: 1000px) { .mgmt-form { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 820px) { .store-container-admin { grid-template-columns: 1fr; } .store-sidebar-admin { border-right: 0; border-bottom: 1px solid var(--line); } }
     </style>
@@ -196,6 +206,7 @@ $firstStore = $stores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'addr
                         <input type="text" name="hours" id="store-hours" value="08:00 - 22:00" placeholder="Giờ mở cửa">
                         <select name="status" id="store-status"><option value="active">Hoạt động</option><option value="inactive">Tạm đóng</option></select>
                         <button type="submit" id="store-submit">+ Thêm</button>
+                        <button type="button" class="cancel-edit" id="cancel-edit" hidden>Hủy</button>
                     </form>
                     <div style="overflow-x:auto">
                         <table class="mgmt-table">
@@ -217,7 +228,7 @@ $firstStore = $stores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'addr
                                             <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['stores_csrf']); ?>">
                                             <input type="hidden" name="action" value="delete">
                                             <input type="hidden" name="id" value="<?php echo (int)$s['id']; ?>">
-                                            <button type="submit">Xóa</button>
+                                            <button type="submit" class="delete-store" title="Xóa cửa hàng" aria-label="Xóa cửa hàng">&#128465;&#65039;</button>
                                         </form>
                                     </td>
                                 </tr>
@@ -273,6 +284,10 @@ document.querySelectorAll('.edit-store').forEach(button => {
         document.getElementById('tab-manage').hidden = false;
         document.querySelectorAll('.store-tab').forEach(tab => tab.classList.remove('active'));
         document.querySelector('.store-tab[onclick*="manage"]').classList.add('active');
+        document.querySelectorAll('.mgmt-table tr.editing').forEach(row => row.classList.remove('editing'));
+        button.closest('tr').classList.add('editing');
+        document.getElementById('store-form').classList.add('editing');
+        document.getElementById('cancel-edit').hidden = false;
         document.getElementById('store-id').value = button.dataset.id;
         document.getElementById('store-name').value = button.dataset.name;
         document.getElementById('store-address').value = button.dataset.address;
@@ -282,6 +297,16 @@ document.querySelectorAll('.edit-store').forEach(button => {
         document.getElementById('store-submit').textContent = 'Lưu thay đổi';
         document.getElementById('store-name').focus();
     });
+});
+
+document.getElementById('cancel-edit').addEventListener('click', () => {
+    document.getElementById('store-form').reset();
+    document.getElementById('store-id').value = '';
+    document.getElementById('store-hours').value = '08:00 - 22:00';
+    document.getElementById('store-submit').textContent = '+ Thêm';
+    document.getElementById('cancel-edit').hidden = true;
+    document.getElementById('store-form').classList.remove('editing');
+    document.querySelectorAll('.mgmt-table tr.editing').forEach(row => row.classList.remove('editing'));
 });
 </script>
 </body>
