@@ -5,6 +5,26 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 $customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
     ? (string) $_SESSION['username']
     : null;
+$checkoutAddresses = [];
+if ($customerUsername !== null) {
+    require_once __DIR__ . '/../config/db.php';
+    $addressesStmt = $conn->prepare(
+        'SELECT id, recipient_name, address, phone, is_default, latitude, longitude
+         FROM addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC'
+    );
+    if (!$addressesStmt) {
+        throw new RuntimeException('Không thể tải địa chỉ nhận hàng.');
+    }
+    $checkoutUserId = (int) $_SESSION['user_id'];
+    $addressesStmt->bind_param('i', $checkoutUserId);
+    $addressesStmt->execute();
+    $addressesResult = $addressesStmt->get_result();
+    while ($addressRow = $addressesResult->fetch_assoc()) {
+        $checkoutAddresses[] = $addressRow;
+    }
+    $addressesStmt->close();
+    $conn->close();
+}
 $pageTitle = "Đặt hàng - ÉCRIN JEWELRY";
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
@@ -17,8 +37,10 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
     <link rel="stylesheet" href="<?php echo htmlspecialchars($appBaseUrl . '/assets/style.css?v=' . filemtime(__DIR__ . '/../assets/style.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script>window.APP_BASE_URL = <?php echo json_encode($appBaseUrl, JSON_UNESCAPED_SLASHES); ?>;</script>
     <script>window.CUSTOMER_USERNAME = <?php echo json_encode($customerUsername, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
+    <script>window.CHECKOUT_ADDRESSES = <?php echo json_encode($checkoutAddresses, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
 </head>
 <body class="checkout-page">
     <header class="checkout-brandbar">
@@ -45,6 +67,22 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                 </p>
                 <p class="checkout-form-message" id="checkout-form-message" role="status" aria-live="polite"></p>
                 <form id="checkout-form">
+                    <fieldset class="checkout-saved-addresses" id="checkout-saved-addresses" hidden>
+                        <legend>Chọn địa chỉ nhận hàng</legend>
+                        <div id="checkout-address-options"></div>
+                        <button class="checkout-address-dropdown-toggle" id="checkout-address-dropdown-toggle" type="button" aria-expanded="false" aria-controls="checkout-other-addresses" hidden>
+                            <span>Địa chỉ khác</span>
+                            <span class="checkout-address-dropdown-arrow" aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="checkout-other-addresses" id="checkout-other-addresses" hidden>
+                            <div id="checkout-other-address-options"></div>
+                            <button class="checkout-add-address" id="checkout-add-address" type="button">＋ Thêm địa chỉ khác</button>
+                        </div>
+                    </fieldset>
+                    <input id="checkout-address-id" type="hidden" name="address_id" value="">
+                    <p class="checkout-address-edit-note" id="checkout-address-edit-note" hidden>
+                        Địa chỉ mới chỉ được lưu vào tài khoản khi bạn chọn lưu làm mặc định.
+                    </p>
                     <div class="checkout-form-grid">
                         <div class="checkout-field checkout-field-full">
                             <label for="checkout-name">Họ và tên <span>*</span></label>
@@ -58,6 +96,8 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                             <label for="checkout-email">Email <span>*</span></label>
                             <input id="checkout-email" name="email" type="email" autocomplete="email" maxlength="254" pattern="[^\s@]+@[^\s@]+\.[^\s@]{2,}" title="Nhập địa chỉ email hợp lệ, ví dụ: ten@example.com." placeholder="email@example.com" required>
                         </div>
+                    </div>
+                    <div class="checkout-address-fields" id="checkout-address-fields">
                         <div class="checkout-field">
                             <label for="checkout-province">Tỉnh / thành phố <span>*</span></label>
                             <select id="checkout-province" name="province" autocomplete="address-level1" required>
@@ -72,9 +112,28 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                         </div>
                         <div class="checkout-field checkout-field-full">
                             <label for="checkout-address-detail">Địa chỉ cụ thể <span>*</span></label>
-                            <input id="checkout-address-detail" name="address_detail" type="text" autocomplete="street-address" maxlength="350" placeholder="Số nhà, tên đường, tòa nhà..." required>
+                            <input id="checkout-address-detail" name="address_detail" type="text" autocomplete="street-address" maxlength="350" placeholder="Nhập số nhà, tên đường..." aria-autocomplete="list" aria-controls="checkout-address-suggestions" required>
+                            <small class="checkout-address-region-note">Khi đổi tỉnh/thành hoặc xã/phường, hãy nhập lại địa chỉ cụ thể để tránh ghép sai vị trí.</small>
+                            <div class="checkout-address-suggestions" id="checkout-address-suggestions" role="listbox" hidden></div>
                         </div>
                     </div>
+
+                    <div class="checkout-map-section" id="checkout-map-section" hidden>
+                        <div class="checkout-map-heading">
+                            <div>
+                                <strong>Vị trí trên bản đồ</strong>
+                                <p>Vị trí được tìm theo địa chỉ. Bạn có thể nhấn hoặc kéo ghim để điều chỉnh. Tìm kiếm gửi địa chỉ tới dịch vụ Photon/OpenStreetMap.</p>
+                            </div>
+                            <button class="checkout-map-search" id="checkout-map-search" type="button">Tìm lại vị trí</button>
+                        </div>
+                        <div id="checkout-address-map" role="application" aria-label="Bản đồ chọn vị trí giao hàng"></div>
+                        <p class="checkout-map-status" id="checkout-map-status" aria-live="polite">Đang chờ địa chỉ đầy đủ.</p>
+                        <small class="checkout-map-attribution">Bản đồ © OpenStreetMap contributors</small>
+                    </div>
+                    <label class="checkout-default-address" for="checkout-default-address">
+                        <input id="checkout-default-address" type="checkbox">
+                        Lưu địa chỉ này làm mặc định cho lần mua sau
+                    </label>
 
                     <div class="checkout-method-card">
                         <div class="checkout-method-icon" aria-hidden="true">⌂</div>
@@ -131,6 +190,7 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
     </div>
 </main>
 <?php include __DIR__ . '/../include/auth_modals.php'; ?>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="<?php echo htmlspecialchars($appBaseUrl . '/assets/script.js?v=' . filemtime(__DIR__ . '/../assets/script.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 </body>
 </html>

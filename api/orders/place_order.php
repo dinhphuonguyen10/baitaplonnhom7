@@ -27,6 +27,33 @@ $full_name = trim((string) ($customer['name'] ?? ''));
 $phone = trim((string) ($customer['phone'] ?? ''));
 $email = trim((string) ($customer['email'] ?? ''));
 $address = trim((string) ($customer['address'] ?? ''));
+$requested_address_id = null;
+if (is_array($data) && array_key_exists('address_id', $data) && $data['address_id'] !== null && $data['address_id'] !== '') {
+    $requested_address_id = filter_var($data['address_id'], FILTER_VALIDATE_INT);
+    if ($requested_address_id === false || $requested_address_id < 1) {
+        respondWithError('Địa chỉ nhận hàng không hợp lệ.');
+    }
+}
+$save_as_new_address = filter_var($data['save_as_new_address'] ?? false, FILTER_VALIDATE_BOOLEAN);
+$make_default = filter_var($data['make_default'] ?? false, FILTER_VALIDATE_BOOLEAN);
+$latitude = null;
+$longitude = null;
+$coordinates = $data['coordinates'] ?? null;
+if ($coordinates !== null) {
+    if (!is_array($coordinates)
+        || !isset($coordinates['latitude'], $coordinates['longitude'])
+        || !is_numeric($coordinates['latitude'])
+        || !is_numeric($coordinates['longitude'])) {
+        respondWithError('Vị trí bản đồ không hợp lệ.');
+    }
+    $latitude = (float) $coordinates['latitude'];
+    $longitude = (float) $coordinates['longitude'];
+    if (!is_finite($latitude) || !is_finite($longitude)
+        || $latitude < -90 || $latitude > 90
+        || $longitude < -180 || $longitude > 180) {
+        respondWithError('Tọa độ bản đồ nằm ngoài phạm vi hợp lệ.');
+    }
+}
 
 if ($full_name === '' || $phone === '' || $email === '' || $address === '') {
     respondWithError('Vui lòng cung cấp đầy đủ thông tin giao hàng.');
@@ -94,17 +121,130 @@ try {
         }
     }
 
+    if ($requested_address_id !== null && $user_id === null) {
+        throw new DomainException('Vui lòng đăng nhập lại để sử dụng địa chỉ đã lưu.');
+    }
+
     if ($user_id !== null) {
-        $address_stmt = $conn->prepare(
-            'SELECT id FROM addresses WHERE user_id = ? AND recipient_name = ? AND address = ? AND phone = ? LIMIT 1'
-        );
-        $address_stmt->bind_param('isss', $user_id, $full_name, $address, $phone);
-        $address_stmt->execute();
-        $saved_address = $address_stmt->get_result()->fetch_assoc();
-        if ($saved_address) {
+        if ($requested_address_id !== null) {
+            $address_stmt = $conn->prepare(
+                'SELECT id FROM addresses WHERE id = ? AND user_id = ? LIMIT 1 FOR UPDATE'
+            );
+            if (!$address_stmt) {
+                throw new RuntimeException('Không thể kiểm tra địa chỉ nhận hàng.');
+            }
+            $address_stmt->bind_param('ii', $requested_address_id, $user_id);
+            $address_stmt->execute();
+            $saved_address = $address_stmt->get_result()->fetch_assoc();
+            $address_stmt->close();
+            if (!$saved_address) {
+                throw new DomainException('Không tìm thấy địa chỉ thuộc tài khoản của bạn.');
+            }
             $address_id = (int) $saved_address['id'];
+            if ($make_default) {
+                $clear_default = $conn->prepare('UPDATE addresses SET is_default = 0 WHERE user_id = ?');
+                if (!$clear_default) {
+                    throw new RuntimeException('Không thể cập nhật địa chỉ mặc định.');
+                }
+                $clear_default->bind_param('i', $user_id);
+                $clear_default->execute();
+                $clear_default->close();
+                if ($latitude === null) {
+                    $default_stmt = $conn->prepare(
+                        'UPDATE addresses SET is_default = 1 WHERE id = ? AND user_id = ?'
+                    );
+                    if (!$default_stmt) {
+                        throw new RuntimeException('Không thể cập nhật địa chỉ mặc định.');
+                    }
+                    $default_stmt->bind_param('ii', $address_id, $user_id);
+                } else {
+                    $default_stmt = $conn->prepare(
+                        'UPDATE addresses SET is_default = 1, latitude = ?, longitude = ? WHERE id = ? AND user_id = ?'
+                    );
+                    if (!$default_stmt) {
+                        throw new RuntimeException('Không thể cập nhật địa chỉ mặc định.');
+                    }
+                    $default_stmt->bind_param('ddii', $latitude, $longitude, $address_id, $user_id);
+                }
+                $default_stmt->execute();
+                $default_stmt->close();
+            }
+        } elseif ($make_default) {
+            $saved_address = null;
+            if (!$save_as_new_address) {
+                $address_stmt = $conn->prepare(
+                    'SELECT id FROM addresses WHERE user_id = ? AND recipient_name = ? AND address = ? AND phone = ? LIMIT 1'
+                );
+                if (!$address_stmt) {
+                    throw new RuntimeException('Không thể kiểm tra địa chỉ nhận hàng.');
+                }
+                $address_stmt->bind_param('isss', $user_id, $full_name, $address, $phone);
+                $address_stmt->execute();
+                $saved_address = $address_stmt->get_result()->fetch_assoc();
+                $address_stmt->close();
+            }
+
+            if ($saved_address) {
+                $address_id = (int) $saved_address['id'];
+                if ($latitude !== null) {
+                    $location_stmt = $conn->prepare(
+                        'UPDATE addresses SET latitude = ?, longitude = ? WHERE id = ? AND user_id = ?'
+                    );
+                    if (!$location_stmt) {
+                        throw new RuntimeException('Không thể cập nhật vị trí địa chỉ.');
+                    }
+                    $location_stmt->bind_param('ddii', $latitude, $longitude, $address_id, $user_id);
+                    $location_stmt->execute();
+                    $location_stmt->close();
+                }
+            } else {
+                $insert_address = $latitude === null
+                    ? $conn->prepare(
+                        'INSERT INTO addresses (user_id, recipient_name, address, phone, is_default)
+                         VALUES (?, ?, ?, ?, 1)'
+                    )
+                    : $conn->prepare(
+                        'INSERT INTO addresses (user_id, recipient_name, address, phone, is_default, latitude, longitude)
+                         VALUES (?, ?, ?, ?, 1, ?, ?)'
+                    );
+                if (!$insert_address) {
+                    throw new RuntimeException('Không thể lưu địa chỉ nhận hàng.');
+                }
+                if ($latitude === null) {
+                    $insert_address->bind_param('isss', $user_id, $full_name, $address, $phone);
+                } else {
+                    $insert_address->bind_param(
+                        'isssdd',
+                        $user_id,
+                        $full_name,
+                        $address,
+                        $phone,
+                        $latitude,
+                        $longitude
+                    );
+                }
+                $insert_address->execute();
+                $address_id = (int) $conn->insert_id;
+                $insert_address->close();
+            }
+
+            $clear_default = $conn->prepare('UPDATE addresses SET is_default = 0 WHERE user_id = ? AND id <> ?');
+            if (!$clear_default) {
+                throw new RuntimeException('Không thể cập nhật địa chỉ mặc định.');
+            }
+            $clear_default->bind_param('ii', $user_id, $address_id);
+            $clear_default->execute();
+            $clear_default->close();
+            $default_stmt = $conn->prepare(
+                'UPDATE addresses SET is_default = 1 WHERE id = ? AND user_id = ?'
+            );
+            if (!$default_stmt) {
+                throw new RuntimeException('Không thể cập nhật địa chỉ mặc định.');
+            }
+            $default_stmt->bind_param('ii', $address_id, $user_id);
+            $default_stmt->execute();
+            $default_stmt->close();
         }
-        $address_stmt->close();
     }
 
     if ($user_id === null) {

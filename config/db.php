@@ -98,3 +98,24 @@ if ($wishlistTable && $wishlistTable->num_rows === 0) {
         CONSTRAINT fk_wishlists_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 }
+
+// Keep saved checkout locations available in databases created before map support.
+$addressTable = $conn->query("SHOW TABLES LIKE 'addresses'");
+if ($addressTable && $addressTable->num_rows > 0) {
+    $addressColumns = [];
+    $addressColumnsResult = $conn->query("SHOW COLUMNS FROM addresses");
+    if ($addressColumnsResult) {
+        while ($column = $addressColumnsResult->fetch_assoc()) {
+            $addressColumns[$column['Field']] = true;
+        }
+    }
+
+    foreach ([
+        'latitude' => 'ALTER TABLE addresses ADD COLUMN latitude DECIMAL(10,7) NULL AFTER is_default',
+        'longitude' => 'ALTER TABLE addresses ADD COLUMN longitude DECIMAL(10,7) NULL AFTER latitude',
+    ] as $columnName => $alterSql) {
+        if (!isset($addressColumns[$columnName]) && !$conn->query($alterSql)) {
+            error_log('Address map schema update failed: ' . $conn->error);
+        }
+    }
+}

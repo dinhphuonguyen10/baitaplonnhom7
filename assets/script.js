@@ -696,7 +696,7 @@ function renderCheckoutReceipt(orderId, customer, items, total) {
 async function loadCheckoutLocations() {
     const provinceSelect = document.getElementById('checkout-province');
     const wardSelect = document.getElementById('checkout-ward');
-    if (!provinceSelect || !wardSelect) return;
+    if (!provinceSelect || !wardSelect) return null;
 
     provinceSelect.innerHTML = '<option value="">Đang tải tỉnh/thành...</option>';
     try {
@@ -717,13 +717,12 @@ async function loadCheckoutLocations() {
         provinceSelect.disabled = false;
         wardSelect.innerHTML = '<option value="">Chọn tỉnh/thành trước</option>';
 
-        provinceSelect.addEventListener('change', async () => {
-            const provinceCode = provinceSelect.value;
+        async function loadWards(provinceCode) {
             wardSelect.disabled = true;
             wardSelect.innerHTML = '<option value="">Đang tải xã/phường...</option>';
             if (!provinceCode) {
                 wardSelect.innerHTML = '<option value="">Chọn tỉnh/thành trước</option>';
-                return;
+                return false;
             }
 
             try {
@@ -743,17 +742,608 @@ async function loadCheckoutLocations() {
                     wardSelect.appendChild(option);
                 });
                 wardSelect.disabled = false;
+                return true;
             } catch (error) {
                 if (provinceSelect.value !== provinceCode) return;
                 console.error('Không tải được xã/phường:', error);
                 wardSelect.innerHTML = '<option value="">Không tải được dữ liệu — vui lòng thử lại</option>';
+                return false;
             }
+        }
+
+        provinceSelect.addEventListener('change', () => {
+            void loadWards(provinceSelect.value);
         });
+
+        return {
+            async selectAddress(provinceName, wardName) {
+                const provinceOption = Array.from(provinceSelect.options)
+                    .find(option => option.textContent.trim().toLocaleLowerCase() === provinceName.trim().toLocaleLowerCase());
+                if (!provinceOption) return false;
+                provinceSelect.value = provinceOption.value;
+                if (!await loadWards(provinceOption.value)) return false;
+                const wardOption = Array.from(wardSelect.options)
+                    .find(option => option.textContent.trim().toLocaleLowerCase() === wardName.trim().toLocaleLowerCase());
+                if (!wardOption) return false;
+                wardSelect.value = wardOption.value;
+                return true;
+            }
+        };
     } catch (error) {
         console.error('Không tải được tỉnh/thành:', error);
         provinceSelect.innerHTML = '<option value="">Không tải được dữ liệu — vui lòng tải lại trang</option>';
         wardSelect.innerHTML = '<option value="">Chọn tỉnh/thành trước</option>';
+        return null;
     }
+}
+
+function initCheckoutAddressPicker(locationsPromise) {
+    const savedAddresses = Array.isArray(window.CHECKOUT_ADDRESSES) ? window.CHECKOUT_ADDRESSES : [];
+    const addressFieldset = document.getElementById('checkout-saved-addresses');
+    const addressOptions = document.getElementById('checkout-address-options');
+    const otherAddresses = document.getElementById('checkout-other-addresses');
+    const otherAddressOptions = document.getElementById('checkout-other-address-options');
+    const addressDropdownToggle = document.getElementById('checkout-address-dropdown-toggle');
+    const addAddressButton = document.getElementById('checkout-add-address');
+    const nameInput = document.getElementById('checkout-name');
+    const phoneInput = document.getElementById('checkout-phone');
+    const defaultInput = document.getElementById('checkout-default-address');
+    const addressIdInput = document.getElementById('checkout-address-id');
+    const editNote = document.getElementById('checkout-address-edit-note');
+    const mapElement = document.getElementById('checkout-address-map');
+    const mapSection = document.getElementById('checkout-map-section');
+    const mapStatus = document.getElementById('checkout-map-status');
+    const mapSearchButton = document.getElementById('checkout-map-search');
+    const suggestions = document.getElementById('checkout-address-suggestions');
+    const provinceSelect = document.getElementById('checkout-province');
+    const wardSelect = document.getElementById('checkout-ward');
+    const addressDetail = document.getElementById('checkout-address-detail');
+    if (!addressOptions || !mapElement || !mapSection || !mapStatus || !mapSearchButton || !suggestions) return null;
+
+    let activeAddress = null;
+    let activeAddressHasEdits = false;
+    let isNewAddressMode = false;
+    let selectedCoordinates = null;
+    let locationEdited = false;
+    let map = null;
+    let marker = null;
+    let lookupTimer = null;
+    let lookupController = null;
+    let lookupVersion = 0;
+    let selectionVersion = 0;
+    const profileName = nameInput.value;
+    const profilePhone = phoneInput.value;
+
+    function setLocation(latitude, longitude, userInitiated) {
+        selectedCoordinates = { latitude, longitude };
+        if (userInitiated) {
+            locationEdited = true;
+            syncEditedSelection();
+        }
+        if (!window.L || !map) {
+            mapStatus.textContent = `Đã ghi nhận tọa độ: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}.`;
+            return;
+        }
+        if (marker) {
+            marker.setLatLng([latitude, longitude]);
+        } else {
+            marker = window.L.marker([latitude, longitude], { draggable: true }).addTo(map);
+            marker.on('dragend', () => {
+                const position = marker.getLatLng();
+                setLocation(position.lat, position.lng, true);
+            });
+        }
+        map.setView([latitude, longitude], Math.max(map.getZoom(), 16));
+        mapStatus.textContent = `Đã ghim vị trí: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}. Có thể kéo ghim để điều chỉnh.`;
+    }
+
+    function clearLocation(statusText) {
+        selectedCoordinates = null;
+        if (marker && map) {
+            map.removeLayer(marker);
+            marker = null;
+        }
+        mapStatus.textContent = statusText;
+    }
+
+    function getAddressForMap() {
+        if (!provinceSelect.value || !wardSelect.value || !addressDetail.value.trim()) return '';
+        const provinceName = provinceSelect.options[provinceSelect.selectedIndex].textContent;
+        return [addressDetail.value.trim(), wardSelect.value, provinceName].join(', ');
+    }
+
+    function getMapQuery() {
+        if (!isAddressComplete()) return '';
+        return getLookupQuery();
+    }
+
+    function getLookupQueries() {
+        const detail = addressDetail.value.trim();
+        if (detail.length < 3) return [];
+        const provinceName = provinceSelect.value
+            ? provinceSelect.options[provinceSelect.selectedIndex].textContent
+            : '';
+        return Array.from(new Set([
+            [detail, wardSelect.value, provinceName, 'Việt Nam'],
+            [detail, provinceName, 'Việt Nam'],
+            [detail, 'Việt Nam']
+        ].map(parts => parts.filter(Boolean).join(', '))));
+    }
+
+    function getLookupQuery() {
+        return getLookupQueries()[0] || '';
+    }
+
+    function splitSavedAddress(address) {
+        const parts = String(address || '').split(',').map(part => part.trim());
+        if (parts.length < 3) {
+            return { detail: String(address || ''), ward: '', province: '' };
+        }
+        return {
+            detail: parts.slice(0, -2).join(', '),
+            ward: parts[parts.length - 2],
+            province: parts[parts.length - 1]
+        };
+    }
+
+    function isAddressComplete() {
+        return Boolean(provinceSelect.value && wardSelect.value && !wardSelect.disabled && addressDetail.value.trim());
+    }
+
+    function syncEditedSelection() {
+        const hasEdits = Boolean(activeAddress && isAddressComplete() && (
+            locationEdited
+            ||
+            nameInput.value.trim() !== String(activeAddress.recipient_name).trim()
+            || phoneInput.value.trim() !== String(activeAddress.phone).trim()
+            || getAddressForMap() !== String(activeAddress.address).trim()
+        ));
+        addressIdInput.value = activeAddress && !hasEdits ? String(activeAddress.id) : '';
+        const selectedDefault = activeAddress && Number(activeAddress.is_default) === 1;
+        defaultInput.disabled = Boolean(selectedDefault && !hasEdits);
+        if (selectedDefault && !hasEdits) defaultInput.checked = true;
+        if (hasEdits && selectedDefault && !activeAddressHasEdits) defaultInput.checked = false;
+        activeAddressHasEdits = hasEdits;
+        if (editNote) {
+            editNote.hidden = !activeAddress && !isNewAddressMode;
+            editNote.textContent = hasEdits
+                ? 'Thông tin sửa chỉ được lưu thành địa chỉ mặc định mới nếu bạn tích chọn lưu mặc định; nếu không, địa chỉ chỉ dùng cho đơn hàng này.'
+                : isNewAddressMode
+                    ? 'Địa chỉ mới chỉ được lưu vào tài khoản khi bạn tích chọn lưu làm mặc định.'
+                    : 'Địa chỉ đã lưu được dùng cho đơn hàng này. Nếu chỉnh sửa, chỉ lưu bản mới khi bạn tích chọn lưu mặc định.';
+        }
+    }
+
+    function updateMapVisibility() {
+        const complete = isAddressComplete();
+        mapSection.hidden = !complete;
+        if (complete) window.setTimeout(() => map?.invalidateSize(), 0);
+        return complete;
+    }
+
+    function normalizeAddressWords(value) {
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[đĐ]/g, 'd')
+            .toLocaleLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean);
+    }
+
+    function getFeatureMatchScore(feature, detail) {
+        const properties = feature.properties || {};
+        const names = [
+            properties.name,
+            properties['name:vi'],
+            properties['name:en'],
+            properties.street
+        ].filter(Boolean);
+        const queryWords = new Set(normalizeAddressWords(detail));
+        if (queryWords.size < 2) return 0;
+        const featureWords = new Set(names.flatMap(normalizeAddressWords));
+        const matchedWords = Array.from(queryWords).filter(word => featureWords.has(word)).length;
+        return matchedWords / queryWords.size;
+    }
+
+    function getFeaturePriority(feature) {
+        const properties = feature.properties || {};
+        if (properties.osm_key === 'amenity' && properties.osm_value === 'bus_station') return 3;
+        if (properties.osm_key === 'amenity') return 2;
+        if (properties.osm_key === 'highway' && properties.osm_value === 'bus_stop') return -2;
+        return 0;
+    }
+
+    function normalizeAreaName(value) {
+        const words = normalizeAddressWords(value);
+        const prefixes = [
+            ['thanh', 'pho'], ['thi', 'tran'], ['phuong'], ['xa'], ['tinh'],
+            ['quan'], ['huyen'], ['ward'], ['commune'], ['district'], ['city'], ['province']
+        ];
+        const prefix = prefixes.find(candidate =>
+            candidate.every((word, index) => words[index] === word)
+        );
+        if (prefix) words.splice(0, prefix.length);
+        const suffixes = ['ward', 'commune', 'district', 'city', 'province'];
+        if (suffixes.includes(words[words.length - 1])) words.pop();
+        return words.join('');
+    }
+
+    function isFeatureInSelectedProvince(feature) {
+        if (!provinceSelect.value) return true;
+        const selectedProvince = normalizeAreaName(
+            provinceSelect.options[provinceSelect.selectedIndex].textContent
+        );
+        const properties = feature.properties || {};
+        const featureProvinces = [properties.city, properties.state]
+            .filter(Boolean)
+            .map(normalizeAreaName)
+            .filter(Boolean);
+        return featureProvinces.includes(selectedProvince);
+    }
+
+    function isFeatureInSelectedArea(feature) {
+        if (!isFeatureInSelectedProvince(feature)) return false;
+        if (!wardSelect.value) return true;
+        const selectedWard = normalizeAreaName(wardSelect.value);
+        const properties = feature.properties || {};
+        const featureWards = [properties.locality, properties.suburb, properties.district]
+            .filter(Boolean)
+            .map(normalizeAreaName)
+            .filter(Boolean);
+        return featureWards.includes(selectedWard);
+    }
+
+    function rankAddressFeatures(features, detail) {
+        return features.slice().sort((left, right) =>
+            getFeatureMatchScore(right, detail) - getFeatureMatchScore(left, detail)
+            || getFeaturePriority(right) - getFeaturePriority(left)
+        );
+    }
+
+    function findMatchingFeature(features, detail) {
+        const houseNumber = detail.match(/^\s*(?:số\s*)?(\d+[a-z]?(?:\/\d+[a-z]?)?)/i);
+        if (houseNumber) {
+            const normalizePart = value => normalizeAddressWords(value).join('');
+            const normalizedDetail = normalizePart(detail);
+            return features.find(feature => {
+                if (!isFeatureInSelectedArea(feature)) return false;
+                const properties = feature.properties || {};
+                const normalizedStreet = normalizePart(properties.street || properties.name).replace(/^duong/, '');
+                return String(properties.housenumber || '').toLocaleLowerCase() === houseNumber[1].toLocaleLowerCase()
+                    && normalizedStreet !== ''
+                    && normalizedDetail.includes(normalizedStreet);
+            }) || null;
+        }
+
+        return rankAddressFeatures(features.filter(isFeatureInSelectedArea), detail)
+            .find(feature => getFeatureMatchScore(feature, detail) >= 0.6) || null;
+    }
+
+    function renderSuggestions(features, version) {
+        suggestions.innerHTML = '';
+        features.slice(0, 5).forEach(feature => {
+            const properties = feature.properties || {};
+            const coordinates = feature.geometry?.coordinates;
+            if (!Array.isArray(coordinates) || coordinates.length < 2) return;
+            const labelParts = [
+                properties.housenumber,
+                properties.street,
+                properties.name,
+                properties['name:vi'],
+                properties.suburb,
+                properties.locality,
+                properties.district,
+                properties.city,
+                properties.state,
+                properties.country
+            ].map(part => String(part || '').trim()).filter(Boolean);
+            const labelText = Array.from(new Set(labelParts)).join(', ');
+            if (!labelText) return;
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'checkout-address-suggestion';
+            option.setAttribute('role', 'option');
+            option.textContent = labelText;
+            option.addEventListener('click', () => {
+                if (version !== lookupVersion) return;
+                const properties = feature.properties || {};
+                const specificDetail = [
+                    properties.housenumber,
+                    properties.street,
+                    properties.name || properties['name:vi'] || properties['name:en']
+                ].map(part => String(part || '').trim()).filter(Boolean).join(', ');
+                if (specificDetail) {
+                    addressDetail.value = specificDetail.slice(0, 350);
+                    syncEditedSelection();
+                }
+                setLocation(Number(coordinates[1]), Number(coordinates[0]), true);
+                suggestions.hidden = true;
+                mapStatus.textContent = `Đã cập nhật địa chỉ theo gợi ý: ${labelText}. Có thể kéo ghim để điều chỉnh.`;
+            });
+            suggestions.appendChild(option);
+        });
+        suggestions.hidden = suggestions.childElementCount === 0;
+    }
+
+    async function lookupAddress(query) {
+        const version = ++lookupVersion;
+        if (lookupController) lookupController.abort();
+        lookupController = new AbortController();
+        mapStatus.textContent = 'Đang tìm địa chỉ thực tế...';
+        try {
+            const detail = addressDetail.value.trim();
+            const queries = Array.from(new Set([query, ...getLookupQueries()].filter(Boolean)));
+            let features = [];
+            for (const searchQuery of queries) {
+                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&limit=5`;
+                const response = await fetch(url, {
+                    headers: { Accept: 'application/json' },
+                    signal: lookupController.signal
+                });
+                if (!response.ok) throw new Error(`Tìm địa chỉ thất bại (${response.status}).`);
+                const result = await response.json();
+                if (version !== lookupVersion) return;
+                const foundFeatures = Array.isArray(result.features) ? result.features : [];
+                const existingFeatures = new Set(features.map(feature => {
+                    const properties = feature.properties || {};
+                    const coordinates = feature.geometry?.coordinates || [];
+                    return `${properties.osm_type || ''}:${properties.osm_id || coordinates.join(',')}:${properties.name || ''}`;
+                }));
+                features = features.concat(foundFeatures.filter(feature => {
+                    const properties = feature.properties || {};
+                    const coordinates = feature.geometry?.coordinates || [];
+                    const key = `${properties.osm_type || ''}:${properties.osm_id || coordinates.join(',')}:${properties.name || ''}`;
+                    if (existingFeatures.has(key)) return false;
+                    existingFeatures.add(key);
+                    return true;
+                }));
+                if (findMatchingFeature(foundFeatures, detail)) break;
+            }
+
+            const localFeatures = features.filter(isFeatureInSelectedArea);
+            const rankedFeatures = rankAddressFeatures(localFeatures, detail);
+            renderSuggestions(rankedFeatures, version);
+            if (!isAddressComplete()) {
+                mapStatus.textContent = rankedFeatures.length
+                    ? 'Chọn gợi ý nếu phù hợp; bản đồ sẽ hiện sau khi điền đủ tỉnh/thành và xã/phường.'
+                    : features.length
+                        ? 'Kết quả tìm được không khớp địa giới đã chọn; hãy kiểm tra lại tỉnh/thành và xã/phường.'
+                        : 'Chưa tìm thấy gợi ý. Thử nhập thêm tên đường hoặc số nhà.';
+                return;
+            }
+            const validFeatures = rankedFeatures.filter(feature =>
+                Array.isArray(feature.geometry?.coordinates)
+                && feature.geometry.coordinates.length >= 2
+                && isFeatureInSelectedArea(feature)
+            );
+            if (validFeatures.length === 0) {
+                clearLocation(features.length
+                    ? 'Kết quả tìm được không thuộc đúng tỉnh/thành và xã/phường đã chọn; hãy kiểm tra địa chỉ hoặc khu vực.'
+                    : 'Không tìm thấy vị trí khớp. Bạn có thể điều chỉnh địa chỉ hoặc ghim trực tiếp trên bản đồ.');
+                return;
+            }
+
+            const exactFeature = findMatchingFeature(validFeatures, detail);
+            if (exactFeature) {
+                setLocation(Number(exactFeature.geometry.coordinates[1]), Number(exactFeature.geometry.coordinates[0]));
+                mapStatus.textContent = detail.match(/^\s*(?:số\s*)?\d+/i)
+                    ? 'Đã ghim vị trí có số nhà và đường phù hợp. Hãy kiểm tra ghim trước khi đặt hàng.'
+                    : 'Đã ghim địa điểm phù hợp với tên bạn nhập. Hãy kiểm tra ghim trước khi đặt hàng.';
+            } else {
+                clearLocation('Chưa tìm được điểm khớp đủ tin cậy. Chọn một gợi ý phù hợp hoặc nhấn đúng vị trí trên bản đồ để ghim.');
+                const nearest = validFeatures[0].geometry.coordinates;
+                map?.setView([Number(nearest[1]), Number(nearest[0])], 16);
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+            console.error('Không tìm được địa chỉ thực tế:', error);
+            mapStatus.textContent = error.message || 'Không thể tìm vị trí lúc này. Bạn có thể ghim trực tiếp trên bản đồ.';
+        }
+    }
+
+    function scheduleAddressLookup() {
+        updateMapVisibility();
+        window.clearTimeout(lookupTimer);
+        if (lookupController) lookupController.abort();
+        lookupVersion += 1;
+        suggestions.innerHTML = '';
+        suggestions.hidden = true;
+        const query = getLookupQuery();
+        if (!query) {
+            clearLocation('Nhập ít nhất 3 ký tự địa chỉ cụ thể để xem gợi ý.');
+            return;
+        }
+        clearLocation('Đang tìm gợi ý địa chỉ...');
+        locationEdited = false;
+        lookupTimer = window.setTimeout(() => {
+            void lookupAddress(query);
+        }, 500);
+    }
+
+    function renderCurrentAddress(address, isNewAddress) {
+        addressOptions.innerHTML = '';
+        const card = document.createElement(address ? 'button' : 'div');
+        card.className = `checkout-address-option checkout-address-current is-selected${address ? ' is-actionable' : ''}`;
+        if (address) {
+            card.type = 'button';
+            card.addEventListener('click', () => {
+                void chooseAddress(address.id);
+            });
+        }
+        const details = document.createElement('span');
+        const title = document.createElement('strong');
+        const phoneText = document.createElement('span');
+        const addressText = document.createElement('span');
+
+        if (address) {
+            title.textContent = address.recipient_name;
+            phoneText.textContent = address.phone;
+            addressText.textContent = address.address;
+            details.append(title, phoneText, addressText);
+            if (Number(address.is_default) === 1) {
+                const defaultLabel = document.createElement('em');
+                defaultLabel.textContent = 'Địa chỉ mặc định';
+                details.appendChild(defaultLabel);
+            }
+        } else {
+            title.textContent = isNewAddress ? 'Địa chỉ mới' : 'Chưa có địa chỉ mặc định';
+            phoneText.textContent = isNewAddress
+                ? 'Nhập thông tin nhận hàng bên dưới.'
+                : 'Chọn địa chỉ trong danh sách hoặc thêm địa chỉ mới.';
+            details.append(title, phoneText);
+        }
+
+        card.appendChild(details);
+        addressOptions.appendChild(card);
+    }
+
+    function addAddressOption(container, address) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'checkout-address-option checkout-address-menu-option';
+        const details = document.createElement('span');
+        const title = document.createElement('strong');
+        const phoneText = document.createElement('span');
+        const addressText = document.createElement('span');
+        title.textContent = address.recipient_name;
+        phoneText.textContent = address.phone;
+        addressText.textContent = address.address;
+        details.append(title, phoneText, addressText);
+        if (Number(address.is_default) === 1) {
+            const defaultLabel = document.createElement('em');
+            defaultLabel.textContent = 'Địa chỉ mặc định';
+            details.appendChild(defaultLabel);
+        }
+        option.appendChild(details);
+        option.addEventListener('click', () => {
+            void chooseAddress(address.id);
+        });
+        container.appendChild(option);
+    }
+
+    function renderOtherAddressOptions() {
+        otherAddressOptions.innerHTML = '';
+        savedAddresses
+            .filter(address => !activeAddress || String(address.id) !== String(activeAddress.id))
+            .forEach(address => addAddressOption(otherAddressOptions, address));
+    }
+
+    async function chooseAddress(addressId) {
+        const currentSelection = ++selectionVersion;
+        window.clearTimeout(lookupTimer);
+        if (lookupController) lookupController.abort();
+        lookupVersion += 1;
+        suggestions.innerHTML = '';
+        suggestions.hidden = true;
+        const selected = savedAddresses.find(address => String(address.id) === String(addressId));
+        activeAddress = selected || null;
+        activeAddressHasEdits = false;
+        isNewAddressMode = !selected;
+        locationEdited = false;
+        addressIdInput.value = selected ? String(selected.id) : '';
+        renderCurrentAddress(selected, isNewAddressMode);
+        renderOtherAddressOptions();
+        otherAddresses.hidden = true;
+        addressDropdownToggle.setAttribute('aria-expanded', 'false');
+
+        if (selected) {
+            nameInput.value = selected.recipient_name;
+            phoneInput.value = selected.phone;
+            defaultInput.checked = Number(selected.is_default) === 1;
+            const parts = splitSavedAddress(selected.address);
+            addressDetail.value = parts.detail;
+            provinceSelect.value = '';
+            wardSelect.disabled = true;
+            wardSelect.innerHTML = '<option value="">Chọn tỉnh/thành trước</option>';
+            const locations = await locationsPromise;
+            let locationPartsLoaded = false;
+            if (currentSelection === selectionVersion && locations && parts.province && parts.ward) {
+                locationPartsLoaded = await locations.selectAddress(parts.province, parts.ward);
+            }
+            if (currentSelection !== selectionVersion) return;
+            if (!locationPartsLoaded) {
+                addressDetail.value = selected.address;
+                provinceSelect.value = '';
+                wardSelect.disabled = true;
+                wardSelect.innerHTML = '<option value="">Chọn tỉnh/thành trước</option>';
+            }
+            syncEditedSelection();
+            const complete = updateMapVisibility();
+            const latitude = Number(selected.latitude);
+            const longitude = Number(selected.longitude);
+            if (complete && selected.latitude !== null && selected.longitude !== null
+                && selected.latitude !== '' && selected.longitude !== ''
+                && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                setLocation(latitude, longitude);
+            } else {
+                scheduleAddressLookup();
+            }
+        } else {
+            nameInput.value = profileName;
+            phoneInput.value = profilePhone;
+            addressIdInput.value = '';
+            locationEdited = false;
+            if (editNote) editNote.hidden = true;
+            defaultInput.disabled = false;
+            defaultInput.checked = false;
+            provinceSelect.value = '';
+            wardSelect.disabled = true;
+            wardSelect.innerHTML = '<option value="">Chọn tỉnh/thành trước</option>';
+            addressDetail.value = '';
+            syncEditedSelection();
+            scheduleAddressLookup();
+        }
+    }
+
+    const defaultAddress = savedAddresses.find(address => Number(address.is_default) === 1) || null;
+    if (savedAddresses.length > 0) {
+        addressFieldset.hidden = false;
+        addressDropdownToggle.hidden = false;
+        addressDropdownToggle.addEventListener('click', () => {
+            const isExpanded = addressDropdownToggle.getAttribute('aria-expanded') === 'true';
+            addressDropdownToggle.setAttribute('aria-expanded', String(!isExpanded));
+            otherAddresses.hidden = isExpanded;
+        });
+        addAddressButton.addEventListener('click', () => {
+            void chooseAddress('new');
+        });
+    }
+
+    if (!window.L) {
+        mapSearchButton.disabled = true;
+        mapStatus.textContent = 'Không tải được thư viện bản đồ. Gợi ý địa chỉ và đặt hàng vẫn hoạt động bình thường.';
+    } else {
+        map = window.L.map(mapElement, { scrollWheelZoom: false }).setView([16.0, 107.5], 5);
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'
+        }).addTo(map);
+        map.on('click', event => setLocation(event.latlng.lat, event.latlng.lng, true));
+
+        mapSearchButton.addEventListener('click', async () => {
+            const query = getMapQuery();
+            if (!query) {
+                mapStatus.textContent = 'Vui lòng nhập đầy đủ tỉnh/thành, xã/phường và địa chỉ cụ thể trước.';
+                return;
+            }
+            await lookupAddress(query);
+        });
+    }
+
+    void chooseAddress(defaultAddress ? defaultAddress.id : 'new');
+
+    return {
+        getAddressId: () => addressIdInput.value ? Number(addressIdInput.value) : null,
+        isEditingSavedAddress: () => Boolean(activeAddress && !addressIdInput.value),
+        getAddress: getAddressForMap,
+        getCoordinates: () => selectedCoordinates,
+        isAddressComplete,
+        scheduleAddressLookup,
+        syncEditedSelection
+    };
 }
 
 function initCheckoutPage() {
@@ -783,7 +1373,7 @@ function initCheckoutPage() {
     }
 
     renderCheckoutSummary();
-    loadCheckoutLocations();
+    const checkoutLocations = loadCheckoutLocations();
 
     const currentCustomer = getCurrentCustomer();
     const userJson = localStorage.getItem('currentUser');
@@ -800,6 +1390,38 @@ function initCheckoutPage() {
     } else if (loginNotice) {
         loginNotice.hidden = false;
     }
+    const addressPicker = initCheckoutAddressPicker(checkoutLocations);
+
+    const provinceSelect = document.getElementById('checkout-province');
+    const wardSelect = document.getElementById('checkout-ward');
+    const addressDetail = document.getElementById('checkout-address-detail');
+    const resetAddressForRegionChange = () => {
+        addressDetail.value = '';
+        if (addressPicker) {
+            addressPicker.syncEditedSelection();
+            addressPicker.scheduleAddressLookup();
+        }
+    };
+    [provinceSelect, wardSelect].forEach(field => {
+        field?.addEventListener('change', resetAddressForRegionChange);
+    });
+    addressDetail?.addEventListener('change', () => {
+        if (addressPicker) {
+            addressPicker.syncEditedSelection();
+            addressPicker.scheduleAddressLookup();
+        }
+    });
+    addressDetail?.addEventListener('input', () => {
+        if (addressPicker) {
+            addressPicker.syncEditedSelection();
+            addressPicker.scheduleAddressLookup();
+        }
+    });
+    [document.getElementById('checkout-name'), document.getElementById('checkout-phone')].forEach(field => {
+        field?.addEventListener('input', () => {
+            if (addressPicker) addressPicker.syncEditedSelection();
+        });
+    });
 
     form.addEventListener('submit', async event => {
         event.preventDefault();
@@ -820,20 +1442,23 @@ function initCheckoutPage() {
         if (!form.reportValidity()) return;
         const provinceSelect = document.getElementById('checkout-province');
         const wardSelect = document.getElementById('checkout-ward');
-        if (!provinceSelect.value || !wardSelect.value || wardSelect.disabled) {
+        const savedAddressId = addressPicker ? addressPicker.getAddressId() : null;
+        if (!savedAddressId && (!provinceSelect.value || !wardSelect.value || wardSelect.disabled)) {
             message.textContent = 'Vui lòng chọn đầy đủ tỉnh/thành phố và xã/phường.';
             (provinceSelect.value ? wardSelect : provinceSelect).focus();
             return;
         }
 
         const formData = new FormData(form);
-        const address = [
-            formData.get('address_detail'),
-            formData.get('ward'),
-            formData.get('province')
-                ? document.querySelector('#checkout-province option:checked').textContent
-                : ''
-        ].filter(Boolean).join(', ');
+        const address = savedAddressId
+            ? addressPicker.getAddress()
+            : [
+                formData.get('address_detail'),
+                formData.get('ward'),
+                formData.get('province')
+                    ? document.querySelector('#checkout-province option:checked').textContent
+                    : ''
+            ].filter(Boolean).join(', ');
         const customer = {
             name: String(formData.get('name')).trim(),
             phone: String(formData.get('phone')).trim(),
@@ -849,7 +1474,11 @@ function initCheckoutPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     cart: selectedItems,
-                    customer
+                    customer,
+                    address_id: savedAddressId,
+                    save_as_new_address: addressPicker ? addressPicker.isEditingSavedAddress() : false,
+                    make_default: document.getElementById('checkout-default-address').checked,
+                    coordinates: addressPicker ? addressPicker.getCoordinates() : null
                 })
             });
             const result = await response.json();
