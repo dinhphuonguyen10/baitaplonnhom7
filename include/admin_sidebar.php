@@ -18,6 +18,7 @@ $currentScript = $adminCurrentPage ?? basename($_SERVER['SCRIPT_NAME'] ?? '');
 $sideMenu = [
     ['icon' => '▦', 'label' => 'Tổng quan',                    'href' => '/admin/index.php',     'file' => 'index.php'],
     ['icon' => '◇', 'label' => 'Quản lý sản phẩm',             'href' => '/admin/products.php',  'file' => 'products.php'],
+    ['icon' => '☆', 'label' => 'Quản lý đánh giá',             'href' => '/admin/reviews.php',   'file' => 'reviews.php'],
     ['icon' => '▧', 'label' => 'Quản lý danh mục',             'href' => '/admin/categories.php','file' => 'categories.php'],
     ['icon' => '♙', 'label' => 'Quản lý tài khoản nhân viên', 'href' => '/admin/users.php',     'file' => 'users.php', 'manager_only' => true],
     ['icon' => '▤', 'label' => 'Quản lý đơn hàng',             'href' => '/admin/orders.php',    'file' => 'orders.php'],

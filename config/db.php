@@ -13,6 +13,40 @@ if ($conn->connect_error) {
 
 $conn->set_charset("utf8mb4");
 
+// Lưu phản hồi của quản trị viên riêng để không thay đổi nội dung đánh giá của khách hàng.
+$reviewRepliesTableSql = "CREATE TABLE IF NOT EXISTS review_replies (
+    review_id int(10) unsigned NOT NULL,
+    admin_username varchar(100) NOT NULL,
+    reply text NOT NULL,
+    replied_at datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+    PRIMARY KEY (review_id),
+    CONSTRAINT fk_review_replies_review FOREIGN KEY (review_id) REFERENCES reviews (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+if (!$conn->query($reviewRepliesTableSql)) {
+    error_log('Review replies schema setup failed: ' . $conn->error);
+}
+$reviewImagesTable = $conn->query("SHOW TABLES LIKE 'review_images'");
+if ($reviewImagesTable && $reviewImagesTable->num_rows === 0) {
+    $reviewImagesTableSql = "CREATE TABLE review_images (
+        id int(10) unsigned NOT NULL AUTO_INCREMENT,
+        review_id int(10) unsigned NOT NULL,
+        image_path varchar(500) NOT NULL,
+        sort_order tinyint(3) unsigned NOT NULL DEFAULT 0,
+        PRIMARY KEY (id),
+        KEY idx_review_images_review (review_id),
+        CONSTRAINT fk_review_images_review FOREIGN KEY (review_id) REFERENCES reviews (id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    if (!$conn->query($reviewImagesTableSql)) {
+        error_log('Review images schema setup failed: ' . $conn->error);
+    }
+}
+$reviewEditCountColumn = $conn->query("SHOW COLUMNS FROM reviews LIKE 'edit_count'");
+if ($reviewEditCountColumn && $reviewEditCountColumn->num_rows === 0) {
+    if (!$conn->query('ALTER TABLE reviews ADD COLUMN edit_count TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER comment')) {
+        error_log('Review edit counter schema setup failed: ' . $conn->error);
+    }
+}
+
 // Tự đồng bộ các cột mới của bảng stores cho database đã tạo từ bản SQL cũ.
 $storesTable = $conn->query("SHOW TABLES LIKE 'stores'");
 if ($storesTable && $storesTable->num_rows > 0) {

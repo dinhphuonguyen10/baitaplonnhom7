@@ -122,7 +122,7 @@ Giỏ hàng được lưu theo tài khoản/khách trong trình duyệt. Trang �
 1. Đặt dự án trong thư mục web của XAMPP, ví dụ `C:\xampp\htdocs\Baitaplon`.
 2. Bật Apache và MySQL trong XAMPP.
 3. Tạo database theo `database/baitaplon.sql` trong phpMyAdmin. File này cũng khởi tạo sản phẩm mẫu theo danh mục, sử dụng ảnh có sẵn trong `assets/`.
-4. Kiểm tra cấu hình kết nối local trong `config/db.php`.
+4. Kiểm tra cấu hình kết nối local trong `config/db.php`. Ứng dụng tự đồng bộ trường giới hạn lượt sửa và các bảng ảnh/phản hồi đánh giá nếu database chưa có.
 5. Mở `http://localhost/Baitaplon/`.
 
 
