@@ -69,7 +69,7 @@ $descriptionByCategory = [
             ? $rawDescription
             : ($descriptionByCategory[$product['category']] ?? 'Một thiết kế được ÉCRIN tuyển chọn để bạn dễ dàng tìm thấy món trang sức phù hợp với phong cách của mình.');
         ?>
-        <section class="product-detail-card product-card" data-db-id="<?php echo (int) $product['id']; ?>" aria-labelledby="product-name">
+        <section class="product-detail-card product-card" data-db-id="<?php echo (int) $product['id']; ?>" data-stock="<?php echo $stock; ?>" aria-labelledby="product-name">
             <!-- CỘT TRÁI: HÌNH ẢNH SẢN PHẨM VUÔNG KHÍT KHUNG -->
             <div class="product-detail-image-wrap">
                 <button type="button" class="wishlist-btn" data-product-id="<?php echo (int) $product['id']; ?>" title="Yêu thích">♡</button>
@@ -122,10 +122,18 @@ $descriptionByCategory = [
                 <?php endif; ?>
 
                 <!-- CẶP NÚT MUA HÀNG & CHAT TƯ VẤN SANG TRỌNG -->
+                <?php $maxQuantity = min($stock, 99); ?>
+                <div class="product-quantity-control product-detail-quantity" role="group" aria-label="Chọn số lượng <?php echo $escape($product['name']); ?>">
+                    <span>Số lượng</span>
+                    <button type="button" class="product-quantity-decrease" aria-label="Giảm số lượng"<?php echo $maxQuantity <= 0 ? ' disabled' : ''; ?>>−</button>
+                    <input class="product-quantity" type="number" min="1" max="<?php echo max($maxQuantity, 1); ?>" value="1" inputmode="numeric" aria-label="Số lượng <?php echo $escape($product['name']); ?>"<?php echo $maxQuantity <= 0 ? ' disabled' : ''; ?>>
+                    <button type="button" class="product-quantity-increase" aria-label="Tăng số lượng"<?php echo $maxQuantity <= 0 ? ' disabled' : ''; ?>>+</button>
+                </div>
                 <div class="product-detail-actions">
-                    <button class="add-to-cart" <?php echo $stock <= 0 ? 'disabled' : ''; ?>>
+                    <button type="button" class="add-to-cart" <?php echo $stock <= 0 ? 'disabled' : ''; ?>>
                         <?php echo $stock > 0 ? 'Thêm vào giỏ' : 'Tạm hết hàng'; ?>
                     </button>
+                    <button type="button" class="buy-now" <?php echo $stock <= 0 ? 'disabled' : ''; ?>>Mua ngay</button>
                     <a class="btn-chat-consult" href="<?php echo $escape($appBaseUrl . '/client/chat.php'); ?>" title="Chat trực tiếp với cửa hàng">
                         <svg class="btn-chat-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"></path>

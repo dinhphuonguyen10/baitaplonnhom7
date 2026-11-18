@@ -67,7 +67,9 @@ function initSlideshow() {
 function renderProductRating(product) {
     const reviewCount = Number(product.review_count) || 0;
     const averageRating = Number(product.average_rating);
-    if (reviewCount <= 0 || !Number.isFinite(averageRating)) return '';
+    if (reviewCount <= 0 || !Number.isFinite(averageRating)) {
+        return '<div class="product-rating product-rating--empty" aria-hidden="true"></div>';
+    }
 
     return `
         <div class="product-rating" aria-label="Đánh giá ${averageRating.toFixed(1)} trên 5 sao, ${reviewCount} lượt">
@@ -78,9 +80,27 @@ function renderProductRating(product) {
     `;
 }
 
+function renderProductMeta(soldCount) {
+    const soldHTML = soldCount > 0
+        ? `<span class="sold">Đã bán ${soldCount}</span>`
+        : '<span class="product-meta-empty" aria-hidden="true"></span>';
+    return `<div class="product-meta">${soldHTML}</div>`;
+}
+
+function getProductQuantityControlMarkup(stock, name) {
+    const maxQuantity = Math.min(stock, 99);
+    const disabled = maxQuantity <= 0 ? ' disabled' : '';
+    return `
+        <div class="product-quantity-control" role="group" aria-label="Chọn số lượng ${escapeHtml(name)}">
+            <button type="button" class="product-quantity-decrease" aria-label="Giảm số lượng"${disabled}>−</button>
+            <input class="product-quantity" type="number" min="1" max="${Math.max(maxQuantity, 1)}" value="1" inputmode="numeric" aria-label="Số lượng ${escapeHtml(name)}"${disabled}>
+            <button type="button" class="product-quantity-increase" aria-label="Tăng số lượng"${disabled}>+</button>
+        </div>
+    `;
+}
+
 function createSliderItems(container, products) {
     products.forEach(product => {
-        const giftHTML = (product.gift && typeof product.gift === 'string' && product.gift.trim() !== '') ? `<p class="product-gift">${product.gift}</p>` : '';
         const discountHTML = product.discount ? `<div class="product-discount">${product.discount}</div>` : '';
         const imagePath = typeof product.image === 'string' ? product.image : '';
         const imageUrl = getProductImageUrl(imagePath);
@@ -88,24 +108,10 @@ function createSliderItems(container, products) {
         const stock = Number(product.stock) || 0;
         const soldCount = Number(product.soldCount) || 0;
 
-        const stockHTML = stock > 0
-            ? `<span class="product-stock" style="font-size: 0.82rem; color: #27ae60;">Kho: <strong>${stock}</strong></span>`
-            : `<span class="product-stock" style="font-size: 0.82rem; color: #e74c3c; font-weight: 600;">Hết hàng</span>`;
-
-        // Chỉ hiển thị lượt bán khi có đơn hàng (soldCount > 0)
-        const soldHTML = soldCount > 0
-            ? `<span class="sold" style="font-size: 0.82rem; color: #e67e22; font-weight: 500;">Đã bán ${soldCount}</span>`
-            : '';
-
-        const metaHTML = `
-            <div class="product-meta" style="display: flex; justify-content: space-between; align-items: center; margin: 6px 0 8px;">
-                ${stockHTML}
-                ${soldHTML}
-            </div>
-        `;
+        const metaHTML = renderProductMeta(soldCount);
 
         const itemHTML = `
-            <div class="product-card" data-db-id="${product.id || ''}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm" style="flex-shrink: 0; width: 240px;">
+            <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm" style="flex-shrink: 0; width: 240px;">
                 ${discountHTML}
                 <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id || ''}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
                 <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
@@ -115,10 +121,15 @@ function createSliderItems(container, products) {
                         <span class="price-sale">${product.priceSale}<sup>đ</sup></span>
                         ${product.priceOriginal && parsePrice(product.priceOriginal) > 0 ? `<span class="price-original">${product.priceOriginal}<sup>đ</sup></span>` : ''}
                     </div>
-                    ${renderProductRating(product)}
                     ${metaHTML}
-                    ${giftHTML}
-                    <button class="add-to-cart"${stock <= 0 ? ' disabled style="background:#bbb;cursor:not-allowed;"' : ''}>${stock <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</button>
+                    ${renderProductRating(product)}
+                    <div class="product-purchase-controls">
+                        ${getProductQuantityControlMarkup(stock, product.name)}
+                        <div class="product-card-actions">
+                            <button type="button" class="add-to-cart"${stock <= 0 ? ' disabled' : ''}>${stock <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</button>
+                            <button type="button" class="buy-now"${stock <= 0 ? ' disabled' : ''}>Mua ngay</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -255,6 +266,7 @@ function initScrollToTop() {
 
 // ==================== ADD TO CART ====================
 let cart = [];
+const DIRECT_CHECKOUT_KEY = 'direct_checkout_product';
 let currentCustomerUsername = typeof window.CUSTOMER_USERNAME === 'string'
     ? window.CUSTOMER_USERNAME
     : null;
@@ -397,14 +409,19 @@ function renderCart() {
 function addItemToCart(product) {
     if (!getCurrentCustomer()) {
         promptCustomerLogin();
-        return;
+        return false;
     }
 
     loadCart(); // Đồng bộ dữ liệu mới nhất
 
     if (!product || !product.name) {
         console.error('Sản phẩm không hợp lệ:', product);
-        return;
+        return false;
+    }
+    const quantity = Number(product.quantity) || 1;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+        showToast('Số lượng sản phẩm không hợp lệ.');
+        return false;
     }
 
     const existingProduct = cart.find(item =>
@@ -413,8 +430,14 @@ function addItemToCart(product) {
             : item.name === product.name
     );
 
+    const nextQuantity = (existingProduct ? Number(existingProduct.quantity) : 0) + quantity;
+    if (nextQuantity > 99 || (Number(product.stock) > 0 && nextQuantity > Number(product.stock))) {
+        showToast('Số lượng vượt quá sản phẩm còn trong kho.');
+        return false;
+    }
+
     if (existingProduct) {
-        existingProduct.quantity += 1;
+        existingProduct.quantity = nextQuantity;
         existingProduct.selected = true;
     } else {
         cart.push({
@@ -422,7 +445,7 @@ function addItemToCart(product) {
             name: product.name,
             price: product.price || 0,
             image: product.image || 'assets/banner/logo.png',
-            quantity: 1
+            quantity
         });
     }
 
@@ -431,6 +454,40 @@ function addItemToCart(product) {
     renderCart();
     showToast(`Đã thêm "${product.name}" vào giỏ hàng`);
     console.log('Đã thêm sản phẩm vào giỏ:', product.name);
+    return true;
+}
+
+function isDirectCheckout() {
+    return new URLSearchParams(window.location.search).get('direct') === '1';
+}
+
+function getDirectCheckoutItem() {
+    if (!isDirectCheckout()) return null;
+
+    try {
+        const savedItem = sessionStorage.getItem(DIRECT_CHECKOUT_KEY);
+        if (!savedItem) return null;
+        const item = JSON.parse(savedItem);
+        if (!item || !Number.isInteger(Number(item.product_id)) || Number(item.product_id) < 1
+            || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1 || Number(item.quantity) > 99
+            || !Number.isFinite(Number(item.price)) || Number(item.price) < 0
+            || typeof item.name !== 'string' || item.name.trim() === '') {
+            throw new Error('Dữ liệu sản phẩm mua ngay không hợp lệ.');
+        }
+        return item;
+    } catch (error) {
+        console.error('Không đọc được sản phẩm mua ngay:', error);
+        return null;
+    }
+}
+
+function getCheckoutItems() {
+    if (isDirectCheckout()) {
+        const directItem = getDirectCheckoutItem();
+        return directItem ? [directItem] : [];
+    }
+    loadCart();
+    return cart.filter(item => item.selected !== false);
 }
 
 function showToast(message) {
@@ -501,6 +558,71 @@ function initAddToCart() {
         promptCustomerLogin();
     });
 
+    document.addEventListener('click', event => {
+        const quantityButton = event.target.closest('.product-quantity-decrease, .product-quantity-increase');
+        if (!quantityButton) return;
+
+        const card = quantityButton.closest('.product-card');
+        const quantityInput = card?.querySelector('.product-quantity');
+        if (!quantityInput) return;
+
+        const min = Number(quantityInput.min) || 1;
+        const max = Number(quantityInput.max) || 99;
+        const delta = quantityButton.classList.contains('product-quantity-increase') ? 1 : -1;
+        const current = Number.parseInt(quantityInput.value, 10);
+        quantityInput.value = String(Math.max(min, Math.min(max, (Number.isFinite(current) ? current : min) + delta)));
+    });
+
+    document.addEventListener('change', event => {
+        if (!event.target.matches('.product-quantity')) return;
+        const input = event.target;
+        const min = Number(input.min) || 1;
+        const max = Number(input.max) || 99;
+        const quantity = Number.parseInt(input.value, 10);
+        input.value = String(Math.max(min, Math.min(max, Number.isFinite(quantity) ? quantity : min)));
+    });
+
+    document.addEventListener('click', event => {
+        const buyButton = event.target.closest('.buy-now');
+        if (!buyButton) return;
+
+        event.preventDefault();
+        if (!getCurrentCustomer()) {
+            promptCustomerLogin();
+            return;
+        }
+
+        const card = buyButton.closest('.product-card');
+        const name = card?.querySelector('h3, h1')?.textContent.trim();
+        const price = card?.querySelector('.price-sale')?.textContent;
+        const image = card?.querySelector('.product-image')?.src;
+        const quantity = Number.parseInt(card?.querySelector('.product-quantity')?.value || '', 10);
+        const productId = Number(card?.dataset.dbId);
+        const stock = Number(card?.dataset.stock);
+        if (!name || !Number.isInteger(productId) || productId < 1 || !Number.isInteger(quantity)
+            || quantity < 1 || quantity > Math.min(stock, 99)) {
+            showToast('Vui lòng kiểm tra sản phẩm và số lượng còn hàng.');
+            return;
+        }
+
+        const colorSelect = card.querySelector('.color-select');
+        const productName = colorSelect?.value ? `${name} - Màu: ${colorSelect.value}` : name;
+        const directItem = {
+            product_id: productId,
+            name: productName,
+            price: parsePrice(price || ''),
+            image: image || appUrl('/assets/banner/logo.png'),
+            quantity
+        };
+        try {
+            sessionStorage.setItem(DIRECT_CHECKOUT_KEY, JSON.stringify(directItem));
+            window.location.assign(`${appUrl('/client/checkout.php')}?direct=1`);
+        } catch (error) {
+            console.error('Không thể bắt đầu mua ngay:', error);
+            showToast('Không thể bắt đầu đặt hàng. Vui lòng thử lại.');
+        }
+    });
+
     // Event Delegation for "Add to Cart" buttons
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.add-to-cart');
@@ -530,10 +652,12 @@ function initAddToCart() {
             name: productName,
             price: priceElement ? parsePrice(priceElement.textContent) : 0,
             image: imageElement ? imageElement.src : '',
+            quantity: Number.parseInt(productCard.querySelector('.product-quantity')?.value || '1', 10),
+            stock: Number(productCard.dataset.stock)
         };
 
         console.log('Đang thêm sản phẩm:', product);
-        addItemToCart(product);
+        if (!addItemToCart(product)) return;
 
         // UI Feedback
         const originalText = btn.textContent;
@@ -629,9 +753,11 @@ function renderCheckoutSummary() {
 
     loadCart();
     container.innerHTML = '';
-    const selectedItems = cart.filter(item => item.selected !== false);
+    const selectedItems = getCheckoutItems();
     if (selectedItems.length === 0) {
-        container.innerHTML = '<p class="empty-cart">Chưa có sản phẩm nào được chọn. Quay lại giỏ hàng để chọn sản phẩm.</p>';
+        container.innerHTML = isDirectCheckout()
+            ? '<p class="empty-cart">Không tải được sản phẩm mua ngay. Vui lòng quay lại trang sản phẩm và thử lại.</p>'
+            : '<p class="empty-cart">Chưa có sản phẩm nào được chọn. Quay lại giỏ hàng để chọn sản phẩm.</p>';
     }
     selectedItems.forEach(item => {
         const row = document.createElement('div');
@@ -1426,10 +1552,11 @@ function initCheckoutPage() {
     form.addEventListener('submit', async event => {
         event.preventDefault();
         message.textContent = '';
-        loadCart();
-        const selectedItems = cart.filter(item => item.selected !== false);
+        const selectedItems = getCheckoutItems();
         if (selectedItems.length === 0) {
-            message.textContent = 'Chưa có sản phẩm nào được chọn. Vui lòng quay lại giỏ hàng để chọn sản phẩm.';
+            message.textContent = isDirectCheckout()
+                ? 'Không tải được sản phẩm mua ngay. Vui lòng quay lại trang sản phẩm và thử lại.'
+                : 'Chưa có sản phẩm nào được chọn. Vui lòng quay lại giỏ hàng để chọn sản phẩm.';
             return;
         }
 
@@ -1486,11 +1613,19 @@ function initCheckoutPage() {
                 throw new Error(result.message || 'Không thể đặt hàng. Vui lòng thử lại.');
             }
 
-            cart = cart.filter(item => item.selected === false);
-            saveCart();
+            if (isDirectCheckout()) {
+                try {
+                    sessionStorage.removeItem(DIRECT_CHECKOUT_KEY);
+                } catch (error) {
+                    console.error('Không thể xóa dữ liệu mua ngay sau khi đặt hàng:', error);
+                }
+            } else {
+                cart = cart.filter(item => item.selected === false);
+                saveCart();
+                renderCart();
+                renderCheckoutSummary();
+            }
             updateCartCount();
-            renderCart();
-            renderCheckoutSummary();
             form.hidden = true;
             renderCheckoutReceipt(result.order_id, customer, result.items || selectedItems, result.total_price);
         } catch (error) {
@@ -1534,7 +1669,6 @@ let _paginationAllProducts = []; // Lưu toàn bộ sản phẩm đã fetch (dù
 
 function buildProductCardHTML(product) {
     const badgeHTML = product.discount ? `<div class="product-badge">${product.discount}</div>` : '';
-    const giftHTML = (product.gift && product.gift.trim() !== '') ? `<p class="product-gift" style="font-size: 0.8rem; color: var(--gold); margin: 5px 0;">🎁 ${product.gift}</p>` : '';
 
     const priceSaleFormatted = formatDbPrice(product.price_sale);
     const priceOriginalHTML = product.price_original && parsePrice(product.price_original) > 0
@@ -1544,20 +1678,7 @@ function buildProductCardHTML(product) {
     const stock = parseInt(product.stock, 10) || 0;
     const soldCount = parseInt(product.sold_count, 10) || 0;
 
-    const stockHTML = stock > 0
-        ? `<span class="product-stock" style="font-size: 0.85rem; color: #27ae60;">Kho: <strong>${stock}</strong></span>`
-        : `<span class="product-stock" style="font-size: 0.85rem; color: #e74c3c; font-weight: 600;">Hết hàng</span>`;
-
-    const soldHTML = soldCount > 0
-        ? `<span class="sold" style="font-size: 0.85rem; color: #e67e22; font-weight: 500;">Đã bán ${soldCount}</span>`
-        : '';
-
-    const metaHTML = `
-        <div class="product-meta" style="display: flex; justify-content: space-between; align-items: center; margin: 6px 0 8px;">
-            ${stockHTML}
-            ${soldHTML}
-        </div>
-    `;
+    const metaHTML = renderProductMeta(soldCount);
 
     const priceSaleRaw = (typeof product.price_sale_raw !== 'undefined') ? product.price_sale_raw : parsePrice(product.price_sale);
     const hasDiscount = Boolean((product.discount && product.discount.trim() !== '') || (product.price_original_raw > product.price_sale_raw));
@@ -1576,10 +1697,15 @@ function buildProductCardHTML(product) {
                     <span class="price-sale">${priceSaleFormatted}<sup>đ</sup></span>
                     ${priceOriginalHTML}
                 </div>
-                ${renderProductRating(product)}
                 ${metaHTML}
-                ${giftHTML}
-                <button class="add-to-cart"${stock <= 0 ? ' disabled style="background:#bbb;cursor:not-allowed;"' : ''}>${stock <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</button>
+                ${renderProductRating(product)}
+                <div class="product-purchase-controls">
+                    ${getProductQuantityControlMarkup(stock, product.name)}
+                    <div class="product-card-actions">
+                        <button type="button" class="add-to-cart"${stock <= 0 ? ' disabled' : ''}>${stock <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</button>
+                        <button type="button" class="buy-now"${stock <= 0 ? ' disabled' : ''}>Mua ngay</button>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -1890,7 +2016,6 @@ function initSearch() {
                 : appUrl(imagePath.replace(/^(?:\.\.\/)+/, ''));
 
             const stock = parseInt(product.stock, 10) || 0;
-            const stockInfo = stock > 0 ? `<small style="color: #27ae60; font-size: 0.8rem;">Kho: ${stock}</small>` : `<small style="color: #e74c3c; font-size: 0.8rem;">Hết hàng</small>`;
 
             const item = document.createElement('div');
             item.className = 'search-result-item';
@@ -1900,7 +2025,6 @@ function initSearch() {
                     <p class="search-result-name">${product.name}</p>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <span class="search-result-price">${priceSaleFormatted}</span>
-                        ${stockInfo}
                     </div>
                 </div>
                 <button class="search-result-btn"${stock <= 0 ? ' disabled style="background:#bbb;cursor:not-allowed;"' : ''}>${stock <= 0 ? 'Hết hàng' : 'Thêm vào giỏ'}</button>

@@ -1297,7 +1297,10 @@ section, main {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin: 6px 0 12px;
+    box-sizing: border-box;
+    flex: 0 0 34px;
+    height: 34px;
+    margin: 6px 0 8px;
     padding-top: 8px;
     border-top: 1px dashed rgba(228, 227, 223, 0.8);
     font-size: 0.82rem;
@@ -1311,10 +1314,17 @@ section, main {
     display: flex;
     align-items: center;
     gap: 5px;
-    margin: 2px 0 6px;
+    box-sizing: border-box;
+    flex: 0 0 22px;
+    height: 22px;
+    margin: 0 0 8px;
     color: var(--navy);
     font-size: 0.78rem;
     font-weight: 600;
+}
+
+.product-rating--empty {
+    visibility: hidden;
 }
 
 .product-rating-star {
@@ -1325,16 +1335,6 @@ section, main {
 .product-rating-count {
     color: var(--text-light);
     font-weight: 400;
-}
-
-.product-gift {
-    font-size: 0.78rem;
-    color: var(--gold);
-    margin-bottom: 12px;
-    border: 1px solid rgba(196, 164, 90, 0.35);
-    padding: 5px 10px;
-    border-radius: 6px;
-    background: rgba(196, 164, 90, 0.08);
 }
 
 /* ==================== ADD TO CART BUTTON ==================== */
@@ -1378,6 +1378,107 @@ section, main {
 .add-to-cart.active-btn {
     background: var(--navy);
     color: var(--white);
+}
+
+.product-quantity-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+.product-quantity-control button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--navy);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.product-quantity-control button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.product-quantity-control input {
+    width: 46px;
+    height: 30px;
+    padding: 2px 4px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--navy);
+    font: inherit;
+    text-align: center;
+}
+
+.product-quantity-control input::-webkit-outer-spin-button,
+.product-quantity-control input::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+.product-quantity-control input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.product-purchase-controls {
+    margin-top: auto;
+}
+
+.product-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+}
+
+.product-card-actions .add-to-cart,
+.product-card-actions .buy-now {
+    min-width: 0;
+    min-height: 38px;
+    padding: 7px 5px;
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    margin: 0;
+}
+
+.product-card-actions .buy-now,
+.buy-now {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border: 1.5px solid var(--gold);
+    border-radius: 8px;
+    background: var(--gold);
+    color: #fff;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.buy-now:hover:not(:disabled) {
+    background: #b89345;
+    border-color: #b89345;
+    transform: translateY(-2px);
+}
+
+.buy-now:disabled {
+    background: #bbb;
+    border-color: #bbb;
+    cursor: not-allowed;
 }
 
 /* ==================== SLIDER CONTROLS ==================== */
@@ -2973,9 +3074,9 @@ section, main {
 .product-detail-actions .add-to-cart {
     width: 100%;
     min-height: 46px;
-    padding: 10px 14px;
-    font-size: 0.82rem;
-    letter-spacing: 0.06em;
+    padding: 8px 6px;
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
     border-radius: 8px;
     margin: 0;
     background: var(--navy);
@@ -2990,6 +3091,33 @@ section, main {
     color: #fff;
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(196, 164, 90, 0.35);
+}
+
+.product-detail-quantity {
+    justify-content: flex-start;
+    margin: 0 0 12px;
+}
+
+.product-detail-quantity > span {
+    margin-right: 4px;
+    color: var(--text-mid);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.product-detail-actions .buy-now,
+.product-detail-actions .btn-chat-consult {
+    min-height: 46px;
+}
+
+.product-detail-actions .buy-now {
+    padding: 8px 6px;
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+}
+
+.product-detail-actions .btn-chat-consult {
+    grid-column: 1 / -1;
 }
 
 /* NÚT CHAT TƯ VẤN SANG TRỌNG */
