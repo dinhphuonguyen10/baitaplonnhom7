@@ -63,6 +63,12 @@ $adminCurrentPage = 'chat.php';
         .chat-day { align-self:center; padding:5px 10px; border-radius:20px; background:#ECEBE7; color:#7E8790; font-size:10px; }
         .chat-bubble { align-self:flex-start; max-width:min(76%,540px); padding:11px 14px 8px; border-radius:14px 14px 14px 4px; background:white; color:#334155; box-shadow:0 2px 9px rgba(16,35,56,.06); overflow-wrap:anywhere; white-space:pre-wrap; font-size:14px; line-height:1.6; }
         .chat-bubble.is-admin { align-self:flex-end; border-radius:14px 14px 4px 14px; background:var(--navy); color:#fff; }
+        .chat-bubble a { color:inherit; text-decoration:underline; text-underline-offset:2px; }
+        .chat-product-card { display:flex; width:min(320px,100%); gap:11px; align-items:center; margin-top:10px; padding:9px; border:1px solid rgba(196,164,90,.32); border-radius:11px; background:#FAF8F3; color:#334155 !important; text-decoration:none !important; }
+        .chat-product-card img { width:68px; height:68px; flex:0 0 68px; border-radius:8px; background:#fff; object-fit:cover; }
+        .chat-product-info { min-width:0; }
+        .chat-product-info strong { display:-webkit-box; overflow:hidden; color:var(--navy); font-size:12px; line-height:1.5; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+        .chat-product-info span { display:block; margin-top:5px; color:#9B835D; font-size:12px; font-weight:700; }
         .chat-bubble-time { display:block; margin-top:6px; color:#9CA3AF; font-size:10px; text-align:right; }
         .chat-bubble.is-admin .chat-bubble-time { color:#C5CFDA; }
         .chat-attachment-image { display:block; width:auto; max-width:min(100%,360px); max-height:290px; border-radius:9px; object-fit:contain; }
@@ -268,15 +274,69 @@ $adminCurrentPage = 'chat.php';
             }
         } else {
             const text = document.createElement('span');
-            text.textContent = escapeText(message.message);
+            appendMessageText(text, message.message);
             bubble.append(text);
         }
+        appendProductCard(bubble, message);
         const time = document.createElement('small');
         time.className = 'chat-bubble-time';
         time.textContent = timeLabel(message.created_at);
         bubble.append(time);
         messagesBox.append(bubble);
         return true;
+    }
+
+    function appendMessageText(container, value) {
+        const text = String(value ?? '');
+        const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+        let cursor = 0;
+        let match;
+        while ((match = urlPattern.exec(text)) !== null) {
+            let url = match[0];
+            let punctuation = '';
+            while (/[.,!?;:)\]]$/.test(url)) {
+                punctuation = url.slice(-1) + punctuation;
+                url = url.slice(0, -1);
+            }
+            container.append(document.createTextNode(text.slice(cursor, match.index)));
+            if (url) {
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = url;
+                container.append(link);
+            }
+            if (punctuation) container.append(document.createTextNode(punctuation));
+            cursor = match.index + match[0].length;
+        }
+        container.append(document.createTextNode(text.slice(cursor)));
+    }
+
+    function appendProductCard(container, message) {
+        const productId = Number(message.product_id);
+        const imagePath = String(message.product_image ?? '').trim();
+        if (!productId || !message.product_name || !imagePath) return;
+
+        const card = document.createElement('a');
+        card.className = 'chat-product-card';
+        card.href = `${base}/client/product.php?id=${encodeURIComponent(productId)}`;
+        card.target = '_blank';
+        card.rel = 'noopener noreferrer';
+        const image = document.createElement('img');
+        image.src = /^https?:\/\//i.test(imagePath) ? imagePath : `${base}/${imagePath.replace(/^\/+/, '')}`;
+        image.alt = String(message.product_name);
+        image.loading = 'lazy';
+        image.onerror = () => { image.src = `${base}/assets/banner/logo.png`; };
+        const details = document.createElement('span');
+        details.className = 'chat-product-info';
+        const name = document.createElement('strong');
+        name.textContent = String(message.product_name);
+        const price = document.createElement('span');
+        price.textContent = `${new Intl.NumberFormat('vi-VN').format(Number(message.product_price) || 0)}đ`;
+        details.append(name, price);
+        card.append(image, details);
+        container.append(card);
     }
 
     async function loadMessages(keepPosition) {

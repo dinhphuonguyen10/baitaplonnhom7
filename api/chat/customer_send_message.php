@@ -14,11 +14,42 @@ $json = file_get_contents('php://input');
 $data = json_decode($json, true);
 $message = isset($data['message']) ? trim($data['message']) : '';
 $messageType = 'text';
+$productId = null;
 
 if ($message === '' || mb_strlen($message, 'UTF-8') > 2000) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Tin nhắn cần có nội dung và không quá 2.000 ký tự."]);
     exit;
+}
+
+if (isset($data['product_id'])) {
+    $productId = filter_var($data['product_id'], FILTER_VALIDATE_INT);
+    if ($productId === false || $productId < 1) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Sản phẩm được chia sẻ không hợp lệ."]);
+        exit;
+    }
+
+    $productCheck = $conn->prepare('SELECT id FROM products WHERE id = ? LIMIT 1');
+    if (!$productCheck) {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "Không thể kiểm tra sản phẩm được chia sẻ."]);
+        exit;
+    }
+    $productCheck->bind_param('i', $productId);
+    if (!$productCheck->execute()) {
+        $productCheck->close();
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "Không thể kiểm tra sản phẩm được chia sẻ."]);
+        exit;
+    }
+    $productExists = $productCheck->get_result()->num_rows > 0;
+    $productCheck->close();
+    if (!$productExists) {
+        http_response_code(404);
+        echo json_encode(["status" => "error", "message" => "Không tìm thấy sản phẩm được chia sẻ."]);
+        exit;
+    }
 }
 
 $userId = intval($_SESSION['user_id']);
@@ -30,14 +61,14 @@ if (!ensureChatTable($conn)) {
     exit;
 }
 
-$stmt = $conn->prepare("INSERT INTO chat_messages (user_id, username, sender, message_type, message) VALUES (?, ?, 'customer', ?, ?)");
-$stmt->bind_param("isss", $userId, $username, $messageType, $message);
+$stmt = $conn->prepare("INSERT INTO chat_messages (user_id, username, sender, message_type, message, product_id) VALUES (?, ?, 'customer', ?, ?, ?)");
+$stmt->bind_param("isssi", $userId, $username, $messageType, $message, $productId);
 
 if ($stmt->execute()) {
     $insertedId = $stmt->insert_id;
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT id, username, sender, message_type, message, attachment_name, attachment_mime, attachment_size, created_at FROM chat_messages WHERE id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, p.price_sale AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.id = ? LIMIT 1");
     $stmt->bind_param("i", $insertedId);
     $stmt->execute();
     $result = $stmt->get_result();

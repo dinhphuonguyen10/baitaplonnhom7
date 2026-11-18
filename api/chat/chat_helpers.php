@@ -9,6 +9,7 @@ function ensureChatTable(mysqli $conn): bool
         is_read TINYINT(1) NOT NULL DEFAULT 0,
         message_type ENUM('text', 'image', 'file') NOT NULL DEFAULT 'text',
         message LONGTEXT NOT NULL,
+        product_id INT UNSIGNED NULL,
         attachment_path VARCHAR(255) NULL,
         attachment_name VARCHAR(255) NULL,
         attachment_mime VARCHAR(127) NULL,
@@ -64,6 +65,7 @@ function ensureChatTable(mysqli $conn): bool
     }
 
     $missingAttachments = [
+        'product_id' => 'INT UNSIGNED NULL',
         'attachment_path' => 'VARCHAR(255) NULL',
         'attachment_name' => 'VARCHAR(255) NULL',
         'attachment_mime' => 'VARCHAR(127) NULL',

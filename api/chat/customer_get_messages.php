@@ -18,7 +18,7 @@ if (!ensureChatTable($conn)) {
     exit;
 }
 
-$stmt = $conn->prepare("SELECT id, username, sender, message_type, message, attachment_name, attachment_mime, attachment_size, created_at FROM chat_messages WHERE user_id = ? ORDER BY created_at ASC");
+$stmt = $conn->prepare("SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, p.price_sale AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.user_id = ? ORDER BY cm.created_at ASC");
 $stmt->bind_param("i", $userId);
 $stmt->execute();
 $result = $stmt->get_result();

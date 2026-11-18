@@ -4560,7 +4560,7 @@ section, main {
 .product-reviews-heading h2 {
     margin: 0 0 7px;
     color: var(--navy);
-    font-family: 'Playfair Display', serif;
+    font-family: 'Roboto', sans-serif;
     font-size: clamp(1.45rem, 3vw, 1.9rem);
 }
 

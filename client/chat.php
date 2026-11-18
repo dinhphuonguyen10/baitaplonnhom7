@@ -6,6 +6,15 @@ $pageTitle = 'Chat với cửa hàng - ÉCRIN JEWELRY';
 $isCustomerLoggedIn = isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer';
 $chatUsername = $_SESSION['username'] ?? 'Quý khách';
 include __DIR__ . '/../include/header.php';
+$chatProduct = null;
+$requestedProductId = filter_var($_GET['product_id'] ?? null, FILTER_VALIDATE_INT);
+if ($isCustomerLoggedIn && $requestedProductId !== false && $requestedProductId !== null && $requestedProductId > 0) {
+    $productStatement = $conn->prepare('SELECT id, name FROM products WHERE id = ? LIMIT 1');
+    $productStatement->bind_param('i', $requestedProductId);
+    $productStatement->execute();
+    $chatProduct = $productStatement->get_result()->fetch_assoc() ?: null;
+    $productStatement->close();
+}
 ?>
 <style>
     .support-chat-page { position:relative; max-width:1280px; margin:0 auto; padding:22px 20px 24px; }
@@ -45,6 +54,12 @@ include __DIR__ . '/../include/header.php';
     .support-chat-welcome p { margin:0; font-size:13px; line-height:1.7; }
     .support-chat-bubble { align-self:flex-start; max-width:min(78%,460px); padding:11px 14px 8px; border-radius:15px 15px 15px 5px; background:#fff; color:#334155; box-shadow:0 3px 12px rgba(16,35,56,.07); overflow-wrap:anywhere; white-space:pre-wrap; font-size:14px; line-height:1.6; }
     .support-chat-bubble.is-customer { align-self:flex-end; border-radius:15px 15px 5px 15px; background:var(--navy); color:#fff; }
+    .support-chat-bubble a { color:inherit; text-decoration:underline; text-underline-offset:2px; }
+    .support-chat-product-card { display:flex; width:min(320px,100%); gap:11px; align-items:center; margin-top:10px; padding:9px; border:1px solid rgba(196,164,90,.32); border-radius:11px; background:#FAF8F3; color:#334155 !important; text-decoration:none !important; }
+    .support-chat-product-card img { width:68px; height:68px; flex:0 0 68px; border-radius:8px; background:#fff; object-fit:cover; }
+    .support-chat-product-info { min-width:0; }
+    .support-chat-product-info strong { display:-webkit-box; overflow:hidden; color:var(--navy); font-size:12px; line-height:1.5; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+    .support-chat-product-info span { display:block; margin-top:5px; color:#9B835D; font-size:12px; font-weight:700; }
     .support-chat-bubble time { display:block; margin-top:5px; color:#9CA3AF; font-size:10px; text-align:right; }
     .support-chat-bubble.is-customer time { color:#C9D1DB; }
     .support-chat-attachment-image { display:block; width:auto; max-width:min(100%,360px); max-height:290px; border-radius:9px; object-fit:contain; }
@@ -152,9 +167,17 @@ include __DIR__ . '/../include/header.php';
     const fileInput = document.getElementById('customer-chat-file');
     const note = document.getElementById('customer-chat-note');
     const api = `${base}/api/chat`;
+    let sharedProduct = <?php echo json_encode($chatProduct, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     let latestId = 0;
     let sending = false;
     let uploading = false;
+
+    if (sharedProduct && !input.value.trim()) {
+        const productUrl = new URL(`${base}/client/product.php?id=${encodeURIComponent(sharedProduct.id)}`, window.location.origin).href;
+        input.value = `Chào ÉCRIN, tôi muốn hỏi về sản phẩm "${sharedProduct.name}":\n${productUrl}`;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+    }
 
     const formatBytes = value => {
         const bytes = Number(value) || 0;
@@ -171,6 +194,57 @@ include __DIR__ . '/../include/header.php';
         if (!data) throw new Error('Máy chủ trả về phản hồi không hợp lệ.');
         if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Không thể kết nối máy chủ.');
         return data;
+    }
+    function appendMessageText(container, value) {
+        const text = String(value ?? '');
+        const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+        let cursor = 0;
+        let match;
+        while ((match = urlPattern.exec(text)) !== null) {
+            let url = match[0];
+            let punctuation = '';
+            while (/[.,!?;:)\]]$/.test(url)) {
+                punctuation = url.slice(-1) + punctuation;
+                url = url.slice(0, -1);
+            }
+            container.append(document.createTextNode(text.slice(cursor, match.index)));
+            if (url) {
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.textContent = url;
+                container.append(link);
+            }
+            if (punctuation) container.append(document.createTextNode(punctuation));
+            cursor = match.index + match[0].length;
+        }
+        container.append(document.createTextNode(text.slice(cursor)));
+    }
+    function appendProductCard(container, message) {
+        const productId = Number(message.product_id);
+        const imagePath = String(message.product_image ?? '').trim();
+        if (!productId || !message.product_name || !imagePath) return;
+
+        const card = document.createElement('a');
+        card.className = 'support-chat-product-card';
+        card.href = `${base}/client/product.php?id=${encodeURIComponent(productId)}`;
+        card.target = '_blank';
+        card.rel = 'noopener noreferrer';
+        const image = document.createElement('img');
+        image.src = /^https?:\/\//i.test(imagePath) ? imagePath : `${base}/${imagePath.replace(/^\/+/, '')}`;
+        image.alt = String(message.product_name);
+        image.loading = 'lazy';
+        image.onerror = () => { image.src = `${base}/assets/banner/logo.png`; };
+        const details = document.createElement('span');
+        details.className = 'support-chat-product-info';
+        const name = document.createElement('strong');
+        name.textContent = String(message.product_name);
+        const price = document.createElement('span');
+        price.textContent = `${new Intl.NumberFormat('vi-VN').format(Number(message.product_price) || 0)}đ`;
+        details.append(name, price);
+        card.append(image, details);
+        container.append(card);
     }
     function renderMessage(message) {
         const id = Number(message.id);
@@ -209,8 +283,9 @@ include __DIR__ . '/../include/header.php';
                 bubble.append(link);
             }
         } else {
-            bubble.append(document.createTextNode(String(message.message ?? '')));
+            appendMessageText(bubble, message.message);
         }
+        appendProductCard(bubble, message);
         const time = document.createElement('time');
         time.textContent = timeLabel(message.created_at);
         bubble.append(time);
@@ -236,11 +311,12 @@ include __DIR__ . '/../include/header.php';
             const data = await request(`${api}/customer_send_message.php`, {
                 method:'POST',
                 headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({message})
+                body:JSON.stringify({message, product_id:sharedProduct ? Number(sharedProduct.id) : null})
             });
             renderMessage(data.message);
             messagesBox.scrollTop = messagesBox.scrollHeight;
             input.value = '';
+            sharedProduct = null;
         } catch (error) {
             note.textContent = error.message;
         } finally {
