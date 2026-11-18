@@ -1628,7 +1628,9 @@ section, main {
     gap: 14px;
     padding: 10px 10px;
     border-radius: 8px;
+    color: inherit;
     cursor: pointer;
+    text-decoration: none;
     transition: background 0.15s;
     border-bottom: 1px solid var(--cream-dark);
 }
@@ -1636,6 +1638,11 @@ section, main {
 .search-result-item:last-child { border-bottom: none; }
 
 .search-result-item:hover { background: var(--cream); }
+
+.search-result-item:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: -2px;
+}
 
 .search-result-image {
     width: 48px;
@@ -1664,20 +1671,6 @@ section, main {
     color: var(--gold);
     font-weight: 700;
 }
-
-.search-result-btn {
-    padding: 6px 14px;
-    background: var(--navy);
-    color: var(--white);
-    border: none;
-    border-radius: 20px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.search-result-btn:hover { background: var(--gold); }
 
 .search-result-empty {
     padding: 20px;

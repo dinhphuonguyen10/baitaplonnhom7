@@ -1865,6 +1865,89 @@ function renderDbProducts(dbProducts, container, page) {
     if (loadMoreContainer) loadMoreContainer.style.display = 'none';
 }
 
+function normalizeSearchText(value) {
+    return String(value ?? '')
+        .toLocaleLowerCase('vi')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function getEditDistance(left, right) {
+    let previousRow = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+        const currentRow = [leftIndex];
+        for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+            const substitutionCost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+            currentRow[rightIndex] = Math.min(
+                currentRow[rightIndex - 1] + 1,
+                previousRow[rightIndex] + 1,
+                previousRow[rightIndex - 1] + substitutionCost
+            );
+        }
+        previousRow = currentRow;
+    }
+    return previousRow[right.length];
+}
+
+function isAdjacentTransposition(left, right) {
+    if (left.length !== right.length) return false;
+    const differences = [];
+    for (let index = 0; index < left.length; index += 1) {
+        if (left[index] !== right[index]) differences.push(index);
+        if (differences.length > 2) return false;
+    }
+    return differences.length === 2
+        && differences[1] === differences[0] + 1
+        && left[differences[0]] === right[differences[1]]
+        && left[differences[1]] === right[differences[0]];
+}
+
+function getProductNameMatchScore(productName, query) {
+    const normalizedName = normalizeSearchText(productName);
+    const normalizedQuery = normalizeSearchText(query);
+    if (!normalizedName || !normalizedQuery) return null;
+    if (normalizedName.includes(normalizedQuery)) return 0;
+
+    const nameWords = normalizedName.split(' ');
+    const queryWords = normalizedQuery.split(' ');
+    let score = 0;
+
+    for (const queryWord of queryWords) {
+        const maxDistance = queryWord.length >= 8 ? 2 : queryWord.length >= 3 ? 1 : 0;
+        let bestDistance = Infinity;
+        for (const nameWord of nameWords) {
+            if (queryWord.length > 1 && nameWord.startsWith(queryWord)) {
+                bestDistance = 0;
+                break;
+            }
+
+            if (Math.abs(queryWord.length - nameWord.length) > maxDistance) continue;
+            let distance = getEditDistance(queryWord, nameWord);
+            if (distance === 2 && isAdjacentTransposition(queryWord, nameWord)) distance = 1;
+            if (distance <= maxDistance) bestDistance = Math.min(bestDistance, distance);
+        }
+        if (bestDistance === Infinity) return null;
+        score += bestDistance;
+    }
+
+    return score;
+}
+
+function findProductsByName(products, query) {
+    return products
+        .map((product, index) => ({
+            product,
+            index,
+            score: getProductNameMatchScore(product.name, query)
+        }))
+        .filter(match => match.score !== null)
+        .sort((left, right) => left.score - right.score || left.index - right.index)
+        .map(match => match.product);
+}
+
 function initSearch() {
     const searchInput = document.querySelector('.search');
     if (!searchInput) return;
@@ -1938,9 +2021,7 @@ function initSearch() {
             return;
         }
 
-        const filtered = products.filter(product =>
-            product.name && product.name.toLowerCase().includes(query)
-        );
+        const filtered = findProductsByName(products, query);
 
         renderSearchResults(filtered, dropdown);
     }
@@ -1966,7 +2047,8 @@ function initSearch() {
 
     async function handleScreenSearch(query) {
         const container = document.getElementById('category-products-container');
-        if (container) {
+        const searchResultsSection = document.getElementById('search-results-section');
+        if (container && (!searchResultsSection || !searchResultsSection.hidden)) {
             // Make sure we have loaded all database products for this category/page or general
             let searchProducts = allProducts;
             if (searchProducts.length === 0) {
@@ -1981,9 +2063,7 @@ function initSearch() {
             }
 
             // Filter products
-            const filtered = searchProducts.filter(product =>
-                product.name && product.name.toLowerCase().includes(query.toLowerCase())
-            );
+            const filtered = findProductsByName(searchProducts, query);
 
             // Render matching products directly on page screen grid!
             renderDbProducts(filtered, container);
@@ -1995,7 +2075,7 @@ function initSearch() {
                 pageTitle.textContent = `KẾT QUẢ TÌM KIẾM: "${query.toUpperCase()}"`;
             }
         } else {
-            // If on homepage or other page without a product grid, redirect to sonmoi.html with query parameter
+            // Load homepage search results in their visible section.
             window.location.href = `${appUrl('/index.php')}?search=${encodeURIComponent(query)}`;
         }
     }
@@ -2015,48 +2095,27 @@ function initSearch() {
                 ? imagePath
                 : appUrl(imagePath.replace(/^(?:\.\.\/)+/, ''));
 
-            const stock = parseInt(product.stock, 10) || 0;
-
-            const item = document.createElement('div');
+            const item = document.createElement('a');
             item.className = 'search-result-item';
-            item.innerHTML = `
-                <img src="${imageUrl}" alt="${product.name}" class="search-result-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
-                <div class="search-result-info">
-                    <p class="search-result-name">${product.name}</p>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <span class="search-result-price">${priceSaleFormatted}</span>
-                    </div>
-                </div>
-                <button class="search-result-btn"${stock <= 0 ? ' disabled style="background:#bbb;cursor:not-allowed;"' : ''}>${stock <= 0 ? 'Hết hàng' : 'Thêm vào giỏ'}</button>
-            `;
+            item.href = `${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id)}`;
+            item.setAttribute('aria-label', `Xem chi tiết ${product.name}`);
 
-            // Handle add to cart click
-            const btn = item.querySelector('.search-result-btn');
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Avoid triggering parent item click
+            const image = document.createElement('img');
+            image.src = imageUrl;
+            image.alt = '';
+            image.className = 'search-result-image';
+            image.onerror = () => { image.src = appUrl('/assets/banner/logo.png'); };
 
-                const prod = {
-                    product_id: Number(product.id),
-                    name: product.name,
-                    price: parsePrice(product.price_sale), // Fixed pricing bug using parsePrice
-                    image: product.image
-                };
-
-                addItemToCart(prod);
-
-                // Temporary feedback state
-                btn.textContent = 'Đã thêm!';
-                btn.style.background = '#4CAF50';
-                setTimeout(() => {
-                    btn.textContent = 'Thêm vào giỏ';
-                    btn.style.background = '';
-                }, 1200);
-            });
-
-            // Make whole row clickable to add to cart
-            item.addEventListener('click', () => {
-                btn.click();
-            });
+            const info = document.createElement('div');
+            info.className = 'search-result-info';
+            const name = document.createElement('p');
+            name.className = 'search-result-name';
+            name.textContent = product.name;
+            const price = document.createElement('span');
+            price.className = 'search-result-price';
+            price.textContent = priceSaleFormatted;
+            info.append(name, price);
+            item.append(image, info);
 
             container.appendChild(item);
         });
@@ -2831,10 +2890,7 @@ async function initDynamicCategoryPages() {
             const response = await fetch(appUrl('/api/catalog/get_products.php'));
             if (!response.ok) throw new Error('Không thể tải danh sách sản phẩm để tìm kiếm.');
             const products = await response.json();
-            const normalizedQuery = searchQuery.trim().toLowerCase();
-            const filteredProducts = products.filter(product =>
-                product.name && product.name.toLowerCase().includes(normalizedQuery)
-            );
+            const filteredProducts = findProductsByName(products, searchQuery);
 
             renderDbProducts(filteredProducts, container);
             const pageTitle = document.querySelector('.page-title-left');
