@@ -136,7 +136,9 @@ if ($isCustomerLoggedIn && isset($_SESSION['user_id']) && isset($conn) && $conn 
             </div>
         </div>
 
-        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/tracuudh.php', ENT_QUOTES, 'UTF-8'); ?>">Tra cứu đơn hàng</a>
+        <?php if ($isCustomerLoggedIn): ?>
+            <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/tracuudh.php', ENT_QUOTES, 'UTF-8'); ?>" class="nav-my-orders-link">Đơn hàng của tôi</a>
+        <?php endif; ?>
         <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/htch.php', ENT_QUOTES, 'UTF-8'); ?>">Hệ thống cửa hàng</a>
         <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/chat.php', ENT_QUOTES, 'UTF-8'); ?>" class="nav-chat-link">
             <svg class="nav-chat-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 5px;">
