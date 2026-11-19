@@ -24,6 +24,15 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
         }
     }
 }
+
+$initialWishlistCount = 0;
+if ($isCustomerLoggedIn && isset($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
+    $wlUid = (int)$_SESSION['user_id'];
+    $wlRes = $conn->query("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = {$wlUid}");
+    if ($wlRes && ($wlRow = $wlRes->fetch_assoc())) {
+        $initialWishlistCount = (int)$wlRow['total'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -66,7 +75,7 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
                 <a class="wishlist-button" href="<?php echo htmlspecialchars($appBaseUrl . '/client/wishlist.php', ENT_QUOTES, 'UTF-8'); ?>" aria-label="Sản phẩm yêu thích" title="Sản phẩm yêu thích">
                     <svg class="wishlist-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                     <span class="wishlist-text">Yêu thích</span>
-                    <span class="wishlist-count" style="display: none;">0</span>
+                    <span class="wishlist-count" <?php echo $initialWishlistCount > 0 ? '' : 'style="display: none;"'; ?>><?php echo $initialWishlistCount; ?></span>
                 </a>
             </div>
 
