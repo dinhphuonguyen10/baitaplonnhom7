@@ -95,33 +95,33 @@ include __DIR__ . '/include/header.php';
         <div class="product-grid category-grid" id="category-products-container" data-db-category=""></div>
     </section>
 
-    <!-- SẢN PHẨM NỔI BẬT-->
-    <section class="combo-section">
+    <!-- 1. MỤC ĐẦU TIÊN: SẢN PHẨM NỔI BẬT (BÁN CHẠY NHẤT - NHIỀU LƯỢT MUA NHẤT) -->
+    <section class="combo-section" aria-label="Sản phẩm nổi bật">
         <div class="combo-container">
             <div class="home-product-heading">
-                <div><p class="section-label">KẾT HỢP TINH TẾ</p><h2>Combo được yêu thích</h2></div>
-                <a href="client/bong_tai.php">Xem bộ sưu tập <span aria-hidden="true">→</span></a>
+                <div><p class="section-label">BÁN CHẠY NHẤT</p><h2>Sản phẩm nổi bật</h2></div>
+                <a href="client/category.php?slug=set-qua-tang">Khám phá bộ sưu tập <span aria-hidden="true">→</span></a>
             </div>
             <div class="combo-slider">
-                <button class="slider-btn prev" id="combo-prev">❮</button>
+                <button class="slider-btn prev" id="featured-prev">❮</button>
 
-                <div class="combo-items" id="combo-items-container">
+                <div class="combo-items" id="featured-items-container">
                     <!-- Sản phẩm sẽ được render từ JavaScript (script.js) -->
                 </div>
 
-                <button class="slider-btn next" id="combo-next"
+                <button class="slider-btn next" id="featured-next"
                     style="width: auto; padding: 0 16px; border-radius: 20px; font-size: 1rem; font-weight: 600; white-space: nowrap;">Xem
                     thêm ❯</button>
             </div>
         </div>
     </section>
 
-    <!-- MẪU ĐƯỢC YÊU THÍCH NHẤT-->
-    <section class="combo-section combo-section--alt">
+    <!-- 2. MỤC THỨ HAI: GỢI Ý CHO BẠN (NHIỀU LƯỢT TIM NHẤT) -->
+    <section class="combo-section combo-section--alt" aria-label="Gợi ý cho bạn">
         <div class="combo-container">
             <div class="home-product-heading">
                 <div><p class="section-label">DÀNH RIÊNG CHO BẠN</p><h2>Gợi ý cho bạn</h2></div>
-                <a href="client/nhan.php">Khám phá nhẫn <span aria-hidden="true">→</span></a>
+                <a href="client/nhan.php">Khám phá ngay <span aria-hidden="true">→</span></a>
             </div>
             <div class="combo-slider">
                 <button class="slider-btn prev" id="suggest-prev">❮</button>
@@ -137,21 +137,21 @@ include __DIR__ . '/include/header.php';
         </div>
     </section>
 
-    <!-- SẢN PHẨM MỚI -->
-    <section class="combo-section">
+    <!-- 3. MỤC THỨ BA: SẢN PHẨM MỚI NHẤT (MẪU MỚI CẬP BẾN) -->
+    <section class="combo-section" aria-label="Sản phẩm mới nhất">
         <div class="combo-container">
             <div class="home-product-heading">
-                <div><p class="section-label">ĐƯỢC TUYỂN CHỌN</p><h2>Sản phẩm nổi bật</h2></div>
-                <a href="client/bong_tai.php">Khám phá bộ sưu tập <span aria-hidden="true">→</span></a>
+                <div><p class="section-label">BỘ SƯU TẬP MỚI</p><h2>Sản phẩm mới nhất</h2></div>
+                <a href="client/day_chuyen.php">Xem mẫu mới <span aria-hidden="true">→</span></a>
             </div>
             <div class="combo-slider">
-                <button class="slider-btn prev" id="featured-prev">❮</button>
+                <button class="slider-btn prev" id="new-prev">❮</button>
 
-                <div class="combo-items" id="featured-items-container">
+                <div class="combo-items" id="new-items-container">
                     <!-- Sản phẩm sẽ được render từ JavaScript (script.js) -->
                 </div>
 
-                <button class="slider-btn next" id="featured-next"
+                <button class="slider-btn next" id="new-next"
                     style="width: auto; padding: 0 16px; border-radius: 20px; font-size: 1rem; font-weight: 600; white-space: nowrap;">Xem
                     thêm ❯</button>
             </div>

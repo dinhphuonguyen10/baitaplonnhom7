@@ -83,11 +83,14 @@ function renderProductRating(product) {
     `;
 }
 
-function renderProductMeta(soldCount) {
+function renderProductMeta(soldCount, wishlistCount) {
     const soldHTML = soldCount > 0
         ? `<span class="sold">Đã bán ${soldCount}</span>`
         : '<span class="product-meta-empty" aria-hidden="true"></span>';
-    return `<div class="product-meta">${soldHTML}</div>`;
+    const wishHTML = (wishlistCount && wishlistCount > 0)
+        ? `<span class="product-wish-stat" style="color:#e84393; font-size:0.8rem; font-weight:600; display:inline-flex; align-items:center; gap:3px;" title="${wishlistCount} lượt yêu thích"><span style="color:#e84393;">♥</span> ${wishlistCount}</span>`
+        : '';
+    return `<div class="product-meta">${soldHTML}${wishHTML}</div>`;
 }
 
 function getProductQuantityControlMarkup(stock, name) {
@@ -110,8 +113,9 @@ function createSliderItems(container, products) {
 
         const stock = Number(product.stock) || 0;
         const soldCount = Number(product.soldCount) || 0;
+        const wishlistCount = Number(product.wishlistCount) || 0;
 
-        const metaHTML = renderProductMeta(soldCount);
+        const metaHTML = renderProductMeta(soldCount, wishlistCount);
 
         const itemHTML = `
             <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm" style="flex-shrink: 0; width: 240px;">
@@ -214,16 +218,19 @@ async function fetchProducts(category) {
             gift: p.gift,
             stock: Number(p.stock) || 0,
             soldCount: Number(p.sold_count) || 0,
+            wishlistCount: Number(p.wishlist_count) || 0,
             average_rating: Number(p.average_rating) || 0,
             review_count: Number(p.review_count) || 0,
-            category: p.category
+            category: p.category,
+            is_favorite: p.is_favorite
         }));
     } catch (error) {
         console.error(`Lỗi khi tải sản phẩm danh mục ${category}:`, error);
         const containerIds = {
-            combo: 'combo-items-container',
+            featured: 'featured-items-container',
             suggest: 'suggest-items-container',
-            featured: 'featured-items-container'
+            new: 'new-items-container',
+            latest: 'new-items-container'
         };
         const container = document.getElementById(containerIds[category]);
         if (container) {
@@ -234,15 +241,18 @@ async function fetchProducts(category) {
 }
 
 async function initComboSlider() {
-    // Tải dữ liệu từ Database thay vì dùng mảng cứng
-    const comboData = await fetchProducts('combo');
-    const suggestData = await fetchProducts('suggest');
+    // 1. Tải dữ liệu từ Database theo thứ tự:
+    // - featured: Sản phẩm nổi bật (Lượt mua nhiều nhất - tính bằng SQL)
+    // - suggest: Gợi ý cho bạn (Lượt tim nhiều nhất - tính bằng SQL)
+    // - new: Sản phẩm mới nhất (Mẫu mới cập bến - tính bằng SQL)
     const featuredData = await fetchProducts('featured');
+    const suggestData = await fetchProducts('suggest');
+    const newData = await fetchProducts('new');
 
-    // Khởi tạo các slider với dữ liệu từ DB
-    initProductSlider('combo-items-container', 'combo-prev', 'combo-next', comboData, []);
-    initProductSlider('suggest-items-container', 'suggest-prev', 'suggest-next', suggestData, []);
+    // Khởi tạo các slider trên trang chủ với dữ liệu từ DB
     initProductSlider('featured-items-container', 'featured-prev', 'featured-next', featuredData, []);
+    initProductSlider('suggest-items-container', 'suggest-prev', 'suggest-next', suggestData, []);
+    initProductSlider('new-items-container', 'new-prev', 'new-next', newData, []);
 }
 
 // ==================== SCROLL TO TOP ====================
@@ -1680,8 +1690,9 @@ function buildProductCardHTML(product) {
 
     const stock = parseInt(product.stock, 10) || 0;
     const soldCount = parseInt(product.sold_count, 10) || 0;
+    const wishlistCount = parseInt(product.wishlist_count, 10) || 0;
 
-    const metaHTML = renderProductMeta(soldCount);
+    const metaHTML = renderProductMeta(soldCount, wishlistCount);
 
     const priceSaleRaw = (typeof product.price_sale_raw !== 'undefined') ? product.price_sale_raw : parsePrice(product.price_sale);
     const hasDiscount = Boolean((product.discount && product.discount.trim() !== '') || (product.price_original_raw > product.price_sale_raw));

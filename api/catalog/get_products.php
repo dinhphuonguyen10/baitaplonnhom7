@@ -20,15 +20,19 @@ if (!empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
 
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
 
-// 1. Sản phẩm nổi bật: Hệ thống tự động tính toán từ SQL VIEW (lượt bán cao nhất / mới nhất)
+// 1. Sản phẩm nổi bật: Hệ thống tự động tính toán từ SQL VIEW (lượt mua cao nhất)
 if ($category === 'featured') {
     $result = $conn->query("SELECT * FROM view_featured_products");
 }
-// 2. Gợi ý cho bạn: Hệ thống tự động đề xuất từ SQL VIEW
+// 2. Gợi ý cho bạn: Hệ thống tự động đề xuất từ SQL VIEW (nhiều lượt tim nhất)
 elseif ($category === 'suggest') {
     $result = $conn->query("SELECT * FROM view_suggested_products");
 }
-// 3. Danh mục sản phẩm cụ thể (Combo, Nhẫn, Bông tai, Dây chuyền, v.v.)
+// 3. Sản phẩm mới nhất: Mẫu mới cập bến (ID mới nhất)
+elseif ($category === 'new' || $category === 'latest') {
+    $result = $conn->query("SELECT * FROM view_new_products");
+}
+// 4. Danh mục sản phẩm cụ thể (Nhẫn, Bông tai, Dây chuyền, Set quà tặng, v.v.)
 elseif ($category !== '') {
     $stmt = $conn->prepare("SELECT * FROM view_product_details WHERE category = ? OR category_name = ? OR CAST(category_id AS CHAR) = ? ORDER BY id DESC");
     $stmt->bind_param("sss", $category, $category, $category);
