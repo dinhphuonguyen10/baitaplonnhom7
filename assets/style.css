@@ -51,17 +51,25 @@ section, main {
     gap: 16px;
 }
 
-.home-page .sticky-header-wrapper {
+.sticky-header-wrapper {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     width: 100%;
     z-index: 1000;
+    background: var(--white);
+    box-shadow: 0 4px 16px rgba(13, 27, 42, 0.08);
 }
 
-.home-page .sticky-header-wrapper .menu {
+.sticky-header-wrapper .menu {
     z-index: 1000;
+}
+
+.sticky-header-spacer {
+    display: block;
+    width: 100%;
+    height: var(--header-height, 160px);
 }
 
 .logo {
@@ -254,7 +262,7 @@ section, main {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.25s, visibility 0.25s;
-    z-index: 998;
+    z-index: 1500;
 }
 
 .cart-overlay.visible {
@@ -272,7 +280,7 @@ section, main {
     box-shadow: -8px 0 32px rgba(0,0,0,0.12);
     transform: translateX(110%);
     transition: transform 0.3s ease;
-    z-index: 999;
+    z-index: 1501;
     display: flex;
     flex-direction: column;
     padding: 24px;
@@ -1219,22 +1227,26 @@ section, main {
     background: #fbf9f5;
     overflow: hidden;
     position: relative;
-    height: 290px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 0;
 }
 
 .product-image {
     width: 100%;
-    height: 290px;
+    height: 100%;
     object-fit: cover;
-    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    object-position: center;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    display: block;
     background: #fbf9f5;
 }
 
 .product-card:hover .product-image {
-    transform: scale(1.08);
+    transform: scale(1.03);
 }
 
 .product-info {
@@ -2216,7 +2228,7 @@ section, main {
 .filter-sidebar {
     position: -webkit-sticky;
     position: sticky;
-    top: 24px;
+    top: calc(var(--header-height, 160px) + 20px);
     align-self: flex-start;
     z-index: 20;
     width: 280px;
@@ -2226,7 +2238,7 @@ section, main {
     padding: 24px 20px;
     border: 1px solid rgba(228, 227, 223, 0.9);
     box-shadow: 0 4px 20px rgba(13, 27, 42, 0.04);
-    max-height: calc(100vh - 48px);
+    max-height: calc(100vh - var(--header-height, 160px) - 30px);
     overflow-y: auto;
     overscroll-behavior: contain;
     transition: box-shadow 0.3s ease, border-color 0.3s ease;
@@ -2944,6 +2956,7 @@ section, main {
     display: block;
     width: 100%;
     height: 100%;
+    max-height: none;
     object-fit: cover;
     transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -3763,7 +3776,7 @@ section, main {
 
 .cart-page-summary {
     position: sticky;
-    top: 24px;
+    top: calc(var(--header-height, 160px) + 24px);
     padding: 24px;
 }
 

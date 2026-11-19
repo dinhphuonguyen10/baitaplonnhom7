@@ -35,12 +35,15 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
     <link rel="stylesheet" href="<?php echo htmlspecialchars($appBaseUrl . '/assets/style.css?v=' . filemtime(__DIR__ . '/../assets/style.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <script>window.APP_BASE_URL = <?php echo json_encode($appBaseUrl, JSON_UNESCAPED_SLASHES); ?>;</script>
     <script>window.CUSTOMER_USERNAME = <?php echo json_encode($customerUsername, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
+    <script>window.ASSET_VERSION = <?php echo json_encode((string)time()); ?>;</script>
 </head>
 
 <body class="<?php echo htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8'); ?>">
 
-    <!-- HEADER -->
-    <header class="header">
+    <!-- HEADER WRAPPER (STICKY) -->
+    <div class="sticky-header-wrapper">
+        <!-- HEADER -->
+        <header class="header">
 
         <!-- Logo ảnh -->
         <div class="logo">
@@ -132,3 +135,5 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
             </svg>Chat với cửa hàng
         </a>
     </nav>
+    </div>
+    <div class="sticky-header-spacer" aria-hidden="true"></div>

@@ -11,9 +11,12 @@ const appUrl = path => {
 const getProductImageUrl = rawPath => {
     if (!rawPath || typeof rawPath !== 'string') return appUrl('/assets/banner/logo.png');
     const trimmed = rawPath.trim();
-    if (trimmed.startsWith('/') || /^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
     const clean = trimmed.replace(/^(?:\.\.\/)+/, '');
-    return appUrl(clean);
+    const cleanPath = clean.startsWith('/') ? clean : '/' + clean;
+    const v = window.ASSET_VERSION || Date.now();
+    const sep = cleanPath.includes('?') ? '&' : '?';
+    return appUrl(cleanPath) + sep + 'v=' + v;
 };
 // ==================== SLIDESHOW ====================
 function initSlideshow() {
@@ -1663,7 +1666,7 @@ function normalizeVietnamese(str) {
 }
 
 // ==================== PAGINATION SYSTEM ====================
-const PRODUCTS_PER_PAGE = 9; // 3 cột × 3 dòng
+const PRODUCTS_PER_PAGE = 12; // 3 cột × 4 dòng = 12 sản phẩm (vừa vặn, chuẩn cho cả desktop 3 cột và mobile 2 cột)
 let _paginationCurrentPage = 1;
 let _paginationAllProducts = []; // Lưu toàn bộ sản phẩm đã fetch (dùng cho phân trang)
 
@@ -1822,10 +1825,15 @@ function goToPage(page) {
     renderDbProducts(_paginationAllProducts, container, page);
     applyUserRole();
 
-    // Cuộn lên đầu lưới sản phẩm
+    // Cuộn lên đầu lưới sản phẩm (tính toán trừ đi chiều cao header cố định)
     const categoryMain = document.querySelector('.category-main');
     if (categoryMain) {
-        categoryMain.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const headerHeight = document.querySelector('.sticky-header-wrapper')?.offsetHeight || 160;
+        const targetPos = categoryMain.getBoundingClientRect().top + window.pageYOffset - headerHeight - 16;
+        window.scrollTo({
+            top: Math.max(0, targetPos),
+            behavior: 'smooth'
+        });
     }
 }
 
@@ -2531,30 +2539,49 @@ function initStickyHeader() {
     const menu = document.querySelector('.menu');
 
     if (header && menu) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'sticky-header-wrapper';
-        header.parentNode.insertBefore(wrapper, header);
-        wrapper.appendChild(header);
-        wrapper.appendChild(menu);
+        let wrapper = header.closest('.sticky-header-wrapper');
+        if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.className = 'sticky-header-wrapper';
+            header.parentNode.insertBefore(wrapper, header);
+            wrapper.appendChild(header);
+            wrapper.appendChild(menu);
+        }
 
-        if (document.body.classList.contains('home-page')) {
-            const spacer = document.createElement('div');
+        let spacer = wrapper.nextElementSibling;
+        if (!spacer || !spacer.classList.contains('sticky-header-spacer')) {
+            spacer = document.createElement('div');
             spacer.className = 'sticky-header-spacer';
             wrapper.parentNode.insertBefore(spacer, wrapper.nextSibling);
-            const updateSpacer = () => {
-                window.requestAnimationFrame(() => {
-                    spacer.style.height = `${wrapper.getBoundingClientRect().height}px`;
-                });
-            };
-            updateSpacer();
-            if ('ResizeObserver' in window) {
-                new ResizeObserver(updateSpacer).observe(wrapper);
-            }
-            wrapper.querySelectorAll('img').forEach(image => {
-                image.addEventListener('load', updateSpacer, { once: true });
-            });
-            window.addEventListener('resize', updateSpacer);
         }
+
+        const updateSpacer = () => {
+            window.requestAnimationFrame(() => {
+                if (wrapper && spacer) {
+                    const h = wrapper.getBoundingClientRect().height;
+                    if (h > 0) {
+                        spacer.style.height = `${h}px`;
+                        document.documentElement.style.setProperty('--header-height', `${h}px`);
+                    }
+                }
+            });
+        };
+
+        updateSpacer();
+
+        if ('ResizeObserver' in window) {
+            new ResizeObserver(updateSpacer).observe(wrapper);
+        }
+
+        wrapper.querySelectorAll('img').forEach(image => {
+            if (image.complete) {
+                updateSpacer();
+            } else {
+                image.addEventListener('load', updateSpacer, { once: true });
+            }
+        });
+
+        window.addEventListener('resize', updateSpacer);
     }
 }
 

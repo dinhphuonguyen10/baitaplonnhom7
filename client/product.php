@@ -60,9 +60,11 @@ $descriptionByCategory = [
     <?php if ($product): ?>
         <?php
         $imagePath = (string) $product['image'];
+        $localImagePath = __DIR__ . '/../' . ltrim($imagePath, '/');
+        $imgVersion = file_exists($localImagePath) ? filemtime($localImagePath) : time();
         $imageUrl = preg_match('~^https?://~i', $imagePath)
             ? $imagePath
-            : $appBaseUrl . '/' . ltrim($imagePath, '/');
+            : $appBaseUrl . '/' . ltrim($imagePath, '/') . '?v=' . $imgVersion;
         $stock = (int) $product['stock'];
         $rawDescription = trim((string)($product['description'] ?? ''));
         $description = $rawDescription !== ''
@@ -74,7 +76,7 @@ $descriptionByCategory = [
             <div class="product-detail-image-wrap">
                 <button type="button" class="wishlist-btn" data-product-id="<?php echo (int) $product['id']; ?>" title="Yêu thích">♡</button>
                 <img
-                    class="product-detail-image product-image"
+                    class="product-detail-image"
                     src="<?php echo $escape($imageUrl); ?>"
                     alt="<?php echo $escape($product['name']); ?>"
                     onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';"
