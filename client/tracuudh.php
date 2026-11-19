@@ -692,13 +692,12 @@ if (!$isCustomerLoggedIn) {
 </style>
 
 <main>
-    <nav class="breadcrumb-container orders-breadcrumb" aria-label="Điều hướng đường dẫn">
-        <a href="<?php echo htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>">Trang chủ</a>
-        <span class="separator">&gt;</span>
-        <strong class="current" aria-current="page">Đơn hàng của tôi</strong>
-    </nav>
-
     <div class="orders-wrapper">
+        <nav class="breadcrumb-container orders-breadcrumb" aria-label="Điều hướng đường dẫn">
+            <a href="<?php echo htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>">Trang chủ</a>
+            <span class="separator">&gt;</span>
+            <strong class="current" aria-current="page">Đơn hàng của tôi</strong>
+        </nav>
         <!-- Page Header -->
         <div class="orders-page-header">
             <div class="orders-icon">📦</div>
