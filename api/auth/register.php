@@ -55,7 +55,7 @@ $stmt->bind_param('s', $phone);
 $stmt->execute();
 if ($stmt->get_result()->fetch_assoc()) {
     $stmt->close();
-    respond(409, ['status' => 'error', 'message' => 'Số điện thoại đã được liên kết với tài khoản khác.']);
+    respond(409, ['status' => 'error', 'message' => 'Số điện thoại này đã được đăng ký trước đó. Vui lòng nhập số điện thoại khác.']);
 }
 $stmt->close();
 // Tạo tài khoản khách hàng vào bảng users

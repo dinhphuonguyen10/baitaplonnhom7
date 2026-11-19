@@ -140,6 +140,36 @@ $homeUrl    = htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8');
         button[type="submit"]:active  { transform: scale(0.98); }
         button[type="submit"]:disabled { opacity: 0.55; cursor: not-allowed; }
 
+        /* Toggle hiện/Ẩn mật khẩu */
+        .pw-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .pw-wrap input[type="password"],
+        .pw-wrap input[type="text"] {
+            width: 100%;
+            margin-bottom: 0;
+            padding-right: 46px;
+        }
+        .pw-toggle-btn {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.45);
+            transition: color 0.2s;
+        }
+        .pw-toggle-btn svg { width: 20px; height: 20px; display: block; }
+        .pw-toggle-btn:hover { color: #c9a96e; }
+
         /* Thông báo */
         .msg {
             min-height: 20px;
@@ -229,10 +259,16 @@ $homeUrl    = htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8');
     <!-- FORM BƯỚC 2: Đặt mật khẩu mới (ẩn ban đầu) -->
     <form id="form-reset" hidden>
         <label for="new-password">Mật khẩu mới (tối thiểu 8 ký tự: hoa, thường, số, ký tự đặc biệt)</label>
-        <input id="new-password" type="password" name="password" placeholder="Ví dụ: Abc@1234 (tối thiểu 8 ký tự)" autocomplete="new-password" minlength="8" required>
+        <div class="pw-wrap">
+            <input id="new-password" type="password" name="password" placeholder="Ví dụ: Abc@1234 (tối thiểu 8 ký tự)" autocomplete="new-password" minlength="8" required>
+            <button type="button" class="pw-toggle-btn" onclick="togglePw('new-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
+        </div>
 
         <label for="confirm-password">Nhập lại mật khẩu mới (tối thiểu 8 ký tự)</label>
-        <input id="confirm-password" type="password" name="confirm_password" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" minlength="8" required>
+        <div class="pw-wrap">
+            <input id="confirm-password" type="password" name="confirm_password" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" minlength="8" required>
+            <button type="button" class="pw-toggle-btn" onclick="togglePw('confirm-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
+        </div>
 
         <button type="submit" id="btn-reset">Đặt lại mật khẩu</button>
         <p class="msg" id="msg-reset" role="alert"></p>
@@ -390,6 +426,32 @@ function setMsg(el, text, type) {
     el.textContent = text;
     el.className   = 'msg' + (type ? ' ' + type : '');
 }
+
+var EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var EYE_CLOSED = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+function togglePw(inputId, btn) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    var isVisible = btn.getAttribute('data-visible') === '1';
+    if (isVisible) {
+        input.type = 'password';
+        btn.innerHTML = EYE_CLOSED;
+        btn.setAttribute('data-visible', '0');
+        btn.title = 'Hiện mật khẩu';
+    } else {
+        input.type = 'text';
+        btn.innerHTML = EYE_OPEN;
+        btn.setAttribute('data-visible', '1');
+        btn.title = 'Ẩn mật khẩu';
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pw-toggle-btn').forEach(function(btn) {
+        btn.innerHTML = EYE_CLOSED;
+        btn.title = 'Hiện mật khẩu';
+    });
+});
 </script>
 
 </body>
