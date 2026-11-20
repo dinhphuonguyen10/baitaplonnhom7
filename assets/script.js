@@ -793,7 +793,7 @@ function renderCheckoutSummary() {
         sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0));
 }
 
-function renderCheckoutReceipt(orderId, customer, items, total) {
+function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 'COD') {
     const success = document.getElementById('checkout-success');
     if (!success) return;
 
@@ -828,6 +828,17 @@ function renderCheckoutReceipt(orderId, customer, items, total) {
         receiptItems.appendChild(row);
     });
     success.querySelector('.checkout-receipt-total').textContent = formatPrice(Number(total) || 0);
+    const receiptPayment = success.querySelector('.checkout-receipt-payment');
+    const successQr = success.querySelector('.checkout-success-qr');
+    if (paymentMethod === 'BANK_QR') {
+        receiptPayment.textContent = 'Thanh toán qua mã QR (demo)';
+        if (successQr) {
+            successQr.hidden = false;
+        }
+    } else {
+        receiptPayment.textContent = 'Thanh toán khi nhận hàng';
+        if (successQr) successQr.hidden = true;
+    }
     success.hidden = false;
     document.querySelector('.checkout-page-layout').hidden = true;
 }
@@ -1492,6 +1503,29 @@ function initCheckoutPage() {
     const loginNotice = document.getElementById('checkout-login-notice');
     if (!form || !submitButton || !message) return;
 
+    const paymentCards = Array.from(document.querySelectorAll('[data-payment-card]'));
+    const qrPanel = document.getElementById('checkout-qr-panel');
+    const qrAmount = document.getElementById('checkout-qr-amount');
+    const syncPaymentMethod = () => {
+        const selected = form.querySelector('input[name="payment_method"]:checked')?.value || 'COD';
+        paymentCards.forEach(card => card.classList.toggle('is-selected', card.dataset.paymentCard === selected));
+        if (qrPanel) qrPanel.hidden = selected !== 'BANK_QR';
+        if (qrAmount) {
+            const total = getCheckoutItems().reduce((sum, item) =>
+                sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+            qrAmount.textContent = formatPrice(total);
+        }
+    };
+    paymentCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const radio = card.querySelector('input[name="payment_method"]');
+            if (radio) radio.checked = true;
+            syncPaymentMethod();
+        });
+        card.querySelector('input[name="payment_method"]')?.addEventListener('change', syncPaymentMethod);
+    });
+    syncPaymentMethod();
+
     const phoneInput = document.getElementById('checkout-phone');
     const emailInput = document.getElementById('checkout-email');
     if (phoneInput) {
@@ -1605,6 +1639,7 @@ function initCheckoutPage() {
             email: String(formData.get('email')).trim(),
             address
         };
+        const paymentMethod = String(formData.get('payment_method') || 'COD');
 
         submitButton.disabled = true;
         submitButton.textContent = 'Đang xử lý đơn hàng...';
@@ -1618,7 +1653,8 @@ function initCheckoutPage() {
                     address_id: savedAddressId,
                     save_as_new_address: addressPicker ? addressPicker.isEditingSavedAddress() : false,
                     make_default: document.getElementById('checkout-default-address').checked,
-                    coordinates: addressPicker ? addressPicker.getCoordinates() : null
+                    coordinates: addressPicker ? addressPicker.getCoordinates() : null,
+                    payment_method: paymentMethod
                 })
             });
             const result = await response.json();
@@ -1640,7 +1676,7 @@ function initCheckoutPage() {
             }
             updateCartCount();
             form.hidden = true;
-            renderCheckoutReceipt(result.order_id, customer, result.items || selectedItems, result.total_price);
+            renderCheckoutReceipt(result.order_id, customer, result.items || selectedItems, result.total_price, paymentMethod);
         } catch (error) {
             console.error('Đặt hàng thất bại:', error);
             message.textContent = error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.';

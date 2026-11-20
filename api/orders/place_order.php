@@ -18,6 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $data = json_decode(file_get_contents('php://input'), true);
 $customer = is_array($data['customer'] ?? null) ? $data['customer'] : [];
 $cart = $data['cart'] ?? null;
+$payment_method = strtoupper(trim((string) ($data['payment_method'] ?? 'COD')));
+
+if (!in_array($payment_method, ['COD', 'BANK_QR'], true)) {
+    respondWithError('Phương thức thanh toán không hợp lệ.');
+}
 
 if (!is_array($cart) || $cart === []) {
     respondWithError('Giỏ hàng trống hoặc không hợp lệ.');
@@ -250,17 +255,17 @@ try {
     if ($user_id === null) {
         $order_stmt = $conn->prepare(
             "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
-             VALUES (NULL, NULL, ?, ?, ?, ?, ?, 'COD')"
+             VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?)"
         );
     } elseif ($address_id === null) {
         $order_stmt = $conn->prepare(
             "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
-             VALUES (?, NULL, ?, ?, ?, ?, ?, 'COD')"
+             VALUES (?, NULL, ?, ?, ?, ?, ?, ?)"
         );
     } else {
         $order_stmt = $conn->prepare(
             "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'COD')"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         );
     }
     $item_stmt = $conn->prepare(
@@ -289,11 +294,11 @@ try {
 
     $total_price = round($total_price, 2);
     if ($user_id === null) {
-        $order_stmt->bind_param('ssssd', $full_name, $phone, $email, $address, $total_price);
+        $order_stmt->bind_param('ssssds', $full_name, $phone, $email, $address, $total_price, $payment_method);
     } elseif ($address_id === null) {
-        $order_stmt->bind_param('issssd', $user_id, $full_name, $phone, $email, $address, $total_price);
+        $order_stmt->bind_param('issssds', $user_id, $full_name, $phone, $email, $address, $total_price, $payment_method);
     } else {
-        $order_stmt->bind_param('iissssd', $user_id, $address_id, $full_name, $phone, $email, $address, $total_price);
+        $order_stmt->bind_param('iissssds', $user_id, $address_id, $full_name, $phone, $email, $address, $total_price, $payment_method);
     }
     $order_stmt->execute();
     $order_id = $conn->insert_id;

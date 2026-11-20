@@ -135,21 +135,46 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                         Lưu địa chỉ này làm mặc định cho lần mua sau
                     </label>
 
-                    <div class="checkout-method-card">
+                    <div class="checkout-method-card checkout-delivery-card">
                         <div class="checkout-method-icon" aria-hidden="true">⌂</div>
-                        <div>
+                        <div class="checkout-method-content">
                             <strong>Giao hàng tiêu chuẩn</strong>
                             <p>Giao hàng đến địa chỉ bạn cung cấp</p>
                         </div>
-                        <span class="checkout-method-check" aria-label="Đang chọn">✓</span>
+                        <span class="checkout-method-check" aria-hidden="true"></span>
                     </div>
-                    <div class="checkout-method-card">
-                        <div class="checkout-method-icon" aria-hidden="true">₫</div>
+                    <fieldset class="checkout-payment-methods">
+                        <legend>Phương thức thanh toán</legend>
+                        <label class="checkout-method-card is-selected" data-payment-card="COD">
+                            <input type="radio" name="payment_method" value="COD" checked>
+                            <div class="checkout-method-icon" aria-hidden="true">₫</div>
+                            <div class="checkout-method-content">
+                                <strong>Thanh toán khi nhận hàng</strong>
+                                <p>Thanh toán trực tiếp cho nhân viên giao hàng</p>
+                            </div>
+                            <span class="checkout-method-check" aria-hidden="true"></span>
+                        </label>
+                        <label class="checkout-method-card" data-payment-card="BANK_QR">
+                            <input type="radio" name="payment_method" value="BANK_QR">
+                            <div class="checkout-method-icon" aria-hidden="true">▣</div>
+                            <div class="checkout-method-content">
+                                <strong>Thanh toán qua mã QR</strong>
+                                <p>Mã QR minh họa, không dùng để chuyển tiền</p>
+                            </div>
+                            <span class="checkout-method-check" aria-hidden="true"></span>
+                        </label>
+                    </fieldset>
+                    <div class="checkout-qr-panel" id="checkout-qr-panel" hidden>
                         <div>
-                            <strong>Thanh toán khi nhận hàng (COD)</strong>
-                            <p>Thanh toán trực tiếp cho nhân viên giao hàng</p>
+                            <span class="checkout-qr-eyebrow">QR minh họa</span>
+                            <h3>Mã QR demo</h3>
+                            <p>Mã này chỉ dùng để minh họa giao diện, không thể dùng để chuyển tiền.</p>
+                            <div class="checkout-qr-meta">
+                                <span>Số tiền cần thanh toán</span>
+                                <strong id="checkout-qr-amount">0 đ</strong>
+                            </div>
                         </div>
-                        <span class="checkout-method-check" aria-label="Đang chọn">✓</span>
+                        <img src="<?php echo htmlspecialchars($appBaseUrl . '/assets/payment-qr-demo.svg', ENT_QUOTES, 'UTF-8'); ?>" alt="Mã QR demo, không dùng để thanh toán" class="checkout-qr-image">
                     </div>
 
                     <button class="checkout-submit-btn" id="submit-checkout" type="submit">Hoàn tất đặt hàng</button>
@@ -180,7 +205,12 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                     <span>Tổng tiền hàng</span>
                     <strong class="checkout-receipt-total"></strong>
                 </div>
-                <p class="checkout-receipt-payment">Thanh toán khi nhận hàng (COD)</p>
+                <p class="checkout-receipt-payment">Thanh toán khi nhận hàng</p>
+                <div class="checkout-success-qr" id="checkout-success-qr" hidden>
+                    <strong>QR demo — không dùng để chuyển tiền</strong>
+                    <img src="<?php echo htmlspecialchars($appBaseUrl . '/assets/payment-qr-demo.svg', ENT_QUOTES, 'UTF-8'); ?>" alt="Mã QR demo, không dùng để thanh toán">
+                    <span>Đây chỉ là hình minh họa, không ghi nhận thanh toán thật.</span>
+                </div>
             </div>
             <div class="checkout-success-actions">
                 <a class="checkout-submit-btn" href="<?php echo htmlspecialchars($appBaseUrl . '/client/tracuudh.php', ENT_QUOTES, 'UTF-8'); ?>">Tra cứu đơn hàng</a>

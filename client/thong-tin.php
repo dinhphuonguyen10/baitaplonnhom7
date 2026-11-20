@@ -7,7 +7,7 @@ $topics = [
         'faqs' => [
             ['Tôi có cần tạo tài khoản để đặt hàng không?', 'Bạn cần đăng nhập tài khoản khách hàng để hoàn tất đặt hàng trên website. Nếu chưa có tài khoản, hãy chọn Đăng ký ở đầu trang.'],
             ['Làm sao để đặt hàng?', 'Chọn sản phẩm, thêm vào giỏ hàng và kiểm tra lại sản phẩm cùng số lượng. Tiếp tục đến trang đặt hàng, đăng nhập tài khoản và điền đầy đủ thông tin người nhận để gửi đơn.'],
-            ['Website hiện có những cách thanh toán nào?', 'Hiện tại website hỗ trợ thanh toán khi nhận hàng (COD). Cửa hàng sẽ xác nhận phí giao hàng (nếu có) khi liên hệ về đơn hàng.'],
+            ['Website hiện có những cách thanh toán nào?', 'Bản demo hỗ trợ chọn thanh toán khi nhận hàng (COD) hoặc phương thức QR minh họa. Mã QR hiện tại chỉ để trình bày giao diện, không dùng để chuyển tiền hay xác nhận thanh toán.'],
             ['Phí và thời gian giao hàng được tính thế nào?', 'Phí giao hàng và thời gian dự kiến phụ thuộc vào địa chỉ nhận. Cửa hàng sẽ trao đổi thông tin cụ thể khi liên hệ xác nhận đơn; website hiện không hiển thị mức phí hoặc thời hạn cố định.'],
             ['Làm sao theo dõi đơn hàng?', 'Mở mục Tra cứu đơn hàng trên thanh điều hướng và nhập mã đơn hàng hoặc số điện thoại đã dùng khi đặt hàng.'],
             ['Tôi muốn cập nhật hoặc hủy đơn thì làm thế nào?', 'Hãy liên hệ cửa hàng sớm nhất có thể qua hotline hoặc Chat với cửa hàng, kèm mã đơn hàng. Nhân viên sẽ kiểm tra tình trạng xử lý và hướng dẫn phương án phù hợp.'],
@@ -27,7 +27,7 @@ $topics = [
             ['title' => '01 · Khám phá và chọn sản phẩm', 'paragraphs' => ['Duyệt các danh mục trên thanh điều hướng hoặc sử dụng ô tìm kiếm. Mở trang sản phẩm để xem hình ảnh, tên và thông tin được cung cấp trước khi thêm vào giỏ hàng.']],
             ['title' => '02 · Kiểm tra giỏ hàng', 'paragraphs' => ['Đối chiếu tên sản phẩm, số lượng và tổng tiền hàng. Nếu muốn thay đổi lựa chọn, bạn có thể cập nhật giỏ hàng trước khi chuyển sang bước đặt hàng.']],
             ['title' => '03 · Đăng nhập và nhập thông tin người nhận', 'paragraphs' => ['Đăng nhập tài khoản khách hàng để tiếp tục. Điền họ tên, số điện thoại, email, tỉnh/thành, xã/phường và địa chỉ cụ thể. Kiểm tra số nhà, tên đường và thông tin liên hệ để hạn chế nhầm lẫn khi giao hàng.', 'Bạn có thể chọn một địa chỉ đã lưu hoặc lưu địa chỉ mới làm mặc định cho lần mua sau.']],
-            ['title' => '04 · Kiểm tra phương thức và gửi đơn', 'paragraphs' => ['Website hiện sử dụng giao hàng tiêu chuẩn và thanh toán khi nhận hàng (COD). Kiểm tra lại thông tin hiển thị rồi chọn Hoàn tất đặt hàng. Phí giao hàng (nếu có) sẽ được cửa hàng xác nhận khi liên hệ.']],
+            ['title' => '04 · Kiểm tra phương thức và gửi đơn', 'paragraphs' => ['Chọn thanh toán khi nhận hàng (COD) hoặc phương thức QR minh họa. Nếu chọn QR, số tiền và hình QR demo sẽ hiển thị; hình này không dùng để chuyển tiền hay xác nhận thanh toán. Kiểm tra lại thông tin đơn rồi chọn Hoàn tất đặt hàng.']],
             ['title' => '05 · Lưu mã và theo dõi đơn', 'paragraphs' => ['Sau khi đặt hàng thành công, lưu mã đơn hàng được hiển thị. Mở mục Tra cứu đơn hàng và nhập mã đơn hoặc số điện thoại đã dùng khi đặt để xem tình trạng xử lý.']],
             ['title' => 'Nếu cần thay đổi thông tin', 'paragraphs' => ['Liên hệ cửa hàng càng sớm càng tốt, cung cấp mã đơn hàng và nội dung cần điều chỉnh. Khả năng cập nhật phụ thuộc vào tình trạng xử lý đơn; nhân viên sẽ kiểm tra và hướng dẫn bạn.']],
         ],
@@ -41,7 +41,8 @@ $topics = [
         'eyebrow' => 'THANH TOÁN AN TÂM',
         'intro' => 'Để bạn nắm rõ khoản cần thanh toán, phương thức hiện có và những lưu ý trước khi nhận hàng, vui lòng tham khảo thông tin dưới đây.',
         'sections' => [
-            ['title' => 'Thanh toán khi nhận hàng (COD)', 'paragraphs' => ['Đơn hàng trên website hiện áp dụng hình thức COD. Sau khi cửa hàng liên hệ xác nhận, bạn thanh toán cho nhân viên giao hàng khi nhận đơn.', 'Số tiền thanh toán căn cứ vào thông tin đơn hàng đã được xác nhận. Phí giao hàng (nếu có) sẽ được cửa hàng thông báo khi liên hệ. Website hiện chưa cung cấp lựa chọn thanh toán trực tuyến hoặc chuyển khoản.']],
+            ['title' => 'Thanh toán khi nhận hàng (COD)', 'paragraphs' => ['Chọn COD nếu muốn thanh toán trực tiếp cho nhân viên giao hàng khi nhận đơn. Số tiền căn cứ vào thông tin đơn hàng đã được xác nhận; phí giao hàng (nếu có) sẽ được cửa hàng thông báo khi liên hệ.']],
+            ['title' => 'Phương thức QR minh họa', 'paragraphs' => ['Khi chọn phương thức QR ở bước đặt hàng, trang hiển thị số tiền hàng và hình QR demo. Đây chỉ là nội dung minh họa giao diện, không nhận chuyển khoản và không xác nhận thanh toán thật.']],
             ['title' => 'Trước khi hoàn tất đặt hàng', 'items' => ['Kiểm tra sản phẩm, số lượng và tổng tiền hàng trong giỏ.', 'Đảm bảo số điện thoại và địa chỉ nhận hàng có thể liên hệ được.', 'Chờ cửa hàng xác nhận thông tin đơn hàng và khoản phí giao hàng (nếu có).']],
             ['title' => 'Khi cần hỗ trợ', 'paragraphs' => ['Nếu thông tin thanh toán chưa rõ hoặc có thay đổi về đơn hàng, hãy gọi hotline 1800 6324 trong khung giờ 08:00–22:00 hằng ngày hoặc nhắn tin qua trang Chat với cửa hàng. Vui lòng cung cấp mã đơn hàng để được hỗ trợ nhanh hơn.']],
         ],
