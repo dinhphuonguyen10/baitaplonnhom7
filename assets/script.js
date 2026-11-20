@@ -831,7 +831,9 @@ function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 
     const receiptPayment = success.querySelector('.checkout-receipt-payment');
     const successQr = success.querySelector('.checkout-success-qr');
     if (paymentMethod === 'BANK_QR') {
-        receiptPayment.textContent = 'Thanh toán qua mã QR (demo)';
+        receiptPayment.textContent = success.dataset.qrDemo === 'true'
+            ? 'Thanh toán qua mã QR (demo)'
+            : 'Thanh toán qua mã QR';
         if (successQr) {
             successQr.hidden = false;
         }

@@ -29,6 +29,10 @@ $pageTitle = "Đặt hàng - ÉCRIN JEWELRY";
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
 $appBaseUrl = rtrim($appBaseUrl, '/');
+$checkoutQrImage = 'payment-qr-demo.svg';
+$checkoutQrImagePath = __DIR__ . '/../assets/' . $checkoutQrImage;
+$checkoutQrUrl = $appBaseUrl . '/assets/' . $checkoutQrImage . '?v=' . filemtime($checkoutQrImagePath);
+$checkoutQrAlt = 'Mã QR demo, không dùng để thanh toán';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -174,7 +178,7 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                                 <strong id="checkout-qr-amount">0 đ</strong>
                             </div>
                         </div>
-                        <img src="<?php echo htmlspecialchars($appBaseUrl . '/assets/payment-qr-demo.svg', ENT_QUOTES, 'UTF-8'); ?>" alt="Mã QR demo, không dùng để thanh toán" class="checkout-qr-image">
+                        <img src="<?php echo htmlspecialchars($checkoutQrUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($checkoutQrAlt, ENT_QUOTES, 'UTF-8'); ?>" class="checkout-qr-image">
                     </div>
 
                     <button class="checkout-submit-btn" id="submit-checkout" type="submit">Hoàn tất đặt hàng</button>
@@ -191,7 +195,7 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                 <p class="checkout-shipping-note">Phí giao hàng (nếu có) sẽ được cửa hàng xác nhận khi liên hệ.</p>
             </aside>
         </div>
-        <section class="checkout-success" id="checkout-success" hidden aria-live="polite">
+        <section class="checkout-success" id="checkout-success" data-qr-demo="true" hidden aria-live="polite">
             <div class="checkout-success-icon" aria-hidden="true">✓</div>
             <h2>Đặt hàng thành công</h2>
             <p class="checkout-success-order-id"></p>
@@ -208,7 +212,7 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                 <p class="checkout-receipt-payment">Thanh toán khi nhận hàng</p>
                 <div class="checkout-success-qr" id="checkout-success-qr" hidden>
                     <strong>QR demo — không dùng để chuyển tiền</strong>
-                    <img src="<?php echo htmlspecialchars($appBaseUrl . '/assets/payment-qr-demo.svg', ENT_QUOTES, 'UTF-8'); ?>" alt="Mã QR demo, không dùng để thanh toán">
+                    <img src="<?php echo htmlspecialchars($checkoutQrUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($checkoutQrAlt, ENT_QUOTES, 'UTF-8'); ?>">
                     <span>Đây chỉ là hình minh họa, không ghi nhận thanh toán thật.</span>
                 </div>
             </div>
