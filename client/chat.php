@@ -82,7 +82,7 @@ if ($isCustomerLoggedIn && $requestedProductId !== false && $requestedProductId 
     .support-chat-submit:disabled { opacity:.55; cursor:wait; transform:none; }
     .support-chat-login { display:grid; flex:1; align-content:center; justify-items:center; padding:35px; text-align:center; }
     .support-chat-login-icon { display:grid; width:62px; height:62px; margin-bottom:16px; place-items:center; border-radius:50%; background:#F5F0E5; color:#9B835D; font-size:25px; }
-    .support-chat-login h3 { margin:0; color:var(--navy); font:500 24px 'Playfair Display',Georgia,serif; }
+    .support-chat-login h3 { margin:0; color:var(--navy); font:500 24px 'Roboto',Arial,sans-serif; }
     .support-chat-login p { max-width:370px; color:var(--text-mid); font-size:14px; line-height:1.7; }
     .support-chat-login button { padding:11px 20px; border:0; border-radius:9px; background:var(--navy); color:#fff; font-size:14px; font-weight:600; cursor:pointer; }
     .support-chat-login button.login-trigger { color:#fff !important; }

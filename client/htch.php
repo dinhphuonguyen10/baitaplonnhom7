@@ -14,7 +14,7 @@ include __DIR__ . '/../include/header.php';
     <style>
         .store-container {
             max-width: 1200px;
-            margin: 40px auto;
+            margin: 64px auto 40px;
             padding: 0 20px;
             display: grid;
             grid-template-columns: 350px 1fr;
@@ -102,21 +102,25 @@ include __DIR__ . '/../include/header.php';
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            align-self: stretch;
+            height: auto;
         }
 
         .map-placeholder {
-            min-height: 450px;
+            flex: 1 1 auto;
+            min-height: 420px;
         }
 
         .map-placeholder iframe {
             display: block;
             width: 100%;
-            height: 450px;
+            height: 100%;
+            min-height: 420px;
             border: 0;
         }
 
         .store-detail-card {
-            padding: 24px;
+            padding: 34px 30px 40px;
             border-top: 1px solid #eee;
         }
 

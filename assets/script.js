@@ -3135,6 +3135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initScrollToTop();
     initProductDetailsNavigation();
     initAddToCart();
+    void initWishlist();
     initCheckoutPage();
     initSearch();
     initTabs();

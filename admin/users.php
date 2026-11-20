@@ -17,6 +17,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!is_string($token) || !hash_equals($_SESSION['staff_management_csrf'], $token)) {
         $error = 'Phiên làm việc không hợp lệ. Vui lòng tải lại trang.';
+    } elseif ($action === 'delete_user') {
+        $targetUserId = (int)($_POST['target_user_id'] ?? 0);
+
+        if ($targetUserId <= 0) {
+            $error = 'Tài khoản cần xóa không hợp lệ.';
+        } else {
+            $stmt = $conn->prepare('SELECT username FROM admins WHERE id = ? LIMIT 1');
+            $stmt->bind_param('i', $targetUserId);
+            $stmt->execute();
+            $targetUser = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (!$targetUser) {
+                $error = 'Không tìm thấy tài khoản cần xóa.';
+            } elseif ((string)$targetUser['username'] === (string)($_SESSION['admin_username'] ?? $_SESSION['username'] ?? '')) {
+                $error = 'Không thể xóa tài khoản đang đăng nhập.';
+            } else {
+                $stmt = $conn->prepare('DELETE FROM admins WHERE id = ? LIMIT 1');
+                $stmt->bind_param('i', $targetUserId);
+                if ($stmt->execute()) {
+                    $success = "Đã xóa tài khoản '{$targetUser['username']}' thành công.";
+                } else {
+                    $error = 'Không thể xóa tài khoản lúc này.';
+                }
+                $stmt->close();
+            }
+        }
     } elseif ($action === 'reset_password') {
         // Đổi mật khẩu cho nhân viên
         $targetUserId = (int)($_POST['target_user_id'] ?? 0);
@@ -74,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $conn->prepare('INSERT INTO admins (username, password, role) VALUES (?, ?, ?)');
                 $stmt->bind_param('sss', $username, $passwordHash, $role);
                 if ($stmt->execute()) {
-                    $roleLabel = $role === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Staff)';
+                    $roleLabel = $role === 'manager' ? 'Quản lý' : 'Nhân viên';
                     $success = "Đã tạo tài khoản {$roleLabel} '{$username}' thành công.";
                 } else {
                     $error = 'Không thể tạo tài khoản lúc này.';
@@ -103,9 +130,9 @@ $adminCurrentPage = 'users.php';
     <style>
         .prototype-panel { margin: 20px 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
         .prototype-panel h2 { margin-top: 0; font-size: 1.25rem; }
-        .prototype-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
-        .prototype-form label { display: grid; gap: 6px; font-weight: 700; font-size: 0.9rem; }
-        .prototype-form input, .prototype-form select { padding: 9px 12px; border: 1px solid #d5dbe2; border-radius: 7px; font: inherit; }
+        .prototype-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: 18px; }
+        .prototype-form label { display: grid; min-width: 0; gap: 6px; font-weight: 700; font-size: 0.9rem; }
+        .prototype-form input, .prototype-form select { width: 100%; padding: 9px 12px; border: 1px solid #d5dbe2; border-radius: 7px; font: inherit; }
         .prototype-form button { padding: 9px 16px; border: 0; border-radius: 7px; background: var(--admin-navy, #0f2747); color: #fff; font-weight: bold; cursor: pointer; }
         .prototype-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .prototype-table th, .prototype-table td { padding: 12px; border-bottom: 1px solid #edf0f3; text-align: left; vertical-align: middle; }
@@ -132,6 +159,18 @@ $adminCurrentPage = 'users.php';
             background: #c4a45a;
             color: #fff;
         }
+        .account-actions { display: inline-flex; justify-content: flex-end; gap: 8px; }
+        .btn-delete-user {
+            padding: 6px 12px;
+            background: #fff;
+            border: 1px solid #d92d20;
+            color: #b42318;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .btn-delete-user:hover { background: #d92d20; color: #fff; }
 
         /* Modal đổi mật khẩu */
         .modal-overlay {
@@ -171,6 +210,129 @@ $adminCurrentPage = 'users.php';
         .btn-cancel { padding: 9px 16px; border: 1px solid #ccc; background: #fff; border-radius: 7px; cursor: pointer; }
         .btn-submit-reset { padding: 9px 18px; border: 0; background: #0f2747; color: #fff; font-weight: bold; border-radius: 7px; cursor: pointer; }
         .btn-submit-reset:hover { background: #1a3c68; }
+        /* Toggle mật khẩu */
+        .pw-wrap {
+            position: relative;
+            display: grid;
+            gap: 6px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .pw-wrap-inner {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .pw-wrap-inner input { width: 100%; padding-right: 40px; }
+        .pw-toggle-btn {
+            position: absolute;
+            right: 8px;
+            width: auto !important;
+            min-width: 0;
+            margin: 0;
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            cursor: pointer;
+            font-size: 17px;
+            line-height: 1;
+            padding: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            color: #64758a !important;
+            transition: color 0.2s;
+        }
+        .pw-toggle-btn svg { display: block; width: 20px; height: 20px; }
+        .pw-toggle-btn:hover { color: #0f2747 !important; }
+
+        @media (max-width: 900px) {
+            .prototype-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .prototype-form > button { grid-column: 1 / -1; }
+        }
+
+        /* Giao diện quản lý tài khoản */
+        .page-content {
+            max-width: 1380px;
+            padding: 42px 42px 64px;
+        }
+        .page-content > h1 {
+            margin-bottom: 28px;
+            color: #0f2747;
+            font-size: clamp(1.8rem, 3vw, 2.25rem);
+            letter-spacing: -0.04em;
+        }
+        .prototype-panel {
+            margin: 0 0 24px;
+            padding: 28px;
+            border: 1px solid #e4eaf1;
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: 0 12px 30px rgba(15, 39, 71, .06);
+        }
+        .prototype-panel h2 {
+            margin: 0 0 22px;
+            color: #0f2747;
+            font-size: 1.2rem;
+            letter-spacing: -0.02em;
+        }
+        .prototype-form {
+            gap: 20px;
+            padding: 22px;
+            border: 1px solid #edf1f5;
+            border-radius: 14px;
+            background: #f8fafc;
+        }
+        .prototype-form label { color: #344054; }
+        .prototype-form input,
+        .prototype-form select {
+            min-height: 46px;
+            border-color: #d8e0ea;
+            background: #fff;
+            color: #17283d;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+        .prototype-form input:focus,
+        .prototype-form select:focus {
+            outline: 0;
+            border-color: #6c91b8;
+            box-shadow: 0 0 0 3px rgba(76, 131, 184, .14);
+        }
+        .prototype-form > button {
+            min-height: 46px;
+            padding: 0 20px;
+            border-radius: 9px;
+            background: #0f2747;
+            transition: background .2s ease, transform .2s ease;
+        }
+        .prototype-form > button:hover { background: #193b61; transform: translateY(-1px); }
+        .prototype-table { margin-top: 0; border: 1px solid #e8edf3; border-radius: 12px; overflow: hidden; }
+        .prototype-table th {
+            padding: 15px 16px;
+            border-bottom: 1px solid #e4eaf1;
+            background: #f7f9fb;
+            color: #667085;
+            font-size: .72rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+        .prototype-table td { padding: 17px 16px; color: #344054; }
+        .prototype-table tbody tr { transition: background .18s ease; }
+        .prototype-table tbody tr:hover { background: #f8fbff; }
+        .prototype-table td strong { color: #0f2747; }
+        .badge { padding: 6px 11px; border-radius: 999px; font-size: .72rem; letter-spacing: .03em; }
+        .badge-manager { background: #e8f3ff; color: #1769aa; }
+        .badge-staff { background: #f1f3f5; color: #475467; }
+        .account-actions { gap: 8px; flex-wrap: wrap; }
+        .btn-reset-pwd, .btn-delete-user { min-height: 36px; padding: 7px 12px; border-radius: 8px; transition: all .2s ease; }
+        .btn-reset-pwd:hover, .btn-delete-user:hover { transform: translateY(-1px); }
+        .modal-box { border: 1px solid #e4eaf1; border-radius: 18px; }
+
+        @media (max-width: 900px) {
+            .page-content { padding: 28px 20px 48px; }
+            .prototype-panel { padding: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -197,13 +359,16 @@ $adminCurrentPage = 'users.php';
                 <label>Tên đăng nhập
                     <input type="text" name="username" placeholder="Ví dụ: nhanvien_a" minlength="3" maxlength="100" required>
                 </label>
-                <label>Mật khẩu ban đầu
-                    <input type="password" name="password" placeholder="Tối thiểu 8 ký tự" minlength="8" required>
+                <label class="pw-wrap">Mật khẩu ban đầu
+                    <div class="pw-wrap-inner">
+                        <input type="password" name="password" placeholder="Tối thiểu 8 ký tự" minlength="8" required id="create-password">
+                        <button type="button" class="pw-toggle-btn" onclick="togglePw('create-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
+                    </div>
                 </label>
                 <label>Vai trò
                     <select name="role">
-                        <option value="staff">Nhân viên (staff)</option>
-                        <option value="manager">Quản lý (manager)</option>
+                        <option value="staff">Nhân viên</option>
+                        <option value="manager">Quản lý</option>
                     </select>
                 </label>
                 <button type="submit">+ Tạo tài khoản</button>
@@ -237,14 +402,22 @@ $adminCurrentPage = 'users.php';
                         <tr>
                             <td>#<?php echo $escape($staff['id']); ?></td>
                             <td><strong><?php echo $escape($staff['username']); ?></strong></td>
-                            <td><span class="badge <?php echo $roleClass; ?>"><?php echo $escape($staff['role']); ?></span></td>
+                            <td><span class="badge <?php echo $roleClass; ?>"><?php echo $escape($staff['role'] === 'manager' ? 'Quản lý' : 'Nhân viên'); ?></span></td>
                             <td><?php echo $escape($staff['created_at']); ?></td>
                             <td style="color: #027a48; font-weight: 600;">✓ Hoạt động</td>
                             <td style="text-align: right;">
-                                <button type="button" class="btn-reset-pwd"
-                                    onclick="openResetModal(<?php echo (int)$staff['id']; ?>, '<?php echo $escape($staff['username']); ?>')">
-                                    🔑 Đổi mật khẩu
-                                </button>
+                                <span class="account-actions">
+                                    <button type="button" class="btn-reset-pwd"
+                                        onclick="openResetModal(<?php echo (int)$staff['id']; ?>, '<?php echo $escape($staff['username']); ?>')">
+                                        🔑 Đổi mật khẩu
+                                    </button>
+                                    <form method="post" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['staff_management_csrf']); ?>">
+                                        <input type="hidden" name="action" value="delete_user">
+                                        <input type="hidden" name="target_user_id" value="<?php echo (int)$staff['id']; ?>">
+                                        <button type="submit" class="btn-delete-user" onclick="return confirm('Bạn có chắc muốn xóa tài khoản này không?');">🗑 Xóa</button>
+                                    </form>
+                                </span>
                             </td>
                         </tr>
                     <?php endwhile; ?>
@@ -275,8 +448,11 @@ $adminCurrentPage = 'users.php';
 
                 <div class="modal-field">
                     <label for="modal-new-password">Mật khẩu mới:</label>
-                    <input type="text" name="new_password" id="modal-new-password" placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)" minlength="8" required>
-                    <small style="color: #667085; font-size: 0.8rem;">* Mật khẩu hiển thị rõ để Admin dễ dàng đọc hoặc gửi lại cho nhân viên.</small>
+                    <div style="position:relative; display:flex; align-items:center;">
+                        <input type="password" name="new_password" id="modal-new-password" placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)" minlength="8" required style="padding-right: 42px; width: 100%;">
+                        <button type="button" class="pw-toggle-btn" onclick="togglePw('modal-new-password', this)" aria-label="Hiện/Ẩn mật khẩu" style="margin:0;" data-visible="0"></button>
+                    </div>
+                    <small style="color: #667085; font-size: 0.8rem;">* Nhập mật khẩu mới cho nhân viên. Nhấn biểu tượng mắt để xem trước.</small>
                 </div>
 
                 <div class="modal-actions">
@@ -308,6 +484,32 @@ $adminCurrentPage = 'users.php';
             closeResetModal();
         }
     });
+
+    var EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var EYE_CLOSED = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+    function togglePw(inputId, btn) {
+        var input = document.getElementById(inputId);
+        if (!input) return;
+        var isVisible = btn.getAttribute('data-visible') === '1';
+        if (isVisible) {
+            input.type = 'password';
+            btn.innerHTML = EYE_CLOSED;
+            btn.setAttribute('data-visible', '0');
+            btn.title = 'Hiện mật khẩu';
+        } else {
+            input.type = 'text';
+            btn.innerHTML = EYE_OPEN;
+            btn.setAttribute('data-visible', '1');
+            btn.title = 'Ẩn mật khẩu';
+        }
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.pw-toggle-btn').forEach(function(btn) {
+            btn.innerHTML = EYE_CLOSED;
+            btn.title = 'Hiện mật khẩu';
+        });
+    });
     </script>
         </section>
     </section></main></div>
@@ -338,8 +540,8 @@ SESSION['username'] ?? ''); ?></strong><small><?php echo $escape($roleLabel); ?>
                 </label>
                 <label>Vai trò
                     <select name="role">
-                        <option value="staff">Nhân viên (staff)</option>
-                        <option value="manager">Quản lý (manager)</option>
+                        <option value="staff">Nhân viên</option>
+                        <option value="manager">Quản lý</option>
                     </select>
                 </label>
                 <button type="submit">+ Tạo tài khoản</button>
@@ -376,7 +578,7 @@ SESSION['username'] ?? ''); ?></strong><small><?php echo $escape($roleLabel); ?>
                         <tr>
                             <td>#<?php echo $escape($staff['id']); ?></td>
                             <td><strong><?php echo $escape($staff['username']); ?></strong></td>
-                            <td><span class="badge <?php echo $roleClass; ?>"><?php echo $escape($staff['role']); ?></span></td>
+                            <td><span class="badge <?php echo $roleClass; ?>"><?php echo $escape($staff['role'] === 'manager' ? 'Quản lý' : 'Nhân viên'); ?></span></td>
                             <td><?php echo $escape($staff['created_at']); ?></td>
                             <td style="color: #027a48; font-weight: 600;">✓ Hoạt động</td>
                             <td style="text-align: right;">

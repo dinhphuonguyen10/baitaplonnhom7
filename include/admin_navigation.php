@@ -11,9 +11,8 @@ $adminLinks = [
     ['products.php', 'Quản lý sản phẩm', '/admin/products.php', false],
     ['categories.php', 'Quản lý danh mục', '/admin/categories.php', false],
     ['users.php', 'Quản lý tài khoản nhân viên', '/admin/users.php', true],
-    ['orders.php', 'Quản lý đơn hàng', '/admin/orders.php', false],
+    ['orders.php', 'Đơn hàng & Thanh toán', '/admin/orders.php', false],
     ['chat.php', 'Quản lý chat', '/admin/chat.php', false],
-    ['payments.php', 'Quản lý thanh toán', '/admin/payments.php', false],
     ['reports.php', 'Báo cáo và thống kê', '/admin/reports.php', true],
 ];
 ?>

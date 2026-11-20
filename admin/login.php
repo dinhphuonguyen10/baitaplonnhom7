@@ -117,6 +117,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: #fff0ef;
             color: #b42318;
         }
+        .pw-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .pw-wrap input {
+            width: 100%;
+            padding-right: 44px;
+        }
+        .pw-toggle-btn {
+            position: absolute;
+            right: 10px;
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            cursor: pointer;
+            padding: 4px;
+            width: auto !important;
+            margin: 0 !important;
+            font-size: 18px;
+            line-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            transition: color 0.2s;
+        }
+        .pw-toggle-btn svg { width: 20px; height: 20px; display: block; }
+        .pw-toggle-btn:hover { color: #0b2033; }
 
     </style>
 </head>
@@ -136,12 +165,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input id="username" name="username" type="text" autocomplete="username" required autofocus>
 
             <label for="password">Mật khẩu</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <div class="pw-wrap">
+                <input id="password" name="password" type="password" autocomplete="current-password" required>
+                <button type="button" class="pw-toggle-btn" onclick="togglePw('password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
+            </div>
 
             <button type="submit">Đăng nhập</button>
         </form>
 
-
     </main>
+<script>
+var EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var EYE_CLOSED = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+function togglePw(inputId, btn) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    var isVisible = btn.getAttribute('data-visible') === '1';
+    if (isVisible) {
+        input.type = 'password';
+        btn.innerHTML = EYE_CLOSED;
+        btn.setAttribute('data-visible', '0');
+        btn.title = 'Hiện mật khẩu';
+    } else {
+        input.type = 'text';
+        btn.innerHTML = EYE_OPEN;
+        btn.setAttribute('data-visible', '1');
+        btn.title = 'Ẩn mật khẩu';
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pw-toggle-btn').forEach(function(btn) {
+        btn.innerHTML = EYE_CLOSED;
+        btn.title = 'Hiện mật khẩu';
+    });
+});
+</script>
 </body>
 </html>
