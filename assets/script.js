@@ -2633,15 +2633,16 @@ function initStickyHeader() {
 }
 
 // ==================== CATEGORY FILTERS & SORTING (SHOPEE STYLE) ====================
-// Lưu trữ dữ liệu gốc từ DB để lọc/sắp xếp trên dữ liệu gốc, không thao tác DOM
-let _categoryOriginalProducts = []; // Toàn bộ sản phẩm gốc (trước lọc)
 
 function initCategoryFilters() {
     const productGrid = document.querySelector('.category-grid');
     if (!productGrid) return;
 
-    // Lưu bản gốc từ _paginationAllProducts (đã fetch xong)
-    _categoryOriginalProducts = [..._paginationAllProducts];
+    const container = document.getElementById('category-products-container');
+    if (!container) return;
+
+    const dbCategory = container.getAttribute('data-db-category');
+    if (!dbCategory) return;
 
     // Các phần tử lọc giá
     const priceFromInput = document.getElementById('filter-price-from') || document.querySelectorAll('.price-filter input')[0];
@@ -2762,7 +2763,7 @@ function initCategoryFilters() {
             priceDropdownItems.forEach(i => i.classList.remove('active'));
 
             btn.classList.add('active');
-            currentSort = btn.getAttribute('data-sort') || 'popular';
+            currentSort = btn.getAttribute('data-sort') || 'best_selling';
             applyFiltersAndSort();
         });
     });
@@ -2809,71 +2810,46 @@ function initCategoryFilters() {
             else if (val === 'Giá từ cao đến thấp') currentSort = 'price_desc';
             else if (val === 'Bán chạy nhất') currentSort = 'best_selling';
             else if (val === 'Mới cập nhật') currentSort = 'newest';
-            else currentSort = 'popular';
+            else currentSort = 'suggest';
             applyFiltersAndSort();
         });
     }
 
-    // ================= HÀM LỌC + SẮP XẾP + PHÂN TRANG =================
-    function applyFiltersAndSort() {
+    // ================= HÀM GỌI API VỚI FILTER + SORT (SQL-SIDE) =================
+    async function applyFiltersAndSort() {
         const minVal = parseVndNumber(priceFromInput?.value);
         const maxVal = parseVndNumber(priceToInput?.value);
-        const reqInStock = inStockCb ? inStockCb.checked : false;
+        const reqInStock  = inStockCb  ? inStockCb.checked  : false;
         const reqDiscount = discountCb ? discountCb.checked : false;
-        const reqGift = giftCb ? giftCb.checked : false;
-
-        // Lọc trên dữ liệu gốc
-        let filtered = _categoryOriginalProducts.filter(product => {
-            const price = (typeof product.price_sale_raw !== 'undefined') ? Number(product.price_sale_raw) : parsePrice(product.price_sale);
-            const stock = parseInt(product.stock, 10) || 0;
-            const hasDiscount = Boolean((product.discount && product.discount.trim() !== '') || (product.price_original_raw > product.price_sale_raw));
-            const hasGift = Boolean(product.gift && product.gift.trim() !== '');
-
-            if (minVal !== null && price < minVal) return false;
-            if (maxVal !== null && price > maxVal) return false;
-            if (reqInStock && stock <= 0) return false;
-            if (reqDiscount && !hasDiscount) return false;
-            if (reqGift && !hasGift) return false;
-            return true;
-        });
-
-        // Sắp xếp
-        filtered.sort((a, b) => {
-            const priceA = (typeof a.price_sale_raw !== 'undefined') ? Number(a.price_sale_raw) : parsePrice(a.price_sale);
-            const priceB = (typeof b.price_sale_raw !== 'undefined') ? Number(b.price_sale_raw) : parsePrice(b.price_sale);
-            const soldA = parseInt(a.sold_count, 10) || 0;
-            const soldB = parseInt(b.sold_count, 10) || 0;
-            const wishA = parseInt(a.wishlist_count || a.wishlistCount, 10) || 0;
-            const wishB = parseInt(b.wishlist_count || b.wishlistCount, 10) || 0;
-            const idA = Number(a.id) || 0;
-            const idB = Number(b.id) || 0;
-
-            if (currentSort === 'price_asc') return priceA - priceB;
-            if (currentSort === 'price_desc') return priceB - priceA;
-            if (currentSort === 'newest') return idB - idA;
-            if (currentSort === 'best_selling') {
-                if (soldB !== soldA) return soldB - soldA;
-                return idB - idA;
-            }
-
-            // 'popular' / 'suggest': Gợi ý cho bạn (nhiều lượt tim nhất trong danh mục)
-            if (wishB !== wishA) return wishB - wishA;
-            return idB - idA;
-        });
-
-        // Ẩn/Hiện khối Empty State
-        if (emptyState) {
-            emptyState.style.display = (filtered.length === 0) ? 'block' : 'none';
-        }
+        const reqGift     = giftCb     ? giftCb.checked     : false;
 
         // Vẽ lại thanh tags tiêu chí đang lọc
         renderActiveFilterBadges(minVal, maxVal, reqInStock, reqDiscount, reqGift);
 
-        // Render lại với phân trang, reset về trang 1
-        const container = document.getElementById('category-products-container');
-        if (container) {
-            renderDbProducts(filtered, container, 1);
+        // Xây dựng query string gửi lên API
+        const params = new URLSearchParams({ category: dbCategory, sort: currentSort });
+        if (minVal !== null) params.set('min_price', minVal);
+        if (maxVal !== null) params.set('max_price', maxVal);
+        if (reqInStock)  params.set('in_stock',     '1');
+        if (reqDiscount) params.set('has_discount',  '1');
+        if (reqGift)     params.set('has_gift',      '1');
+
+        try {
+            const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?${params}`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const products = await response.json();
+
+            // Ẩn/Hiện khối Empty State
+            if (emptyState) {
+                emptyState.style.display = (products.length === 0) ? 'block' : 'none';
+            }
+
+            renderDbProducts(products, container, 1);
             applyUserRole();
+            // Đồng bộ lại nút tim
+            wishlistIds.forEach(id => updateWishlistBtns(id, true));
+        } catch (error) {
+            console.error('Lỗi khi tải sản phẩm:', error);
         }
     }
 
@@ -2891,15 +2867,9 @@ function initCategoryFilters() {
             badges.push({ type: 'price', label: `Đến ${formatVndNumber(maxVal)}₫` });
         }
 
-        if (reqInStock) {
-            badges.push({ type: 'stock', label: 'Còn hàng' });
-        }
-        if (reqDiscount) {
-            badges.push({ type: 'discount', label: 'Đang giảm giá' });
-        }
-        if (reqGift) {
-            badges.push({ type: 'gift', label: 'Có quà tặng' });
-        }
+        if (reqInStock)  badges.push({ type: 'stock',    label: 'Còn hàng' });
+        if (reqDiscount) badges.push({ type: 'discount',  label: 'Đang giảm giá' });
+        if (reqGift)     badges.push({ type: 'gift',      label: 'Có quà tặng' });
 
         if (badges.length === 0) {
             activeFilterBar.style.display = 'none';
@@ -2985,20 +2955,16 @@ async function initDynamicCategoryPages() {
     const dbCategory = container.getAttribute('data-db-category');
     if (!dbCategory) return;
 
+    // Load lần đầu: mặc định sort=best_selling, không có filter
     console.log(`Loading dynamic products for category: ${dbCategory}...`);
     try {
-        const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?category=${encodeURIComponent(dbCategory)}`);
+        const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?category=${encodeURIComponent(dbCategory)}&sort=best_selling`);
         if (!response.ok) throw new Error('Network response was not ok');
         const dbProducts = await response.json();
 
         if (dbProducts && dbProducts.length > 0) {
             console.log(`Loaded ${dbProducts.length} products from database. Rendering dynamically...`);
-
             renderDbProducts(dbProducts, container);
-
-            // Hiển thị hay ẩn nút "Xem thêm" được xử lý tự động trong renderDbProducts tùy theo số sản phẩm thực tế từ DB
-
-            // Sau khi render xong các thẻ động, cập nhật lại hiển thị nút "Chỉnh sửa sản phẩm" dựa trên quyền Admin
             applyUserRole();
         } else {
             container.innerHTML = '<p class="empty-category-message">Danh mục hiện chưa có sản phẩm.</p>';

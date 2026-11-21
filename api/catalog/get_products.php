@@ -35,8 +35,9 @@ elseif ($category === 'new' || $category === 'latest') {
     $result = $conn->query("SELECT * FROM view_product_details ORDER BY id DESC LIMIT 10");
 }
 // 4. TRANG DANH MỤC CỤ THỂ (Nhẫn, Bông tai, Dây chuyền, Vòng tay, Set quà tặng)
-// Sắp xếp động hoàn toàn bằng SQL theo đúng tiêu chí trên từng danh mục:
+// Lọc và sắp xếp hoàn toàn bằng SQL theo tiêu chí truyền từ JS:
 elseif ($category !== '') {
+    // --- Sắp xếp ---
     $orderBy = "sold_count DESC, id DESC"; // Mặc định: Bán chạy nhất trong danh mục
     if ($sort === 'popular' || $sort === 'suggest') {
         $orderBy = "wishlist_count DESC, id DESC"; // Gợi ý: nhiều tim nhất trong danh mục
@@ -48,8 +49,40 @@ elseif ($category !== '') {
         $orderBy = "price_sale DESC, id DESC"; // Giá từ cao đến thấp
     }
 
-    $stmt = $conn->prepare("SELECT * FROM view_product_details WHERE category = ? OR category_name = ? OR CAST(category_id AS CHAR) = ? ORDER BY {$orderBy}");
-    $stmt->bind_param("sss", $category, $category, $category);
+    // --- Bộ lọc (filter) từ JS ---
+    $minPrice   = isset($_GET['min_price'])    ? (float)$_GET['min_price']    : null;
+    $maxPrice   = isset($_GET['max_price'])    ? (float)$_GET['max_price']    : null;
+    $inStock    = isset($_GET['in_stock'])     && $_GET['in_stock']     === '1';
+    $hasDiscount= isset($_GET['has_discount']) && $_GET['has_discount'] === '1';
+    $hasGift    = isset($_GET['has_gift'])     && $_GET['has_gift']     === '1';
+
+    // Xây dựng WHERE động
+    $where  = "(category = ? OR category_name = ? OR CAST(category_id AS CHAR) = ?)";
+    $params = [$category, $category, $category];
+    $types  = "sss";
+
+    if ($minPrice !== null) {
+        $where   .= " AND price_sale >= ?";
+        $params[] = $minPrice;
+        $types   .= "d";
+    }
+    if ($maxPrice !== null) {
+        $where   .= " AND price_sale <= ?";
+        $params[] = $maxPrice;
+        $types   .= "d";
+    }
+    if ($inStock) {
+        $where .= " AND stock > 0";
+    }
+    if ($hasDiscount) {
+        $where .= " AND (discount IS NOT NULL AND discount != '' OR price_original > price_sale)";
+    }
+    if ($hasGift) {
+        $where .= " AND gift IS NOT NULL AND gift != ''";
+    }
+
+    $stmt = $conn->prepare("SELECT * FROM view_product_details WHERE {$where} ORDER BY {$orderBy}");
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
 }
