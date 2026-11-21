@@ -241,10 +241,10 @@ async function fetchProducts(category) {
 }
 
 async function initComboSlider() {
-    // 1. Tải dữ liệu từ Database theo thứ tự:
-    // - featured: Sản phẩm nổi bật (Lượt mua nhiều nhất - tính bằng SQL)
-    // - suggest: Gợi ý cho bạn (Lượt tim nhiều nhất - tính bằng SQL)
-    // - new: Sản phẩm mới nhất (Mẫu mới cập bến - tính bằng SQL)
+    // 1. Tải dữ liệu từ Database theo câu lệnh SQL lọc trực tiếp qua API:
+    // - featured: Sản phẩm nổi bật (Lọc bằng SQL: WHERE is_featured = 1)
+    // - suggest: Gợi ý cho bạn (Lọc bằng SQL: WHERE is_suggested = 1)
+    // - new: Sản phẩm mới nhất (Lọc bằng SQL: WHERE is_new = 1)
     const featuredData = await fetchProducts('featured');
     const suggestData = await fetchProducts('suggest');
     const newData = await fetchProducts('new');

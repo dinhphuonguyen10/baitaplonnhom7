@@ -64,8 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $imagePath = trim($_POST['image_url']);
             }
 
-            $stmt = $conn->prepare("INSERT INTO products (name, category_id, price_sale, stock, image, description) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("sidiss", $name, $categoryId, $price, $stock, $imagePath, $description);
+            $isFeatured  = isset($_POST['is_featured']) ? 1 : 0;
+            $isSuggested = isset($_POST['is_suggested']) ? 1 : 0;
+            $isNew       = isset($_POST['is_new']) ? 1 : 0;
+
+            $stmt = $conn->prepare("INSERT INTO products (name, category_id, price_sale, stock, image, description, is_featured, is_suggested, is_new) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("sidissiii", $name, $categoryId, $price, $stock, $imagePath, $description, $isFeatured, $isSuggested, $isNew);
             if ($stmt->execute()) {
                 $message = "Đã thêm sản phẩm '{$name}' thành công!";
                 $messageType = 'success';
@@ -85,6 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price       = (float)($_POST['price'] ?? 0);
         $stock       = max(0, (int)($_POST['stock'] ?? 0));
         $description = trim($_POST['description'] ?? '');
+        $isFeatured  = isset($_POST['is_featured']) ? 1 : 0;
+        $isSuggested = isset($_POST['is_suggested']) ? 1 : 0;
+        $isNew       = isset($_POST['is_new']) ? 1 : 0;
         if ($description === '') {
             $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
         }
@@ -112,11 +119,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($hasNewImage) {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, image = ?, description = ? WHERE id = ?");
-                $stmt->bind_param("sidissi", $name, $categoryId, $price, $stock, $newImagePath, $description, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, image = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
+                $stmt->bind_param("sidissiiii", $name, $categoryId, $price, $stock, $newImagePath, $description, $isFeatured, $isSuggested, $isNew, $id);
             } else {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, description = ? WHERE id = ?");
-                $stmt->bind_param("sidisi", $name, $categoryId, $price, $stock, $description, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
+                $stmt->bind_param("sidisiiii", $name, $categoryId, $price, $stock, $description, $isFeatured, $isSuggested, $isNew, $id);
             }
 
             if ($stmt->execute()) {
@@ -321,6 +328,17 @@ if ($prodRes) {
                                         </td>
                                         <td class="prod-name-cell">
                                             <div class="prod-name"><?php echo $escape($p['name']); ?></div>
+                                            <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+                                                <?php if (!empty($p['is_featured'])): ?>
+                                                    <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #fef08a; color: #854d0e; font-weight: 600;">⭐ Nổi bật</span>
+                                                <?php endif; ?>
+                                                <?php if (!empty($p['is_suggested'])): ?>
+                                                    <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #e0e7ff; color: #3730a3; font-weight: 600;">💡 Gợi ý</span>
+                                                <?php endif; ?>
+                                                <?php if (!empty($p['is_new'])): ?>
+                                                    <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #dcfce7; color: #166534; font-weight: 600;">🆕 Mới</span>
+                                                <?php endif; ?>
+                                            </div>
                                             <?php if (!empty($p['description'])): ?>
                                                 <div class="prod-desc-preview" title="<?php echo $escape($p['description']); ?>"><?php echo $escape($p['description']); ?></div>
                                             <?php endif; ?>
@@ -407,6 +425,24 @@ if ($prodRes) {
                 </div>
 
                 <div class="form-field">
+                    <label>Phân loại hiển thị trang chủ:</label>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 4px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" name="is_featured" value="1">
+                            <span>⭐ Sản phẩm nổi bật</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" name="is_suggested" value="1">
+                            <span>💡 Gợi ý cho bạn</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" name="is_new" value="1" checked>
+                            <span>🆕 Sản phẩm mới</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-field">
                     <label>Ảnh sản phẩm:</label>
                     <input type="file" name="image_file" accept="image/*">
                     <small>Hoặc nhập link ảnh trực tiếp:</small>
@@ -482,6 +518,24 @@ if ($prodRes) {
                 </div>
 
                 <div class="form-field">
+                    <label>Phân loại hiển thị trang chủ:</label>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 4px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" name="is_featured" id="edit-is-featured" value="1">
+                            <span>⭐ Sản phẩm nổi bật</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" name="is_suggested" id="edit-is-suggested" value="1">
+                            <span>💡 Gợi ý cho bạn</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" name="is_new" id="edit-is-new" value="1">
+                            <span>🆕 Sản phẩm mới</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-field">
                     <label>Ảnh sản phẩm hiện tại:</label>
                     <div><img id="edit-img-preview" src="" alt="" class="current-img-preview"></div>
                     <label>Đổi ảnh mới (nếu muốn):</label>
@@ -551,6 +605,9 @@ function openEditModal(prod, imgSrc) {
     document.getElementById('edit-price').value       = prod.price_sale;
     document.getElementById('edit-stock').value       = prod.stock;
     document.getElementById('edit-description').value = prod.description || descTemplates[prod.category_id] || '';
+    document.getElementById('edit-is-featured').checked  = parseInt(prod.is_featured, 10) === 1;
+    document.getElementById('edit-is-suggested').checked = parseInt(prod.is_suggested, 10) === 1;
+    document.getElementById('edit-is-new').checked       = parseInt(prod.is_new, 10) === 1;
     originalStock = parseInt(prod.stock, 10) || 0;
 
     // Reset ô nhập thêm hàng

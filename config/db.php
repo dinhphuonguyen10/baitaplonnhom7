@@ -101,19 +101,82 @@ if ($storesTable && $storesTable->num_rows > 0) {
     }
 }
 
-// Tự đồng bộ cột description của bảng products và VIEW view_product_details nếu database chưa cập nhật
-$prodDescCol = $conn->query("SHOW COLUMNS FROM products LIKE 'description'");
-if ($prodDescCol && $prodDescCol->num_rows === 0) {
+// Tự đồng bộ cấu trúc bảng products và VIEW view_product_details
+$prodColumns = [];
+$prodColsRes = $conn->query("SHOW COLUMNS FROM products");
+if ($prodColsRes) {
+    while ($col = $prodColsRes->fetch_assoc()) {
+        $prodColumns[$col['Field']] = true;
+    }
+}
+
+$needUpdateView = false;
+if (!isset($prodColumns['description'])) {
     $conn->query("ALTER TABLE products ADD COLUMN description TEXT NULL AFTER category_id");
+    $needUpdateView = true;
+}
+if (!isset($prodColumns['is_featured'])) {
+    $conn->query("ALTER TABLE products ADD COLUMN is_featured TINYINT(1) NOT NULL DEFAULT 0 AFTER description");
+    $needUpdateView = true;
+}
+if (!isset($prodColumns['is_suggested'])) {
+    $conn->query("ALTER TABLE products ADD COLUMN is_suggested TINYINT(1) NOT NULL DEFAULT 0 AFTER is_featured");
+    $needUpdateView = true;
+}
+if (!isset($prodColumns['is_new'])) {
+    $conn->query("ALTER TABLE products ADD COLUMN is_new TINYINT(1) NOT NULL DEFAULT 0 AFTER is_suggested");
+    $needUpdateView = true;
+}
+
+// Xóa bỏ các view cũ không còn dùng để code gọn gàng, tránh nhầm lẫn
+$conn->query("DROP VIEW IF EXISTS view_featured_products");
+$conn->query("DROP VIEW IF EXISTS view_suggested_products");
+$conn->query("DROP VIEW IF EXISTS view_new_products");
+
+// Khởi tạo hoặc cập nhật VIEW view_product_details tính toán hoàn toàn bằng SQL
+if ($needUpdateView || true) {
     $conn->query("CREATE OR REPLACE VIEW view_product_details AS
-        SELECT
-            p.id, p.name, p.category_id, p.price_sale, p.price_original, p.stock, p.image, p.description,
-            c.name AS category_name, c.slug AS category,
-            COALESCE(SUM(oi.quantity), 0) AS sold_count
+        SELECT 
+            p.id,
+            p.name,
+            p.price_sale,
+            p.price_original,
+            p.discount,
+            p.gift,
+            p.image,
+            p.stock,
+            p.category_id,
+            p.description,
+            p.is_featured,
+            p.is_suggested,
+            p.is_new,
+            c.slug AS category,
+            c.name AS category_name,
+            COALESCE((
+                SELECT SUM(oi.quantity)
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+                WHERE oi.product_id = p.id
+                  AND (o.status IS NULL OR o.status NOT IN ('Đã hủy', 'huy', 'cancelled'))
+            ), 0) AS sold_count,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM wishlists w
+                WHERE w.product_id = p.id
+            ), 0) AS wishlist_count,
+            COALESCE((
+                SELECT ROUND(AVG(r.rating), 1)
+                FROM reviews r
+                WHERE r.product_id = p.id AND r.rating BETWEEN 1 AND 5
+            ), 0) AS average_rating,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM reviews r
+                WHERE r.product_id = p.id AND r.rating BETWEEN 1 AND 5
+            ), 0) AS review_count
         FROM products p
-        JOIN categories c ON p.category_id = c.id
-        LEFT JOIN order_items oi ON p.id = oi.product_id
-        GROUP BY p.id");
+        LEFT JOIN categories c ON c.id = p.category_id
+        GROUP BY p.id, c.slug, c.name");
 }
 
 // Tự đồng bộ bảng wishlists (danh sách yêu thích / thả tim) nếu chưa tồn tại

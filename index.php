@@ -95,7 +95,7 @@ include __DIR__ . '/include/header.php';
         <div class="product-grid category-grid" id="category-products-container" data-db-category=""></div>
     </section>
 
-    <!-- 1. MỤC ĐẦU TIÊN: SẢN PHẨM NỔI BẬT (BÁN CHẠY NHẤT - NHIỀU LƯỢT MUA NHẤT) -->
+    <!-- 1. MỤC ĐẦU TIÊN: SẢN PHẨM NỔI BẬT (LỌC BẰNG SQL: is_featured = 1) -->
     <section class="combo-section" aria-label="Sản phẩm nổi bật">
         <div class="combo-container">
             <div class="home-product-heading">
@@ -116,7 +116,7 @@ include __DIR__ . '/include/header.php';
         </div>
     </section>
 
-    <!-- 2. MỤC THỨ HAI: GỢI Ý CHO BẠN (NHIỀU LƯỢT TIM NHẤT) -->
+    <!-- 2. MỤC THỨ HAI: GỢI Ý CHO BẠN (LỌC BẰNG SQL: is_suggested = 1) -->
     <section class="combo-section combo-section--alt" aria-label="Gợi ý cho bạn">
         <div class="combo-container">
             <div class="home-product-heading">
@@ -137,7 +137,7 @@ include __DIR__ . '/include/header.php';
         </div>
     </section>
 
-    <!-- 3. MỤC THỨ BA: SẢN PHẨM MỚI NHẤT (MẪU MỚI CẬP BẾN) -->
+    <!-- 3. MỤC THỨ BA: SẢN PHẨM MỚI NHẤT (LỌC BẰNG SQL: is_new = 1) -->
     <section class="combo-section" aria-label="Sản phẩm mới nhất">
         <div class="combo-container">
             <div class="home-product-heading">
