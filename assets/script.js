@@ -84,13 +84,7 @@ function renderProductRating(product) {
 }
 
 function renderProductMeta(soldCount, wishlistCount) {
-    const soldHTML = soldCount > 0
-        ? `<span class="sold">Đã bán ${soldCount}</span>`
-        : '<span class="product-meta-empty" aria-hidden="true"></span>';
-    const wishHTML = (wishlistCount && wishlistCount > 0)
-        ? `<span class="product-wish-stat" style="color:#e84393; font-size:0.8rem; font-weight:600; display:inline-flex; align-items:center; gap:3px;" title="${wishlistCount} lượt yêu thích"><span style="color:#e84393;">♥</span> ${wishlistCount}</span>`
-        : '';
-    return `<div class="product-meta">${soldHTML}${wishHTML}</div>`;
+    return '<div class="product-meta"><span class="product-meta-empty" aria-hidden="true"></span></div>';
 }
 
 function getProductQuantityControlMarkup(stock, name) {
@@ -2678,7 +2672,7 @@ function initCategoryFilters() {
     const priceDropdownItems = document.querySelectorAll('.price-dropdown-item');
     const legacySortSelect = document.querySelector('.sorting-options select') || document.getElementById('product-sort');
 
-    let currentSort = 'popular';
+    let currentSort = 'best_selling';
 
     // Hàm tiện ích: Làm sạch và chuẩn hóa số tiền từ chuỗi
     function parseVndNumber(val) {
@@ -2849,16 +2843,21 @@ function initCategoryFilters() {
             const priceB = (typeof b.price_sale_raw !== 'undefined') ? Number(b.price_sale_raw) : parsePrice(b.price_sale);
             const soldA = parseInt(a.sold_count, 10) || 0;
             const soldB = parseInt(b.sold_count, 10) || 0;
+            const wishA = parseInt(a.wishlist_count || a.wishlistCount, 10) || 0;
+            const wishB = parseInt(b.wishlist_count || b.wishlistCount, 10) || 0;
             const idA = Number(a.id) || 0;
             const idB = Number(b.id) || 0;
 
             if (currentSort === 'price_asc') return priceA - priceB;
             if (currentSort === 'price_desc') return priceB - priceA;
             if (currentSort === 'newest') return idB - idA;
-            if (currentSort === 'best_selling') return soldB - soldA;
+            if (currentSort === 'best_selling') {
+                if (soldB !== soldA) return soldB - soldA;
+                return idB - idA;
+            }
 
-            // 'popular'
-            if (soldB !== soldA) return soldB - soldA;
+            // 'popular' / 'suggest': Gợi ý cho bạn (nhiều lượt tim nhất trong danh mục)
+            if (wishB !== wishA) return wishB - wishA;
             return idB - idA;
         });
 

@@ -110,9 +110,9 @@ include __DIR__ . '/../include/header.php';
                 <div class="shopee-sort-bar">
                     <span class="sort-bar-label">Sắp xếp theo</span>
                     <div class="sort-actions">
-                        <button type="button" class="shopee-sort-btn active" data-sort="popular">Phổ biến</button>
+                        <button type="button" class="shopee-sort-btn active" data-sort="best_selling">Bán chạy</button>
+                        <button type="button" class="shopee-sort-btn" data-sort="popular">Gợi ý</button>
                         <button type="button" class="shopee-sort-btn" data-sort="newest">Mới nhất</button>
-                        <button type="button" class="shopee-sort-btn" data-sort="best_selling">Bán chạy</button>
 
                         <div class="shopee-sort-price-dropdown" id="shopee-sort-price-dropdown">
                             <button type="button" class="shopee-sort-btn price-dropdown-toggle" id="price-dropdown-toggle" aria-haspopup="true" aria-expanded="false">

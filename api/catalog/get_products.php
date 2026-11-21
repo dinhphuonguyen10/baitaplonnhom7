@@ -20,22 +20,35 @@ if (!empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
 }
 
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
+$sort     = isset($_GET['sort']) ? trim($_GET['sort']) : '';
 
-// 1. Sản phẩm nổi bật: Lọc trực tiếp bằng SQL với cột is_featured = 1
+// 1. TRANG CHỦ - Sản phẩm nổi bật: Top 10 sản phẩm có nhiều lượt bán nhất (bán chạy nhất)
 if ($category === 'featured') {
-    $result = $conn->query("SELECT * FROM view_product_details WHERE is_featured = 1 ORDER BY id DESC LIMIT 12");
+    $result = $conn->query("SELECT * FROM view_product_details ORDER BY sold_count DESC, id DESC LIMIT 10");
 }
-// 2. Gợi ý cho bạn: Lọc trực tiếp bằng SQL với cột is_suggested = 1
+// 2. TRANG CHỦ - Gợi ý cho bạn: Top 10 sản phẩm có nhiều lượt tim nhất (yêu thích nhất)
 elseif ($category === 'suggest') {
-    $result = $conn->query("SELECT * FROM view_product_details WHERE is_suggested = 1 ORDER BY id DESC LIMIT 12");
+    $result = $conn->query("SELECT * FROM view_product_details ORDER BY wishlist_count DESC, id DESC LIMIT 10");
 }
-// 3. Sản phẩm mới nhất: Lọc trực tiếp bằng SQL với cột is_new = 1
+// 3. TRANG CHỦ - Sản phẩm mới nhất: Top 10 sản phẩm mới được thêm vào gần đây nhất (ID mới nhất)
 elseif ($category === 'new' || $category === 'latest') {
-    $result = $conn->query("SELECT * FROM view_product_details WHERE is_new = 1 ORDER BY id DESC LIMIT 12");
+    $result = $conn->query("SELECT * FROM view_product_details ORDER BY id DESC LIMIT 10");
 }
-// 4. Danh mục sản phẩm cụ thể (Nhẫn, Bông tai, Dây chuyền, Set quà tặng, v.v.)
+// 4. TRANG DANH MỤC CỤ THỂ (Nhẫn, Bông tai, Dây chuyền, Vòng tay, Set quà tặng)
+// Sắp xếp động hoàn toàn bằng SQL theo đúng tiêu chí trên từng danh mục:
 elseif ($category !== '') {
-    $stmt = $conn->prepare("SELECT * FROM view_product_details WHERE category = ? OR category_name = ? OR CAST(category_id AS CHAR) = ? ORDER BY id DESC");
+    $orderBy = "sold_count DESC, id DESC"; // Mặc định: Bán chạy nhất trong danh mục
+    if ($sort === 'popular' || $sort === 'suggest') {
+        $orderBy = "wishlist_count DESC, id DESC"; // Gợi ý: nhiều tim nhất trong danh mục
+    } elseif ($sort === 'newest') {
+        $orderBy = "id DESC"; // Mới nhất trong danh mục
+    } elseif ($sort === 'price_asc') {
+        $orderBy = "price_sale ASC, id DESC"; // Giá từ thấp đến cao
+    } elseif ($sort === 'price_desc') {
+        $orderBy = "price_sale DESC, id DESC"; // Giá từ cao đến thấp
+    }
+
+    $stmt = $conn->prepare("SELECT * FROM view_product_details WHERE category = ? OR category_name = ? OR CAST(category_id AS CHAR) = ? ORDER BY {$orderBy}");
     $stmt->bind_param("sss", $category, $category, $category);
     $stmt->execute();
     $result = $stmt->get_result();

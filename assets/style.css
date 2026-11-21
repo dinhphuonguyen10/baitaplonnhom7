@@ -1319,7 +1319,7 @@ section, main {
 }
 
 .rating { color: #f0a500; font-weight: 600; }
-.sold   { color: #d35400; font-weight: 500; font-size: 0.82rem; }
+.sold, .product-wish-stat { display: none !important; color: #d35400; font-weight: 500; font-size: 0.82rem; }
 .product-stock { font-size: 0.82rem; font-weight: 500; }
 
 .product-rating {
