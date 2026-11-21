@@ -112,7 +112,7 @@ function createSliderItems(container, products) {
         const metaHTML = renderProductMeta(soldCount, wishlistCount);
 
         const itemHTML = `
-            <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm" style="flex-shrink: 0; width: 240px;">
+            <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
                 ${discountHTML}
                 <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id || ''}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
                 <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
