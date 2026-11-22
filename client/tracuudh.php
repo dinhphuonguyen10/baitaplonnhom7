@@ -338,6 +338,20 @@ if (!$isCustomerLoggedIn) {
     white-space: nowrap;
 }
 
+.order-review-link, .order-reviewed-label {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 92px; padding: 8px 12px; border-radius: 9px;
+    font-size: .78rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.order-review-link { color: #fff; background: #c94f5c; border: 1px solid #c94f5c; }
+.order-review-link:hover { background: #ad3d4a; }
+.order-reviewed-label { color: #3c8c61; background: #edf8f1; border: 1px solid #d8efdf; }
+.order-product-review-action { margin-left: auto; }
+@media (max-width: 560px) {
+    .order-product-row { flex-wrap: wrap; }
+    .order-product-review-action { margin-left: 86px; }
+}
+
 /* Card Footer */
 .order-card-bottom {
     display: flex;
@@ -785,6 +799,13 @@ if (!$isCustomerLoggedIn) {
         return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
+    function renderReviewAction(item, isDelivered) {
+        if (!isDelivered || !item.product_id) return '';
+        if (Number(item.is_reviewed) === 1) return '<span class="order-reviewed-label order-product-review-action">✓ Đã đánh giá</span>';
+        const reviewUrl = `${BASE}/client/product.php?id=${encodeURIComponent(item.product_id)}#product-reviews`;
+        return `<a class="order-review-link order-product-review-action" href="${reviewUrl}">Đánh giá</a>`;
+    }
+
     function escHtml(s) {
         const div = document.createElement('div');
         div.textContent = s;
@@ -852,6 +873,7 @@ if (!$isCustomerLoggedIn) {
                         <p class="product-qty">x${item.quantity}</p>
                     </div>
                     <div class="order-product-price">${formatMoney(totalPrice)}</div>
+                    ${renderReviewAction(item, isDelivered)}
                 </div>
             `;
         });
@@ -1063,6 +1085,7 @@ if (!$isCustomerLoggedIn) {
         (order.items || []).forEach(item => {
             const totalPrice = Number(item.price) * Number(item.quantity);
             const imgSrc = getProductImageUrl(item.image);
+            const isDelivered = ['Đã giao hàng', 'Đã giao'].includes(order.status);
             itemsHtml += `
                 <div class="order-product-row">
                     <img class="order-product-img" src="${imgSrc}" alt="" onerror="this.src='${BASE}/assets/banner/logo.png'">
@@ -1071,6 +1094,7 @@ if (!$isCustomerLoggedIn) {
                         <p class="product-qty">x${item.quantity}</p>
                     </div>
                     <div class="order-product-price">${formatMoney(totalPrice)}</div>
+                    ${renderReviewAction(item, isDelivered)}
                 </div>
             `;
         });

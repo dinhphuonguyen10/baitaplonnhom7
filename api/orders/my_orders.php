@@ -53,8 +53,15 @@ while ($row = $result->fetch_assoc()) {
     $order_id = $row['id'];
 
     // Lấy chi tiết sản phẩm
-    $stmt_items = $conn->prepare("SELECT * FROM order_items WHERE order_id = ?");
-    $stmt_items->bind_param("i", $order_id);
+    $stmt_items = $conn->prepare(
+        "SELECT oi.*, EXISTS (
+            SELECT 1 FROM reviews r
+            WHERE r.product_id = oi.product_id AND r.user_id = ?
+        ) AS is_reviewed
+         FROM order_items oi
+         WHERE oi.order_id = ?"
+    );
+    $stmt_items->bind_param("ii", $user_id, $order_id);
     $stmt_items->execute();
     $result_items = $stmt_items->get_result();
 

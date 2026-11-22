@@ -138,6 +138,19 @@ if ($statusStmt) {
     $statusStmt->close();
 }
 
+$recentOrders = [];
+$recentOrdersResult = $conn->query(
+    "SELECT id, full_name, total_price, status, created_at
+     FROM orders
+     ORDER BY created_at DESC, id DESC
+     LIMIT 5"
+);
+if ($recentOrdersResult) {
+    while ($row = $recentOrdersResult->fetch_assoc()) {
+        $recentOrders[] = $row;
+    }
+}
+
 $topProducts = [];
 $topStmt = $conn->prepare(
     "SELECT oi.product_name,
@@ -223,7 +236,7 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
         .welcome-row { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 24px; }
         .period-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 16px; }
         .period-field { display: grid; gap: 5px; }
-        .period-field label { color: #64758a; font-size: 11px; font-weight: 600; }
+        .period-field label { color: #64758a; font-size: 13px; font-weight: 600; }
         .period-filter select, .period-filter input { min-height: 39px; padding: 8px 10px; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #35465a; }
         .period-filter select { min-width: 150px; }
         .period-filter input { width: 145px; }
@@ -231,37 +244,44 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
         .period-filter .reset-period { display: inline-flex; min-height: 39px; align-items: center; padding: 0 14px; border: 1px solid #dce2e9; border-radius: 7px; color: var(--navy); background: #fff; font-weight: 600; }
         .business-panel, .orders-panel, .best-panel, .revenue-panel { border: 1px solid #ebedf1; border-radius: 12px; background: #fff; box-shadow: var(--shadow); }
         .business-panel { margin-bottom: 18px; padding: 20px 20px 18px; }
-        .business-panel h2, .orders-panel h2, .best-panel h2, .revenue-panel h2 { margin: 0; color: var(--navy); font-size: 16px; }
+        .business-panel h2, .orders-panel h2, .best-panel h2, .revenue-panel h2 { margin: 0; color: var(--navy); font-size: 18px; }
         .business-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
         .business-card { min-height: 104px; padding: 20px 20px 16px; border-radius: 9px; background: #f1f2f4; }
-        .business-label { display: flex; align-items: center; gap: 7px; color: #6f7d8d; font-size: 13px; }
-        .business-value { margin-top: 9px; color: #17283d; font-size: 25px; line-height: 1; }
-        .business-note { display: block; margin-top: 8px; color: #00a878; font-size: 11px; }
+        .business-label { display: flex; align-items: center; gap: 7px; color: #6f7d8d; font-size: 15px; }
+        .business-value { margin-top: 9px; color: #17283d; font-size: 28px; line-height: 1; }
+        .business-note { display: block; margin-top: 8px; color: #00a878; font-size: 13px; }
         .dashboard-middle { display: grid; grid-template-columns: 1.18fr .82fr; gap: 18px; margin-bottom: 18px; }
         .orders-panel, .best-panel { min-height: 242px; padding: 20px; }
         .panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .text-link { color: #718198; font-size: 11px; white-space: nowrap; }
-        .order-status-list { display: grid; margin-top: 15px; }
-        .order-status-row { display: flex; min-height: 45px; align-items: center; border-bottom: 1px dashed #dfe3e8; color: #718198; }
-        .order-status-row:last-child { border-bottom: 0; }
-        .order-status-label { flex: 1; }
-        .order-status-count { color: #17283d; font-size: 17px; font-weight: 700; }
+        .text-link { color: #718198; font-size: 13px; white-space: nowrap; }
+        .recent-order-list { display: grid; margin-top: 10px; }
+        .recent-order { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 43px; border-bottom: 1px dashed #e5e9ee; }
+        .recent-order:last-child { border-bottom: 0; }
+        .recent-order-main { min-width: 0; }
+        .recent-order-main strong { display: block; overflow: hidden; color: #26384d; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+        .recent-order-main small { display: block; margin-top: 3px; color: #98a3af; font-size: 11px; }
+        .recent-order-meta { display: flex; align-items: flex-end; flex-direction: column; gap: 4px; }
+        .recent-order-total { color: #17283d; font-size: 14px; font-weight: 700; white-space: nowrap; }
+        .recent-order-status { padding: 3px 7px; border-radius: 20px; background: #f1f4f7; color: #718198; font-size: 10px; white-space: nowrap; }
+        .recent-order-status.is-pending { background: #fff4df; color: #ad7100; }
+        .recent-order-status.is-done { background: #e7f7f0; color: #13845d; }
+        .recent-order-status.is-cancelled { background: #fff0ef; color: #c14d46; }
         .best-list { display: grid; gap: 3px; margin-top: 12px; }
         .best-item { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: center; gap: 10px; min-height: 58px; }
         .product-thumb { width: 38px; height: 38px; display: grid; place-items: center; overflow: hidden; border-radius: 8px; background: #f2f4f6; }
         .product-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .product-info { min-width: 0; }
-        .product-info strong { display: block; overflow: hidden; color: #17283d; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-        .product-info small { display: block; margin-top: 4px; color: #9aa4b0; font-size: 9px; }
+        .product-info strong { display: block; overflow: hidden; color: #17283d; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+        .product-info small { display: block; margin-top: 4px; color: #9aa4b0; font-size: 10px; }
         .mini-progress { height: 3px; margin-top: 6px; overflow: hidden; border-radius: 3px; background: #eef1f4; }
         .mini-progress i { display: block; height: 100%; border-radius: inherit; background: #89afd2; }
         .product-sales { text-align: right; }
-        .product-sales strong { display: block; color: #17283d; font-size: 13px; }
-        .product-sales small { color: #9aa4b0; font-size: 9px; }
+        .product-sales strong { display: block; color: #17283d; font-size: 15px; }
+        .product-sales small { color: #9aa4b0; font-size: 10px; }
         .revenue-panel { padding: 20px 20px 16px; }
         .revenue-chart { margin-top: 24px; }
         .chart-area { display: grid; grid-template-columns: 58px minmax(0,1fr); height: 280px; }
-        .chart-y { display: flex; flex-direction: column; justify-content: space-between; padding: 0 10px 24px 0; color: #718198; font-size: 11px; text-align: right; }
+        .chart-y { display: flex; flex-direction: column; justify-content: space-between; padding: 0 10px 24px 0; color: #718198; font-size: 13px; text-align: right; }
         .chart-plot { position: relative; height: 256px; border-bottom: 1px solid #dfe4ea; }
         .chart-grid { position: absolute; inset: 0 0 24px; display: flex; flex-direction: column; justify-content: space-between; }
         .chart-grid i { border-top: 1px solid #edf0f3; }
@@ -270,9 +290,9 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
         .chart-bar { width: 36%; min-width: 3px; max-width: 8px; min-height: 2px; border-radius: 2px 2px 0 0; }
         .bar-current { background: #0784f9; }
         .bar-previous { background: #91c8ff; }
-        .chart-x { position: absolute; right: 0; bottom: -20px; left: 0; display: grid; grid-template-columns: repeat(24,1fr); color: #718198; font-size: 10px; text-align: center; }
+        .chart-x { position: absolute; right: 0; bottom: -20px; left: 0; display: grid; grid-template-columns: repeat(24,1fr); color: #718198; font-size: 11px; text-align: center; }
         .chart-x span:nth-child(even) { visibility: hidden; }
-        .chart-legend { display: flex; justify-content: center; gap: 24px; margin-top: 22px; color: #718198; font-size: 11px; }
+        .chart-legend { display: flex; justify-content: center; gap: 24px; margin-top: 22px; color: #718198; font-size: 13px; }
         .chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
         .chart-legend i { width: 12px; height: 12px; border-radius: 2px; }
         .legend-current { background: #0784f9; }
@@ -350,15 +370,30 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
             <div class="dashboard-middle">
                 <section class="orders-panel">
                     <div class="panel-title-row">
-                        <h2>Đơn hàng cần xử lý <span title="Các đơn trong khoảng thời gian đã chọn">ⓘ</span></h2>
+                        <h2>Đơn hàng mới nhất</h2>
+                        <a class="text-link" href="<?php echo $escape($appBaseUrl . '/admin/orders.php'); ?>">Quản lý đơn →</a>
                     </div>
-                    <div class="order-status-list">
-                        <?php foreach ($statusCounts as $status => $count): ?>
-                            <div class="order-status-row">
-                                <span class="order-status-label"><?php echo $escape($status); ?></span>
-                                <strong class="order-status-count"><?php echo number_format($count); ?></strong>
-                            </div>
-                        <?php endforeach; ?>
+                    <div class="recent-order-list">
+                        <?php if ($recentOrders === []): ?>
+                            <p class="page-subtitle">Chưa có đơn hàng nào.</p>
+                        <?php else: ?>
+                            <?php foreach ($recentOrders as $order): ?>
+                                <?php
+                                $orderStatus = (string) $order['status'];
+                                $statusClass = in_array($orderStatus, ['Đã giao hàng', 'Đã giao'], true) ? 'is-done' : (in_array($orderStatus, ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true) ? 'is-cancelled' : (in_array($orderStatus, ['Chờ xác nhận', 'Pending'], true) ? 'is-pending' : ''));
+                                ?>
+                                <article class="recent-order">
+                                    <div class="recent-order-main">
+                                        <strong>#<?php echo (int) $order['id']; ?> · <?php echo $escape($order['full_name']); ?></strong>
+                                        <small><?php echo $escape(date('d/m/Y · H:i', strtotime((string) $order['created_at']))); ?></small>
+                                    </div>
+                                    <div class="recent-order-meta">
+                                        <strong class="recent-order-total"><?php echo number_format((float) $order['total_price'], 0, ',', '.'); ?>₫</strong>
+                                        <span class="recent-order-status <?php echo $escape($statusClass); ?>"><?php echo $escape($orderStatus); ?></span>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </section>
 

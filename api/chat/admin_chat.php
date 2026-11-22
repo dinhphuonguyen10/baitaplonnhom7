@@ -18,7 +18,9 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'GET') {
     $action = $_GET['action'] ?? '';
+    // Existing actions
     if ($action === 'conversations') {
+
         $sql = "SELECT cm.user_id,
                        COALESCE(NULLIF(u.username, ''), MAX(cm.username), 'Khách hàng') AS username,
                        (SELECT latest.message FROM chat_messages latest WHERE latest.user_id = cm.user_id ORDER BY latest.id DESC LIMIT 1) AS last_message,
@@ -71,6 +73,57 @@ if ($method === 'POST') {
     $payload = json_decode(file_get_contents('php://input'), true);
     if (!is_array($payload)) {
         chatJsonResponse(['status' => 'error', 'message' => 'Yêu cầu không hợp lệ.'], 400);
+    }
+    // New action: save auto responses
+    if (($payload['action'] ?? '') === 'save_auto_responses') {
+        $responses = $payload['responses'] ?? [];
+        $configPath = __DIR__ . '/../../config/auto_responses.json';
+        if (!is_array($responses)) {
+            chatJsonResponse(['status' => 'error', 'message' => 'Dữ liệu trả lời không hợp lệ.'], 400);
+        }
+        file_put_contents($configPath, json_encode($responses, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        chatJsonResponse(['status' => 'success']);
+    }
+    // New action: auto reply to new customer message
+    if (($payload['action'] ?? '') === 'auto_reply') {
+        $type = $payload['type'] ?? '';
+        $userId = filter_var($payload['user_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$type || !$userId) {
+            chatJsonResponse(['status' => 'error', 'message' => 'Tham số không hợp lệ.'], 400);
+        }
+        $configPath = __DIR__ . '/../../config/auto_responses.json';
+        $responses = [];
+        if (file_exists($configPath)) {
+            $responses = json_decode(file_get_contents($configPath), true);
+        }
+        $messageText = $responses[$type] ?? '';
+        if (!$messageText) {
+            chatJsonResponse(['status' => 'error', 'message' => 'Tin nhắn tự động không được cấu hình.'], 400);
+        }
+        // Insert admin message
+        $adminUsername = (string) ($_SESSION['admin_username'] ?? $_SESSION['username'] ?? 'Nhân viên ÉCRIN');
+        $stmt = $conn->prepare("INSERT INTO chat_messages (user_id, username, sender, message_type, message) VALUES (?, ?, 'admin', 'text', ?)");
+        if (!$stmt) {
+            chatJsonResponse(['status' => 'error', 'message' => 'Không thể gửi tin tự động.'], 500);
+        }
+        $stmt->bind_param('iss', $userId, $adminUsername, $messageText);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            chatJsonResponse(['status' => 'error', 'message' => 'Không thể gửi tin tự động.'], 500);
+        }
+        $messageId = $stmt->insert_id;
+        $stmt->close();
+        // Return the inserted message
+        $read = $conn->prepare('SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, p.price_sale AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.id = ? LIMIT 1');
+        if ($read) {
+            $read->bind_param('i', $messageId);
+            $read->execute();
+            $messageRow = $read->get_result()->fetch_assoc();
+            $read->close();
+            chatJsonResponse(['status' => 'success', 'message' => $messageRow]);
+        } else {
+            chatJsonResponse(['status' => 'success', 'message' => []]);
+        }
     }
 
     if (($payload['action'] ?? '') === 'mark_read') {

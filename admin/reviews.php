@@ -24,35 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notice = ['type' => 'error', 'message' => 'Phiên thao tác không hợp lệ. Vui lòng tải lại trang.'];
     } elseif ($reviewId === false || $reviewId < 1) {
         $notice = ['type' => 'error', 'message' => 'Mã đánh giá không hợp lệ.'];
-    } elseif ($action === 'delete') {
-        $stmt = $conn->prepare('DELETE FROM reviews WHERE id = ?');
-        $stmt->bind_param('i', $reviewId);
-        if ($stmt->execute()) {
-            $notice = ['type' => 'success', 'message' => 'Đã xóa đánh giá khỏi hệ thống.'];
-        } else {
-            error_log('Admin review delete failed: ' . $stmt->error);
-            $notice = ['type' => 'error', 'message' => 'Không thể xóa đánh giá lúc này.'];
-        }
-        $stmt->close();
-    } elseif ($action === 'update') {
-        $rating = filter_var($_POST['rating'] ?? null, FILTER_VALIDATE_INT);
-        $comment = trim((string) ($_POST['comment'] ?? ''));
-        if ($rating === false || $rating < 1 || $rating > 5) {
-            $notice = ['type' => 'error', 'message' => 'Số sao phải từ 1 đến 5.'];
-        } elseif (mb_strlen($comment, 'UTF-8') > 2000) {
-            $notice = ['type' => 'error', 'message' => 'Nội dung đánh giá không được vượt quá 2.000 ký tự.'];
-        } else {
-            $storedComment = $comment === '' ? null : $comment;
-            $stmt = $conn->prepare('UPDATE reviews SET rating = ?, comment = ? WHERE id = ?');
-            $stmt->bind_param('isi', $rating, $storedComment, $reviewId);
-            if ($stmt->execute()) {
-                $notice = ['type' => 'success', 'message' => 'Đã cập nhật đánh giá.'];
-            } else {
-                error_log('Admin review update failed: ' . $stmt->error);
-                $notice = ['type' => 'error', 'message' => 'Không thể cập nhật đánh giá lúc này.'];
-            }
-            $stmt->close();
-        }
     } elseif ($action === 'reply') {
         $reply = trim((string) ($_POST['reply'] ?? ''));
         if ($reply === '') {
@@ -252,8 +223,6 @@ if ($totalReviews > 0) {
         .unverified-badge { background: #f3f4f6; color: #667085; }
         .review-actions { display: flex; gap: 6px; white-space: nowrap; }
         .review-actions button { border: 0; border-radius: 6px; padding: 7px 9px; cursor: pointer; font-weight: 700; }
-        .review-edit { background: #e0f2fe; color: #026aa2; }
-        .review-delete { background: #fee4e2; color: #b42318; }
         .review-empty { padding: 24px; color: var(--muted); text-align: center; }
         .edit-dialog { width: min(520px, calc(100vw - 32px)); border: 0; border-radius: 12px; padding: 0; box-shadow: 0 20px 60px rgba(15,39,71,.22); }
         .edit-dialog::backdrop { background: rgba(15,39,71,.55); }
@@ -393,23 +362,10 @@ if ($totalReviews > 0) {
                                     </td>
                                     <td><?php echo $date ? $escape(date('d/m/Y H:i', $date)) : 'Không rõ'; ?></td>
                                     <td>
-                                        <div class="review-actions">
-                                            <button type="button" class="review-edit" onclick='openReviewEdit(<?php echo json_encode([
-                                                'id' => $reviewId,
-                                                'rating' => $rating,
-                                                'comment' => (string) ($review['comment'] ?? ''),
-                                            ], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>Sửa</button>
-                                            <button type="button" class="review-reply-action" onclick='openReviewReply(<?php echo json_encode([
-                                                'id' => $reviewId,
-                                                'reply' => (string) ($review['admin_reply'] ?? ''),
-                                            ], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'><?php echo empty($review['admin_reply']) ? 'Trả lời' : 'Sửa trả lời'; ?></button>
-                                            <form method="post" onsubmit="return confirm('Xóa đánh giá này?');">
-                                                <input type="hidden" name="csrf_token" value="<?php echo $escape($csrfToken); ?>">
-                                                <input type="hidden" name="action" value="delete">
-                                                <input type="hidden" name="review_id" value="<?php echo $reviewId; ?>">
-                                                <button type="submit" class="review-delete">Xóa</button>
-                                            </form>
-                                        </div>
+                                        <button type="button" class="review-reply-action" onclick='openReviewReply(<?php echo json_encode([
+                                            'id' => $reviewId,
+                                            'reply' => (string) ($review['admin_reply'] ?? ''),
+                                        ], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'><?php echo empty($review['admin_reply']) ? 'Trả lời' : 'Sửa trả lời'; ?></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -421,27 +377,6 @@ if ($totalReviews > 0) {
         </section>
     </main>
 </div>
-
-<dialog class="edit-dialog" id="review-edit-dialog">
-    <form method="post">
-        <h3>Chỉnh sửa đánh giá</h3>
-        <input type="hidden" name="csrf_token" value="<?php echo $escape($csrfToken); ?>">
-        <input type="hidden" name="action" value="update">
-        <input type="hidden" name="review_id" id="edit-review-id">
-        <label for="edit-review-rating">Số sao</label>
-        <select name="rating" id="edit-review-rating">
-            <?php for ($rating = 5; $rating >= 1; $rating--): ?>
-                <option value="<?php echo $rating; ?>"><?php echo $rating; ?> sao</option>
-            <?php endfor; ?>
-        </select>
-        <label for="edit-review-comment">Nội dung</label>
-        <textarea name="comment" id="edit-review-comment" maxlength="2000"></textarea>
-        <div class="dialog-actions">
-            <button type="button" class="dialog-cancel" onclick="closeReviewEdit()">Hủy</button>
-            <button type="submit" class="dialog-save">Lưu thay đổi</button>
-        </div>
-    </form>
-</dialog>
 
 <dialog class="edit-dialog" id="review-reply-dialog">
     <form method="post">
@@ -459,15 +394,6 @@ if ($totalReviews > 0) {
 </dialog>
 
 <script>
-function openReviewEdit(review) {
-    document.getElementById('edit-review-id').value = String(review.id);
-    document.getElementById('edit-review-rating').value = String(review.rating);
-    document.getElementById('edit-review-comment').value = review.comment || '';
-    document.getElementById('review-edit-dialog').showModal();
-}
-function closeReviewEdit() {
-    document.getElementById('review-edit-dialog').close();
-}
 function openReviewReply(review) {
     document.getElementById('reply-review-id').value = String(review.id);
     document.getElementById('review-reply-text').value = review.reply || '';

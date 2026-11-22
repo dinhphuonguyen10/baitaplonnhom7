@@ -3,6 +3,7 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/chat_helpers.php';
+require_once __DIR__ . '/../../include/auto_reply_helper.php';
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'customer') {
     http_response_code(401);
@@ -76,6 +77,21 @@ if ($stmt->execute()) {
     $stmt->close();
 
     echo json_encode(["status" => "success", "message" => $messageData]);
+
+    // Gửi tin chào tự động nếu đây là tin nhắn đầu tiên của khách
+    $countStmt = $conn->prepare(
+        "SELECT COUNT(*) AS cnt FROM chat_messages WHERE user_id = ? AND sender = 'customer'"
+    );
+    if ($countStmt) {
+        $countStmt->bind_param('i', $userId);
+        $countStmt->execute();
+        $countRow = $countStmt->get_result()->fetch_assoc();
+        $countStmt->close();
+        if ((int)($countRow['cnt'] ?? 0) === 1) {
+            // Chỉ gửi auto-reply khi đây là tin nhắn đầu tiên
+            sendAutoReply($conn, $userId, 'new_message');
+        }
+    }
 } else {
     echo json_encode(["status" => "error", "message" => "Không thể gửi tin nhắn. Vui lòng thử lại sau."]);
 }

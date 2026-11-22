@@ -151,6 +151,7 @@ $savedReportsTableSql = "CREATE TABLE IF NOT EXISTS admin_saved_reports (
     created_by varchar(100) NOT NULL DEFAULT '',
     created_at datetime NOT NULL DEFAULT current_timestamp(),
     updated_at datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+    config_json text NULL,
     PRIMARY KEY (id),
     KEY idx_admin_saved_reports_type (report_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
@@ -158,6 +159,15 @@ $savedReportsAvailable = $conn->query($savedReportsTableSql);
 if (!$savedReportsAvailable) {
     $reportError = 'Không thể khởi tạo danh sách báo cáo đã lưu.';
     error_log('Admin saved reports table setup failed: ' . $conn->error);
+}
+if ($savedReportsAvailable) {
+    $configColumnResult = $conn->query("SHOW COLUMNS FROM admin_saved_reports LIKE 'config_json'");
+    if ($configColumnResult && $configColumnResult->num_rows === 0
+        && !$conn->query('ALTER TABLE admin_saved_reports ADD COLUMN config_json TEXT NULL')) {
+        $savedReportsAvailable = false;
+        $reportError = 'Không thể chuẩn bị lưu cấu hình báo cáo.';
+        error_log('Admin saved report config migration failed: ' . $conn->error);
+    }
 }
 
 if (!isset($_SESSION['reports_csrf']) || !is_string($_SESSION['reports_csrf']) || strlen($_SESSION['reports_csrf']) !== 64) {
@@ -172,6 +182,52 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $savedReportsAvailable) 
     $action = is_string($submittedAction) ? $submittedAction : '';
     if (!is_string($submittedToken) || !hash_equals($reportsCsrf, $submittedToken)) {
         $reportNotice = ['type' => 'error', 'message' => 'Phiên thao tác không hợp lệ. Vui lòng tải lại trang.'];
+    } elseif ($action === 'save_report_state') {
+        $rawReportId = $_POST['report_id'] ?? '';
+        $reportId = $rawReportId === '' ? null : filter_var($rawReportId, FILTER_VALIDATE_INT);
+        $titleInput = $_POST['title'] ?? '';
+        $title = is_string($titleInput) ? trim($titleInput) : '';
+        $typeInput = $_POST['report_type'] ?? '';
+        $reportType = is_string($typeInput) ? $typeInput : '';
+        $configInput = $_POST['report_config'] ?? '';
+        $config = is_string($configInput) && strlen($configInput) <= 4000 ? json_decode($configInput, true) : null;
+        $allowedSections = ['revenue', 'category', 'products', 'orders'];
+        $allowedCustomerReports = ['new', 'repeat', 'revenue', 'orders'];
+        $allowedPeriods = ['today', 'yesterday', 'last_7', 'this_month', 'last_month', 'last_30', 'custom'];
+        $configValid = is_array($config)
+            && in_array($config['view'] ?? '', ['sales', 'customer'], true)
+            && in_array($config['period'] ?? '', $allowedPeriods, true)
+            && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($config['from'] ?? ''))
+            && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($config['to'] ?? ''))
+            && (($reportType !== 'sales') || (filter_var($config['category_id'] ?? 0, FILTER_VALIDATE_INT) !== false && (int) ($config['category_id'] ?? 0) >= 0))
+            && ($reportType === 'sales'
+                ? (($config['view'] ?? '') === 'sales' && in_array($config['section'] ?? '', $allowedSections, true))
+                : (($config['view'] ?? '') === 'customer' && in_array($config['customer_report'] ?? '', $allowedCustomerReports, true)));
+        if (!$configValid || !preg_match('/^.{1,250}$/us', $title) || !isset($reportTypes[$reportType])
+            || ($reportId !== null && ($reportId === false || $reportId < 1))) {
+            $reportNotice = ['type' => 'error', 'message' => 'Không thể lưu cấu hình báo cáo. Vui lòng tải lại trang và thử lại.'];
+        } else {
+            $configJson = json_encode($config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($reportId) {
+                $saveStateStmt = $conn->prepare('UPDATE admin_saved_reports SET config_json = ? WHERE id = ? AND report_type = ?');
+                if ($saveStateStmt) $saveStateStmt->bind_param('sis', $configJson, $reportId, $reportType);
+            } else {
+                $saveStateStmt = $conn->prepare('INSERT INTO admin_saved_reports (title, report_type, created_by, config_json) VALUES (?, ?, ?, ?)');
+                if ($saveStateStmt) $saveStateStmt->bind_param('ssss', $title, $reportType, $adminUsername, $configJson);
+            }
+            if (!$saveStateStmt || !$saveStateStmt->execute()) {
+                $reportNotice = ['type' => 'error', 'message' => 'Không thể lưu báo cáo. Vui lòng thử lại.'];
+                error_log('Admin saved report config update failed: ' . ($saveStateStmt ? $saveStateStmt->error : $conn->error));
+                if ($saveStateStmt) $saveStateStmt->close();
+            } else {
+                if (!$reportId) $reportId = $saveStateStmt->insert_id;
+                $saveStateStmt->close();
+                $_SESSION['reports_notice'] = ['type' => 'success', 'message' => 'Đã lưu cấu hình báo cáo.'];
+                $config['report_id'] = $reportId;
+                header('Location: ' . $appBaseUrl . '/admin/reports.php?' . http_build_query($config));
+                exit;
+            }
+        }
     } elseif (in_array($action, ['create_saved_report', 'update_saved_report'], true)) {
         $submittedTitle = $_POST['title'] ?? '';
         $submittedType = $_POST['report_type'] ?? '';
@@ -283,7 +339,7 @@ if ($savedReportsAvailable) {
 $savedReportId = filter_var($_GET['report_id'] ?? null, FILTER_VALIDATE_INT);
 $currentSavedReport = null;
 if ($savedReportId !== false && $savedReportId > 0 && $savedReportsAvailable) {
-    $findReportStmt = $conn->prepare('SELECT id, title, report_type FROM admin_saved_reports WHERE id = ?');
+    $findReportStmt = $conn->prepare('SELECT id, title, report_type, config_json FROM admin_saved_reports WHERE id = ?');
     if ($findReportStmt) {
         $findReportStmt->bind_param('i', $savedReportId);
         if ($findReportStmt->execute()) {
@@ -293,6 +349,16 @@ if ($savedReportId !== false && $savedReportId > 0 && $savedReportsAvailable) {
             }
         }
         $findReportStmt->close();
+    }
+}
+if ($currentSavedReport && !empty($currentSavedReport['config_json'])) {
+    $savedConfig = json_decode((string) $currentSavedReport['config_json'], true);
+    if (is_array($savedConfig)) {
+        $hasReportOverrides = count(array_diff(array_keys($_GET), ['view', 'report_id'])) > 0;
+        $_GET = $hasReportOverrides
+            ? array_merge($savedConfig, $_GET)
+            : array_merge($_GET, $savedConfig);
+        $reportView = (string) ($_GET['view'] ?? $reportView);
     }
 }
 $customTitleParam = trim((string) ($_GET['title'] ?? ''));
@@ -328,49 +394,49 @@ if ($reportView === 'list') {
             .report-index-search { width: 100%; height: 42px; margin-bottom: 18px; padding: 0 14px; border: 1px solid #dce2e9; border-radius: 8px; background: #fff; color: var(--text); }
             .report-index-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
             .report-index-card { overflow: hidden; border: 1px solid #e5e9ef; border-radius: 10px; background: #fff; box-shadow: var(--shadow); }
-            .report-index-card h2 { display: flex; align-items: center; gap: 10px; margin: 0; padding: 18px 20px; border-bottom: 1px solid #e9edf2; color: var(--navy); font-size: 16px; }
-            .report-index-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; background: #e8f3ff; color: #1685ff; font-size: 17px; }
+            .report-index-card h2 { display: flex; align-items: center; gap: 10px; margin: 0; padding: 18px 20px; border-bottom: 1px solid #e9edf2; color: var(--navy); font-size: 18px; }
+            .report-index-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; background: #e8f3ff; color: #1685ff; font-size: 19px; }
             .report-index-list { padding: 6px 20px 12px; }
             .report-index-item { display: block; position: relative; padding: 14px 8px 14px 24px; border-bottom: 1px dashed #e4e8ed; color: #23364b; transition: color .15s, background .15s; }
             .report-index-item:last-child { border-bottom: 0; }
             .report-index-item::before { position: absolute; top: 21px; left: 8px; width: 6px; height: 6px; border-radius: 50%; background: #a4adb8; content: ''; }
             .report-index-item:hover, .report-index-item:focus-visible { border-radius: 6px; background: #f4f8fc; color: #087fe8; outline: none; }
-            .report-index-item strong { display: block; font-size: 13px; font-weight: 500; }
+            .report-index-item strong { display: block; font-size: 15px; font-weight: 500; }
             .report-saved-item { display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px dashed #e4e8ed; }
             .report-saved-item:last-child { border-bottom: 0; }
             .report-saved-link { flex: 1; min-width: 0; color: #23364b; }
             .report-saved-link:hover { color: #087fe8; }
-            .report-saved-link strong { display: block; overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+            .report-saved-link strong { display: block; overflow: hidden; font-size: 15px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
             .report-saved-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
-            .report-row-action { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: #8793a2; cursor: pointer; font-size: 16px; }
+            .report-row-action { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: #8793a2; cursor: pointer; font-size: 18px; }
             .report-row-action:hover { background: #eef5fc; color: #087fe8; }
             .report-row-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
             .report-row-delete { display: inline-flex; margin: 0; }
-            .report-index-heading .report-add-button { min-height: 40px; padding: 0 15px; border: 0; border-radius: 7px; background: #0784f9; color: #fff; font-weight: 600; cursor: pointer; }
-            .report-index-heading .report-add-button:hover { background: #006fd6; }
+            .report-index-heading .report-add-button { min-height: 40px; padding: 0 15px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
+            .report-index-heading .report-add-button:hover { background: var(--navy-soft); }
             .report-notice { margin: 0 0 16px; padding: 11px 14px; border: 1px solid #cfe7d7; border-radius: 7px; background: #f0faf3; color: #28643a; }
             .report-notice.error { border-color: #f3c4c4; background: #fff2f2; color: #9c2f2f; }
             .report-modal[hidden] { display: none; }
             .report-modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: rgba(15, 25, 38, .48); }
             .report-modal-card { width: min(100%, 560px); overflow: hidden; border-radius: 9px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
             .report-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 17px 24px; border-bottom: 1px solid #e6e9ed; }
-            .report-modal-header h2 { margin: 0; color: #17283d; font-size: 21px; }
-            .report-modal-close { border: 0; background: transparent; color: #98a2af; cursor: pointer; font-size: 25px; line-height: 1; }
+            .report-modal-header h2 { margin: 0; color: #17283d; font-size: 24px; }
+            .report-modal-close { border: 0; background: transparent; color: #98a2af; cursor: pointer; font-size: 28px; line-height: 1; }
             .report-modal-body { padding: 22px 24px 24px; }
-            .report-modal-label { display: block; margin-bottom: 8px; color: #4b5a6b; font-size: 13px; }
+            .report-modal-label { display: block; margin-bottom: 8px; color: #4b5a6b; font-size: 15px; }
             .report-modal-label b { color: #e34747; }
             .report-title-wrap { position: relative; }
             .report-title-input { width: 100%; height: 44px; padding: 0 60px 0 12px; border: 1px solid #cfd5dc; border-radius: 7px; color: #17283d; }
-            .report-title-count { position: absolute; top: 14px; right: 12px; color: #8995a4; font-size: 12px; }
-            .report-type-label { display: block; margin: 21px 0 10px; color: #4b5a6b; font-size: 13px; }
+            .report-title-count { position: absolute; top: 14px; right: 12px; color: #8995a4; font-size: 14px; }
+            .report-type-label { display: block; margin: 21px 0 10px; color: #4b5a6b; font-size: 15px; }
             .report-type-options { display: flex; flex-wrap: wrap; gap: 14px; }
             .report-type-option { position: relative; width: 200px; min-height: 125px; padding: 15px; border: 1px solid #d5dbe2; border-radius: 8px; cursor: pointer; text-align: center; }
             .report-type-option:has(input:checked) { border-color: #0784f9; background: #f1f8ff; color: #0784f9; }
             .report-type-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-            .report-type-option .type-icon { display: block; margin-bottom: 5px; color: #0784f9; font-size: 24px; }
+            .report-type-option .type-icon { display: block; margin-bottom: 5px; color: #0784f9; font-size: 27px; }
             .report-type-option strong, .report-type-option small { display: block; }
-            .report-type-option strong { font-size: 15px; }
-            .report-type-option small { margin-top: 5px; color: #64758a; font-size: 12px; line-height: 1.4; }
+            .report-type-option strong { font-size: 17px; }
+            .report-type-option small { margin-top: 5px; color: #64758a; font-size: 14px; line-height: 1.4; }
             .report-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px; border-top: 1px solid #e6e9ed; }
             .report-modal-footer button { min-width: 82px; height: 39px; padding: 0 15px; border: 1px solid #0784f9; border-radius: 7px; background: #fff; color: #0784f9; cursor: pointer; font-weight: 600; }
             .report-modal-footer button[type=submit] { background: #0784f9; color: #fff; }
@@ -379,18 +445,18 @@ if ($reportView === 'list') {
             .report-export-modal { position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; padding: 16px; background: rgba(15, 25, 38, .48); }
             .report-export-card { width: min(100%, 480px); overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
             .report-export-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 12px; }
-            .report-export-header h2 { margin: 0; color: #111827; font-size: 20px; font-weight: 700; }
-            .report-export-close { border: 0; background: transparent; color: #9ca3af; cursor: pointer; font-size: 24px; line-height: 1; padding: 4px; }
+            .report-export-header h2 { margin: 0; color: #111827; font-size: 22px; font-weight: 700; }
+            .report-export-close { border: 0; background: transparent; color: #9ca3af; cursor: pointer; font-size: 27px; line-height: 1; padding: 4px; }
             .report-export-close:hover { color: #4b5563; }
-            .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 15px; line-height: 1.5; }
+            .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 17px; line-height: 1.5; }
             .report-export-body p { margin: 0; }
             .report-export-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 0 24px 24px; }
-            .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 14px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
+            .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 16px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
             .report-export-footer .report-export-cancel { border: 1px solid #0084ff; background: #fff; color: #0084ff; }
             .report-export-footer .report-export-cancel:hover { background: #f0f7ff; }
             .report-export-footer .report-export-confirm { border: 1px solid #0084ff; background: #0084ff; color: #fff; }
             .report-export-footer .report-export-confirm:hover { background: #0070d8; border-color: #0070d8; }
-            .report-index-export-btn { min-height: 40px; padding: 0 16px; border: 1px solid #0784f9; border-radius: 7px; background: #fff; color: #0784f9; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; transition: all .15s ease; }
+            .report-index-export-btn { min-height: 40px; padding: 0 16px; border: 1px solid #0784f9; border-radius: 7px; background: #fff; color: #0784f9; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 16px; transition: all .15s ease; }
             .report-index-export-btn:hover { background: #f0f7ff; border-color: #006fd6; color: #006fd6; }
             @media (max-width: 850px) { .report-index-grid { grid-template-columns: 1fr; } }
             @media (max-width: 560px) { .report-index-heading { align-items: flex-start; flex-direction: column; } .report-index-card h2 { padding: 15px; } .report-index-list { padding-right: 12px; padding-left: 12px; } .report-modal-header { padding: 15px; } .report-modal-body { padding: 18px 15px; } .report-type-option { width: calc(50% - 7px); min-width: 130px; } }
@@ -429,7 +495,7 @@ if ($reportView === 'list') {
                             <?php foreach ($savedReports as $savedReport): ?>
                                 <?php if ($savedReport['report_type'] !== 'sales') continue; ?>
                                 <div class="report-saved-item">
-                                    <a class="report-saved-link" href="<?php echo $escape($appBaseUrl . '/admin/reports.php?' . http_build_query(['view' => 'sales', 'section' => 'revenue', 'report_id' => (int) $savedReport['id']])); ?>">
+                                    <a class="report-saved-link" href="<?php echo $escape($appBaseUrl . '/admin/reports.php?' . http_build_query(['view' => 'sales', 'report_id' => (int) $savedReport['id']])); ?>">
                                         <strong><?php echo $escape($savedReport['title']); ?></strong>
                                     </a>
                                     <div class="report-saved-actions">
@@ -456,7 +522,7 @@ if ($reportView === 'list') {
                             <?php foreach ($savedReports as $savedReport): ?>
                                 <?php if ($savedReport['report_type'] !== 'customer') continue; ?>
                                 <div class="report-saved-item">
-                                    <a class="report-saved-link" href="<?php echo $escape($appBaseUrl . '/admin/reports.php?' . http_build_query(['view' => 'customer', 'customer_report' => 'revenue', 'report_id' => (int) $savedReport['id']])); ?>">
+                                    <a class="report-saved-link" href="<?php echo $escape($appBaseUrl . '/admin/reports.php?' . http_build_query(['view' => 'customer', 'report_id' => (int) $savedReport['id']])); ?>">
                                         <strong><?php echo $escape($savedReport['title']); ?></strong>
                                     </a>
                                     <div class="report-saved-actions">
@@ -807,43 +873,46 @@ if ($reportView === 'customer') {
             .customer-table { width: 100%; border-collapse: collapse; }
             .customer-table th, .customer-table td { border-bottom: 1px solid #eef1f5; text-align: left; }
             .customer-table td:first-child { font-weight: 600; }
-            .customer-detail-heading .report-back-button { display: inline-grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #718198; font-size: 20px; }
+            .customer-detail-heading .report-back-button { display: inline-grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #718198; font-size: 22px; }
             .customer-detail-heading .report-back-button:hover { color: #0784f9; }
             .customer-detail-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-            .customer-detail-heading h1 { font-size: 23px; }
+            .customer-detail-heading h1 { font-size: 26px; }
             .customer-detail-actions { display: flex; align-items: center; gap: 18px; margin-left: auto; }
-            .customer-detail-actions a, .customer-detail-actions button { padding: 0; border: 0; background: transparent; color: #34465b; cursor: pointer; font-size: 13px; font-weight: 600; }
+            .customer-detail-actions a, .customer-detail-actions button { padding: 0; border: 0; background: transparent; color: #34465b; cursor: pointer; font-size: 15px; font-weight: 600; }
+            .customer-detail-actions form { margin: 0; }
+            .customer-detail-actions .report-save-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 8px; background: var(--navy); color: #fff; font-size: 16px; font-weight: 600; }
+            .customer-detail-actions .report-save-button:hover { background: var(--navy-soft); color: #fff; }
             .customer-filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 20px; }
             .customer-filterbar > select, .customer-filterbar > input { min-height: 39px; padding: 8px 10px; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: var(--text); }
             .customer-filterbar > select { min-width: 150px; }
             .customer-filterbar > input { width: 145px; }
             .customer-filterbar .report-button { min-height: 39px; padding: 0 14px; border: 1px solid var(--navy); border-radius: 7px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
             .customer-filterbar .report-button:hover { background: var(--navy-soft); color: #fff; }
-            .customer-compare-label { display: inline-flex; min-height: 39px; align-items: center; padding: 0 12px; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #526276; font-size: 12px; }
+            .customer-compare-label { display: inline-flex; min-height: 39px; align-items: center; padding: 0 12px; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #526276; font-size: 14px; }
             .customer-table-panel { overflow: hidden; padding: 18px 0 0; }
             .customer-table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 18px 14px; }
-            .customer-table th { padding: 12px 14px; background: #f2f4f6; color: #46576a; font-size: 12px; white-space: nowrap; }
-            .customer-table td { padding: 12px 14px; font-size: 13px; white-space: nowrap; }
+            .customer-table th { padding: 12px 14px; background: #f2f4f6; color: #46576a; font-size: 14px; white-space: nowrap; }
+            .customer-table td { padding: 12px 14px; font-size: 15px; white-space: nowrap; }
             .customer-table tbody tr:nth-child(even) { background: #f3f5f7; }
             .customer-table tbody tr[hidden] { display: none; }
-            .customer-table-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 18px; color: #526276; font-size: 12px; }
+            .customer-table-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 18px; color: #526276; font-size: 14px; }
             .customer-table-footer select, .customer-table-footer button { min-height: 32px; border: 1px solid #dce2e9; border-radius: 5px; background: #fff; color: #526276; }
             .customer-table-footer button { min-width: 32px; cursor: pointer; }
             .customer-table-footer button:disabled { opacity: .4; cursor: default; }
-            .customer-copy-status { color: #16835d; font-size: 12px; }
+            .customer-copy-status { color: #16835d; font-size: 14px; }
             .customer-empty { padding: 18px 0; color: var(--muted); text-align: center; }
             .customer-error { margin-bottom: 16px; padding: 12px 15px; border: 1px solid #f3c4c4; border-radius: 8px; background: #fff2f2; color: #9c2f2f; }
             .customer-report-panel .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
             .report-export-modal { position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; padding: 16px; background: rgba(15, 25, 38, .48); }
             .report-export-card { width: min(100%, 480px); overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
             .report-export-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 12px; }
-            .report-export-header h2 { margin: 0; color: #111827; font-size: 20px; font-weight: 700; }
-            .report-export-close { border: 0; background: transparent; color: #9ca3af; cursor: pointer; font-size: 24px; line-height: 1; padding: 4px; }
+            .report-export-header h2 { margin: 0; color: #111827; font-size: 22px; font-weight: 700; }
+            .report-export-close { border: 0; background: transparent; color: #9ca3af; cursor: pointer; font-size: 27px; line-height: 1; padding: 4px; }
             .report-export-close:hover { color: #4b5563; }
-            .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 15px; line-height: 1.5; }
+            .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 17px; line-height: 1.5; }
             .report-export-body p { margin: 0; }
             .report-export-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 0 24px 24px; }
-            .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 14px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
+            .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 16px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
             .report-export-footer .report-export-cancel { border: 1px solid #0084ff; background: #fff; color: #0084ff; }
             .report-export-footer .report-export-cancel:hover { background: #f0f7ff; }
             .report-export-footer .report-export-confirm { border: 1px solid #0084ff; background: #0084ff; color: #fff; }
@@ -869,8 +938,18 @@ if ($reportView === 'customer') {
                     <div class="customer-detail-actions">
                         <?php if ($customerError === ''): ?><button type="button" onclick="document.getElementById('export-confirmation').style.display='grid'">⇧ Xuất báo cáo</button><?php endif; ?>
                         <button type="button" id="copy-customer-report">▢ Sao chép</button>
+                        <?php if ($currentSavedReport): ?><form method="post">
+                            <input type="hidden" name="csrf_token" value="<?php echo $escape($reportsCsrf); ?>">
+                            <input type="hidden" name="action" value="save_report_state">
+                            <input type="hidden" name="report_id" value="<?php echo $savedReportId ? (int) $savedReportId : ''; ?>">
+                            <input type="hidden" name="report_type" value="customer">
+                            <input type="hidden" name="title" value="<?php echo $escape($customerTitle); ?>">
+                            <input type="hidden" name="report_config" value="<?php echo $escape(json_encode(['view' => 'customer', 'customer_report' => $customerReport, 'period' => 'custom', 'from' => $startDate, 'to' => $endDate], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>">
+                            <button type="submit" class="report-save-button">▣ Lưu báo cáo</button>
+                        </form><?php endif; ?>
                     </div>
                 </div>
+                <?php if (is_array($reportNotice) && ($reportNotice['message'] ?? '') !== ''): ?><p class="report-notice<?php echo ($reportNotice['type'] ?? '') === 'error' ? ' error' : ''; ?>" role="status"><?php echo $escape($reportNotice['message']); ?></p><?php endif; ?>
                 <?php if ($customerError !== ''): ?><p class="customer-error" role="alert"><?php echo $escape($customerError); ?></p><?php endif; ?>
                 <form method="get" class="customer-filterbar">
                         <input type="hidden" name="view" value="customer">
@@ -1453,12 +1532,12 @@ $svgNumber = static fn($value): string => number_format((float) $value, 2, '.', 
     <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/style.css'); ?>">
     <style>
         .report-panel { margin-bottom: 20px; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow); }
-        .report-panel h2 { margin: 0; color: var(--navy); font-size: 17px; }
+        .report-panel h2 { margin: 0; color: var(--navy); font-size: 19px; }
         .report-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-        .report-panel-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+        .report-panel-header p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
         .report-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
         .report-field { display: grid; gap: 6px; min-width: 150px; }
-        .report-field label { color: #64758a; font-size: 12px; font-weight: 600; }
+        .report-field label { color: #64758a; font-size: 14px; font-weight: 600; }
         .report-field select, .report-field input { min-height: 39px; padding: 8px 10px; border: 1px solid #dce2e9; border-radius: 7px; color: var(--text); background: #fff; }
         .report-filter-actions { display: flex; gap: 8px; }
         .report-button { display: inline-flex; min-height: 39px; align-items: center; justify-content: center; padding: 0 14px; border: 1px solid var(--navy); border-radius: 7px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
@@ -1468,59 +1547,62 @@ $svgNumber = static fn($value): string => number_format((float) $value, 2, '.', 
         .report-error { margin: 0 0 18px; padding: 12px 15px; border: 1px solid #f3c4c4; border-radius: 8px; background: #fff2f2; color: #9c2f2f; }
         .report-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
         .report-stat { min-width: 0; padding: 18px; border: 1px solid #e9edf2; border-radius: 11px; background: #fff; box-shadow: var(--shadow); }
-        .report-stat-label { color: #8190a0; font-size: 12px; }
-        .report-stat-value { display: block; margin-top: 9px; color: var(--navy); font-size: clamp(18px, 2vw, 25px); font-weight: 700; overflow-wrap: anywhere; }
-        .report-stat-note { display: block; margin-top: 7px; color: #98a2af; font-size: 11px; }
+        .report-stat-label { color: #8190a0; font-size: 14px; }
+        .report-stat-value { display: block; margin-top: 9px; color: var(--navy); font-size: clamp(20px, 2.2vw, 28px); font-weight: 700; overflow-wrap: anywhere; }
+        .report-stat-note { display: block; margin-top: 7px; color: #98a2af; font-size: 13px; }
         .report-columns { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(270px, 1fr); gap: 18px; }
-        .report-empty { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+        .report-empty { margin: 12px 0 0; color: var(--muted); font-size: 15px; }
         .report-status-list { display: grid; }
-        .report-status-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid #eef1f5; color: #687789; font-size: 12px; }
+        .report-status-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid #eef1f5; color: #687789; font-size: 14px; }
         .report-status-row:last-child { border-bottom: 0; }
         .report-status-row strong { color: var(--navy); }
         .report-table-wrap { overflow-x: auto; }
         .report-table { width: 100%; border-collapse: collapse; }
         .report-table th, .report-table td { padding: 12px 10px; border-bottom: 1px solid #eef1f5; text-align: left; }
-        .report-table th { color: #7d8a99; font-size: 11px; font-weight: 600; }
-        .report-table td { color: #35465a; font-size: 12px; }
+        .report-table th { color: #7d8a99; font-size: 13px; font-weight: 600; }
+        .report-table td { color: #35465a; font-size: 14px; }
         .report-table td:last-child, .report-table th:last-child { text-align: right; }
         .report-product-name { min-width: 180px; font-weight: 600; }
         .report-detail-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-        .report-back-button { display: inline-grid; width: 40px; height: 40px; place-items: center; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #718198; font-size: 20px; }
-        .report-detail-heading h1 { font-size: 23px; }
+        .report-back-button { display: inline-grid; width: 40px; height: 40px; place-items: center; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #718198; font-size: 22px; }
+        .report-detail-heading h1 { font-size: 26px; }
         .report-detail-actions { display: flex; align-items: center; gap: 18px; margin-left: auto; }
-        .report-detail-actions a, .report-detail-actions button { padding: 0; border: 0; background: transparent; color: #34465b; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .report-detail-actions a, .report-detail-actions button { padding: 0; border: 0; background: transparent; color: #34465b; cursor: pointer; font-size: 15px; font-weight: 600; }
         .report-detail-actions a:hover, .report-detail-actions button:hover { color: #0784f9; }
+        .report-detail-actions form { margin: 0; }
+        .report-detail-actions .report-save-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 8px; background: var(--navy); color: #fff; font-size: 16px; font-weight: 600; }
+        .report-detail-actions .report-save-button:hover { background: var(--navy-soft); color: #fff; }
         .report-detail-filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 20px; }
         .report-detail-filterbar .report-field { min-width: 0; }
         .report-detail-filterbar .report-field select, .report-detail-filterbar .report-field input { min-height: 39px; }
         .report-detail-filterbar .report-field:first-of-type select { min-width: 140px; }
-        .report-compare-label, .report-grain-label { display: inline-flex; min-height: 39px; align-items: center; padding: 0 12px; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #526276; font-size: 12px; white-space: nowrap; }
+        .report-compare-label, .report-grain-label { display: inline-flex; min-height: 39px; align-items: center; padding: 0 12px; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #526276; font-size: 14px; white-space: nowrap; }
         .report-table-panel { overflow: hidden; padding: 18px 0 0; }
         .report-table-wrap { overflow-x: auto; }
         .report-table-detail { min-width: 720px; }
         .report-table-detail thead { background: #f2f4f6; }
-        .report-table-detail th { padding: 12px 14px; color: #46576a; font-size: 12px; white-space: nowrap; }
-        .report-table-detail td { padding: 12px 14px; color: #29394c; font-size: 13px; white-space: nowrap; }
+        .report-table-detail th { padding: 12px 14px; color: #46576a; font-size: 14px; white-space: nowrap; }
+        .report-table-detail td { padding: 12px 14px; color: #29394c; font-size: 15px; white-space: nowrap; }
         .report-table-detail tbody:not(.report-table-summary) tr:nth-child(even) { background: #f3f5f7; }
         .report-table-detail .report-table-summary td { background: #fff; font-weight: 700; }
         .report-table-detail .report-table-summary td:last-child { color: #17283d; }
         .report-table-detail tbody tr[hidden] { display: none; }
-        .report-table-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 18px; color: #526276; font-size: 12px; }
+        .report-table-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 18px; color: #526276; font-size: 14px; }
         .report-table-footer select, .report-table-footer button { min-height: 32px; border: 1px solid #dce2e9; border-radius: 5px; background: #fff; color: #526276; }
         .report-table-footer button { min-width: 32px; cursor: pointer; }
         .report-table-footer button:disabled { opacity: .4; cursor: default; }
-        .report-copy-status { color: #16835d; font-size: 12px; }
+        .report-copy-status { color: #16835d; font-size: 14px; }
         .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
         .report-export-modal { position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; padding: 16px; background: rgba(15, 25, 38, .48); }
         .report-export-card { width: min(100%, 480px); overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
         .report-export-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 12px; }
-        .report-export-header h2 { margin: 0; color: #111827; font-size: 20px; font-weight: 700; }
-        .report-export-close { border: 0; background: transparent; color: #9ca3af; cursor: pointer; font-size: 24px; line-height: 1; padding: 4px; }
+        .report-export-header h2 { margin: 0; color: #111827; font-size: 22px; font-weight: 700; }
+        .report-export-close { border: 0; background: transparent; color: #9ca3af; cursor: pointer; font-size: 27px; line-height: 1; padding: 4px; }
         .report-export-close:hover { color: #4b5563; }
-        .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 15px; line-height: 1.5; }
+        .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 17px; line-height: 1.5; }
         .report-export-body p { margin: 0; }
         .report-export-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 0 24px 24px; }
-        .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 14px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
+        .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 16px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
         .report-export-footer .report-export-cancel { border: 1px solid #0084ff; background: #fff; color: #0084ff; }
         .report-export-footer .report-export-cancel:hover { background: #f0f7ff; }
         .report-export-footer .report-export-confirm { border: 1px solid #0084ff; background: #0084ff; color: #fff; }
@@ -1561,8 +1643,18 @@ $svgNumber = static fn($value): string => number_format((float) $value, 2, '.', 
                         <button type="button" onclick="document.getElementById('export-confirmation').style.display='grid'">⇧ Xuất báo cáo</button>
                     <?php endif; ?>
                     <button type="button" id="copy-report">▢ Sao chép</button>
+                    <?php if ($currentSavedReport): ?><form method="post">
+                        <input type="hidden" name="csrf_token" value="<?php echo $escape($reportsCsrf); ?>">
+                        <input type="hidden" name="action" value="save_report_state">
+                        <input type="hidden" name="report_id" value="<?php echo $savedReportId ? (int) $savedReportId : ''; ?>">
+                        <input type="hidden" name="report_type" value="sales">
+                        <input type="hidden" name="title" value="<?php echo $escape($salesTitle); ?>">
+                        <input type="hidden" name="report_config" value="<?php echo $escape(json_encode(['view' => 'sales', 'section' => $salesSection, 'period' => 'custom', 'from' => $startDate, 'to' => $endDate, 'category_id' => $categoryId], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)); ?>">
+                        <button type="submit" class="report-save-button">▣ Lưu báo cáo</button>
+                    </form><?php endif; ?>
                 </div>
             </div>
+            <?php if (is_array($reportNotice) && ($reportNotice['message'] ?? '') !== ''): ?><p class="report-notice<?php echo ($reportNotice['type'] ?? '') === 'error' ? ' error' : ''; ?>" role="status"><?php echo $escape($reportNotice['message']); ?></p><?php endif; ?>
             <?php if ($reportError !== ''): ?><p class="report-error" role="alert"><?php echo $escape($reportError); ?></p><?php endif; ?>
             <form method="get" class="report-detail-filterbar">
                 <input type="hidden" name="view" value="sales">

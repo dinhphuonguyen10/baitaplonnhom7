@@ -1,0 +1,48 @@
+{
+    "templates": [
+        {
+            "id": "new_message",
+            "title": "Lời chào mở đầu",
+            "type": "Chào mừng",
+            "type_color": "#1890FF",
+            "trigger_label": "Khách hàng mới (nhắn tin lần đầu tiên)",
+            "message": "Xin chào! 💎 Cảm ơn bạn đã liên hệ với ÉCRIN Jewelry. Chúng tôi đã nhận được tin nhắn của bạn và sẽ phản hồi trong thời gian sớm nhất. Trong khi chờ đợi, bạn có thể tham khảo thêm bộ sưu tập mới nhất của chúng tôi nhé!",
+            "status": "active",
+            "updated_at": "2026-11-22 16:45:23",
+            "activated_at": "2026-11-22 16:45:23"
+        },
+        {
+            "id": "order_thankyou",
+            "title": "Chăm sóc sau tạo đơn",
+            "type": "Hành trình đơn",
+            "type_color": "#722ED1",
+            "trigger_label": "Đơn hàng được tạo thành công",
+            "message": "🎉 Cảm ơn bạn đã đặt hàng tại ÉCRIN Jewelry! Đơn hàng của bạn đã được tiếp nhận và đang được xử lý. Chúng tôi sẽ liên hệ xác nhận và cập nhật thông tin giao hàng sớm nhất có thể. Cảm ơn bạn đã tin tưởng và lựa chọn ÉCRIN! 💛",
+            "status": "active",
+            "updated_at": "2026-11-22 22:00:00",
+            "activated_at": "2026-11-22 22:00:00"
+        },
+        {
+            "id": "review_thankyou",
+            "title": "Cảm ơn đánh giá",
+            "type": "Chăm sóc",
+            "type_color": "#52C41A",
+            "trigger_label": "(Gửi thủ công từ trang quản lý chat)",
+            "message": "💬 Cảm ơn bạn đã dành thời gian đánh giá sản phẩm của ÉCRIN! Phản hồi của bạn rất quan trọng để chúng tôi ngày càng hoàn thiện hơn. Hẹn gặp lại bạn trong những bộ sưu tập tiếp theo nhé! 🌟",
+            "status": "inactive",
+            "updated_at": "2026-11-22 22:00:00",
+            "activated_at": null
+        },
+        {
+            "id": "reorder_remind",
+            "title": "Nhắc mua lại",
+            "type": "Tương tác",
+            "type_color": "#FA8C16",
+            "trigger_label": "(Gửi thủ công từ trang quản lý chat)",
+            "message": "✨ Xin chào! ÉCRIN Jewelry có những mẫu trang sức mới vừa về. Bạn có muốn khám phá không? Chúng tôi luôn có những ưu đãi đặc biệt dành cho khách hàng thân thiết như bạn 💎",
+            "status": "inactive",
+            "updated_at": "2026-11-22 22:00:00",
+            "activated_at": null
+        }
+    ]
+}

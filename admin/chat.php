@@ -88,6 +88,21 @@ $adminCurrentPage = 'chat.php';
         .chat-send { display:grid; width:38px; height:38px; flex:0 0 38px; padding:0; place-items:center; border:0; border-radius:50%; background:var(--navy); color:#fff; cursor:pointer; box-shadow:0 2px 6px rgba(16,35,56,.16); transition:background .18s ease,transform .18s ease; }
         .chat-send svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
         .chat-send:hover { background:var(--navy-mid); transform:translateY(-1px); }
+.auto-button {
+  background: linear-gradient(135deg, #6A5ACD, #8A2BE2);
+  border: none;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-weight: 600;
+  margin-left: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+.auto-button:hover {
+  background: linear-gradient(135deg, #7B68EE, #9370DB);
+  transform: translateY(-1px);
+}
         .chat-send:disabled { opacity:.55; cursor:wait; }
         .chat-notice { min-height:16px; margin:0 0 5px; color:#A34B42; font-size:11px; }
         .chat-notice:empty { display:none; }
@@ -95,6 +110,63 @@ $adminCurrentPage = 'chat.php';
         @media(max-width:900px) { .chat-workspace { height:calc(100vh - 200px); min-height:420px; grid-template-columns:260px minmax(0,1fr); } .page-content { padding-right:20px; padding-left:20px; } }
         @media(max-width:680px) { .chat-workspace { position:relative; height:calc(100vh - 205px); min-height:520px; grid-template-columns:1fr; } .chat-inbox { border-right:0; } .chat-workspace.has-selection .chat-inbox { display:none; } .chat-workspace:not(.has-selection) .chat-thread { display:none; } .chat-workspace.has-selection .chat-thread { position:absolute; inset:0; } .chat-thread-head { min-height:65px; padding:10px 14px; } .chat-back { display:inline-flex !important; } .chat-messages { padding:16px 12px; } .chat-bubble { max-width:88%; } .chat-compose { padding:10px; } .chat-compose-hint { display:none; } .chat-live { display:none; } }
         .chat-back { display:none; border:0; background:transparent; color:var(--navy); font-size:20px; cursor:pointer; }
+        .welcome-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
+        .chat-actions-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+        .chat-action-btn {
+            display:inline-flex; align-items:center; gap:7px;
+            padding:9px 16px; border:0; border-radius:10px;
+            background:linear-gradient(135deg,#1D3461,#2A5298);
+            color:#fff; font-size:13px; font-weight:600; cursor:pointer;
+            box-shadow:0 2px 8px rgba(16,35,56,.18);
+            transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;
+            white-space:nowrap;
+        }
+        .chat-action-btn svg { width:16px; height:16px; flex:0 0 16px; }
+        .chat-action-btn:hover { transform:translateY(-2px); box-shadow:0 4px 14px rgba(16,35,56,.25); filter:brightness(1.08); }
+        .chat-action-btn:active { transform:translateY(0); }
+        .chat-action-btn--secondary {
+            background:linear-gradient(135deg,#4B3B6B,#7B5EA7);
+        }
+        .auto-badge {
+            display:inline-block; padding:2px 10px; border-radius:20px;
+            background:#EAF5ED; color:#3A7D55; font-size:11px; font-weight:600; margin-left:8px;
+        }
+        /* Auto-response modal */
+        .ar-overlay {
+            position:fixed; inset:0; background:rgba(13,24,38,.45); z-index:900;
+            display:flex; align-items:center; justify-content:center;
+            opacity:0; transition:opacity .22s ease;
+        }
+        .ar-overlay.is-open { opacity:1; pointer-events:all; }
+        .ar-overlay:not(.is-open) { pointer-events:none; }
+        .ar-modal {
+            width:min(560px,95vw); max-height:90vh; overflow-y:auto;
+            background:#fff; border-radius:18px; box-shadow:0 20px 60px rgba(13,24,38,.22);
+            padding:32px 32px 24px; transform:translateY(24px) scale(.97);
+            transition:transform .22s ease;
+        }
+        .ar-overlay.is-open .ar-modal { transform:none; }
+        .ar-modal h2 { font-size:18px; color:var(--navy); margin:0 0 4px; }
+        .ar-modal .ar-subtitle { color:#6B7A90; font-size:13px; margin:0 0 24px; }
+        .ar-field { margin-bottom:20px; }
+        .ar-field label { display:block; font-size:12px; font-weight:700; color:#4B5563; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+        .ar-field textarea {
+            width:100%; box-sizing:border-box; min-height:84px; padding:12px 14px;
+            border:1.5px solid #E2E6EC; border-radius:10px; font:14px 'Roboto',sans-serif;
+            line-height:1.6; color:#1E293B; resize:vertical; outline:0;
+            transition:border-color .15s;
+        }
+        .ar-field textarea:focus { border-color:#C4A45A; box-shadow:0 0 0 3px rgba(196,164,90,.12); }
+        .ar-tip { font-size:11px; color:#9CA3AF; margin-top:5px; }
+        .ar-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
+        .ar-btn {
+            padding:9px 22px; border:0; border-radius:9px; font-size:13px; font-weight:600;
+            cursor:pointer; transition:transform .15s, filter .15s;
+        }
+        .ar-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+        .ar-btn--save { background:linear-gradient(135deg,#1D3461,#2A5298); color:#fff; }
+        .ar-btn--cancel { background:#F1F3F5; color:#374151; }
+        .ar-status { font-size:12px; margin-right:auto; padding:6px 0; }
     </style>
 </head>
 <body>
@@ -111,6 +183,12 @@ $adminCurrentPage = 'chat.php';
         <section class="page-content">
             <div class="welcome-row">
                 <div><p class="eyebrow">CHĂM SÓC KHÁCH HÀNG</p><h1>Trò chuyện</h1><p class="page-subtitle">Tư vấn và hỗ trợ khách hàng của ÉCRIN Jewelry.</p></div>
+                <div class="chat-actions-bar">
+                    <a class="chat-action-btn" href="<?php echo $escape($appBaseUrl . '/admin/auto_responses.php'); ?>" title="Quản lý mẫu trả lời tự động" style="text-decoration:none">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        Quản lý phản hồi tự động
+                    </a>
+                </div>
             </div>
             <section class="chat-workspace" id="admin-chat" aria-label="Trung tâm tin nhắn">
                 <aside class="chat-inbox">
@@ -490,6 +568,77 @@ $adminCurrentPage = 'chat.php';
     attachButton.addEventListener('click', () => {
         if (!attachButton.disabled) fileInput.click();
     });
+
+
+// ─── Auto-response modal ───────────────────────────────────────────────
+const arOverlay = document.createElement('div');
+arOverlay.className = 'ar-overlay';
+arOverlay.setAttribute('role', 'dialog');
+arOverlay.setAttribute('aria-modal', 'true');
+arOverlay.setAttribute('aria-label', 'Quản lý phản hồi tự động');
+arOverlay.innerHTML = `
+  <div class="ar-modal">
+    <h2>Phản hồi tự động</h2>
+    <p class="ar-subtitle">Khi khách nhắn tin lần đầu hoặc đặt hàng xong, hệ thống tự động gửi tin theo mẫu dưới đây.</p>
+    <div class="ar-field">
+      <label>💬 Khi khách nhắn tin lần đầu</label>
+      <textarea id="ar-new-message" rows="4" placeholder="VD: Xin chào! Chúng tôi đã nhận được tin nhắn và sẽ phản hồi sớm..."></textarea>
+      <p class="ar-tip">⚠️ Chỉ gửi 1 lần cho lần nhắn đầu tiên của mỗi khách.</p>
+    </div>
+    <div class="ar-field">
+      <label>📦 Khi khách đặt hàng thành công</label>
+      <textarea id="ar-order-thankyou" rows="4" placeholder="VD: Cảm ơn bạn đã đặt hàng! Chúng tôi sẽ xử lý đơn hàng và liên hệ sớm..."></textarea>
+      <p class="ar-tip">⚠️ Gửi ngay sau khi đặt hàng thành công (chỉ áp dụng cho khách đã đăng nhập).</p>
+    </div>
+    <div class="ar-actions">
+      <span class="ar-status" id="ar-status"></span>
+      <button class="ar-btn ar-btn--cancel" id="ar-cancel">Đóng</button>
+      <button class="ar-btn ar-btn--save" id="ar-save">Lưu thay đổi</button>
+    </div>
+  </div>
+`;
+document.body.appendChild(arOverlay);
+
+const arStatus = document.getElementById('ar-status');
+
+async function openAutoConfig() {
+  arStatus.textContent = 'Đang tải...';
+  arOverlay.classList.add('is-open');
+  try {
+    const data = await request(`${api}?action=get_auto_responses`);
+    document.getElementById('ar-new-message').value = data.responses.new_message || '';
+    document.getElementById('ar-order-thankyou').value = data.responses.order_thankyou || '';
+    arStatus.textContent = '';
+  } catch (e) {
+    arStatus.textContent = 'Không thể tải mẫu.';
+  }
+}
+
+// The management button now navigates to the full template list page.
+document.getElementById('ar-cancel').addEventListener('click', () => arOverlay.classList.remove('is-open'));
+arOverlay.addEventListener('click', e => { if (e.target === arOverlay) arOverlay.classList.remove('is-open'); });
+
+document.getElementById('ar-save').addEventListener('click', async () => {
+  const responses = {
+    new_message: document.getElementById('ar-new-message').value.trim(),
+    order_thankyou: document.getElementById('ar-order-thankyou').value.trim()
+  };
+  arStatus.textContent = 'Đang lưu...';
+  document.getElementById('ar-save').disabled = true;
+  try {
+    await request(api, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'save_auto_responses', responses})});
+    arStatus.style.color = '#3A7D55';
+    arStatus.textContent = '✔ Đã lưu thành công!';
+    setTimeout(() => arOverlay.classList.remove('is-open'), 1200);
+  } catch (e) {
+    arStatus.style.color = '#A34B42';
+    arStatus.textContent = 'Lỗi khi lưu, thử lại.';
+  } finally {
+    document.getElementById('ar-save').disabled = false;
+  }
+});
+// ───────────────────────────────────────────────────────────────────────
+
     textarea.addEventListener('keydown', event => {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
