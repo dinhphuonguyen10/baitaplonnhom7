@@ -1,27 +1,5 @@
--- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
---
--- Host: localhost    Database: baitaplon
--- ------------------------------------------------------
--- Server version	10.4.32-MariaDB
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
---
--- Table structure for table `addresses`
---
-
-DROP TABLE IF EXISTS `addresses`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `addresses` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int(10) unsigned NOT NULL,
@@ -50,7 +28,6 @@ UNLOCK TABLES;
 -- Table structure for table `admins`
 --
 
-DROP TABLE IF EXISTS `admins`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `admins` (
@@ -78,7 +55,6 @@ UNLOCK TABLES;
 -- Table structure for table `banners`
 --
 
-DROP TABLE IF EXISTS `banners`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `banners` (
@@ -102,7 +78,6 @@ UNLOCK TABLES;
 -- Table structure for table `cart_items`
 --
 
-DROP TABLE IF EXISTS `cart_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `cart_items` (
@@ -132,7 +107,6 @@ UNLOCK TABLES;
 -- Table structure for table `carts`
 --
 
-DROP TABLE IF EXISTS `carts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `carts` (
@@ -159,7 +133,6 @@ UNLOCK TABLES;
 -- Table structure for table `categories`
 --
 
-DROP TABLE IF EXISTS `categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `categories` (
@@ -186,7 +159,6 @@ UNLOCK TABLES;
 -- Table structure for table `chat_messages`
 --
 
-DROP TABLE IF EXISTS `chat_messages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `chat_messages` (
@@ -222,7 +194,6 @@ UNLOCK TABLES;
 -- Table structure for table `order_items`
 --
 
-DROP TABLE IF EXISTS `order_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `order_items` (
@@ -255,7 +226,6 @@ UNLOCK TABLES;
 -- Table structure for table `orders`
 --
 
-DROP TABLE IF EXISTS `orders`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `orders` (
@@ -294,7 +264,6 @@ UNLOCK TABLES;
 -- Table structure for table `products`
 --
 
-DROP TABLE IF EXISTS `products`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `products` (
@@ -331,7 +300,6 @@ UNLOCK TABLES;
 -- Table structure for table `review_images`
 --
 
-DROP TABLE IF EXISTS `review_images`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `review_images` (
@@ -358,7 +326,6 @@ UNLOCK TABLES;
 -- Table structure for table `review_replies`
 --
 
-DROP TABLE IF EXISTS `review_replies`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `review_replies` (
@@ -384,7 +351,6 @@ UNLOCK TABLES;
 -- Table structure for table `reviews`
 --
 
-DROP TABLE IF EXISTS `reviews`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `reviews` (
@@ -416,7 +382,6 @@ UNLOCK TABLES;
 -- Table structure for table `stores`
 --
 
-DROP TABLE IF EXISTS `stores`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `stores` (
@@ -445,7 +410,6 @@ UNLOCK TABLES;
 -- Table structure for table `users`
 --
 
-DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `users` (
@@ -474,8 +438,6 @@ UNLOCK TABLES;
 -- Temporary table structure for view `view_product_details`
 --
 
-DROP TABLE IF EXISTS `view_product_details`;
-/*!50001 DROP VIEW IF EXISTS `view_product_details`*/;
 SET @saved_cs_client     = @@character_set_client;
 SET character_set_client = utf8;
 /*!50001 CREATE VIEW `view_product_details` AS SELECT
@@ -504,8 +466,6 @@ SET character_set_client = @saved_cs_client;
 -- Temporary table structure for view `view_top_rated_products`
 --
 
-DROP TABLE IF EXISTS `view_top_rated_products`;
-/*!50001 DROP VIEW IF EXISTS `view_top_rated_products`*/;
 SET @saved_cs_client     = @@character_set_client;
 SET character_set_client = utf8;
 /*!50001 CREATE VIEW `view_top_rated_products` AS SELECT
@@ -531,7 +491,6 @@ SET character_set_client = @saved_cs_client;
 -- Table structure for table `web_config`
 --
 
-DROP TABLE IF EXISTS `web_config`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `web_config` (
@@ -556,7 +515,6 @@ UNLOCK TABLES;
 -- Table structure for table `wishlists`
 --
 
-DROP TABLE IF EXISTS `wishlists`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `wishlists` (
@@ -587,7 +545,6 @@ UNLOCK TABLES;
 -- Final view structure for view `view_product_details`
 --
 
-/*!50001 DROP VIEW IF EXISTS `view_product_details`*/;
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
@@ -605,7 +562,6 @@ UNLOCK TABLES;
 -- Final view structure for view `view_top_rated_products`
 --
 
-/*!50001 DROP VIEW IF EXISTS `view_top_rated_products`*/;
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;
 /*!50001 SET @saved_col_connection     = @@collation_connection */;
