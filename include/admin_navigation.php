@@ -13,6 +13,7 @@ $adminLinks = [
     ['users.php', 'Quản lý tài khoản nhân viên', '/admin/users.php', true],
     ['orders.php', 'Đơn hàng & Thanh toán', '/admin/orders.php', false],
     ['chat.php', 'Quản lý chat', '/admin/chat.php', false],
+    ['banners.php', 'Quản lý banner', '/admin/banners.php', true],
     ['reports.php', 'Báo cáo và thống kê', '/admin/reports.php', true],
 ];
 ?>
@@ -30,12 +31,9 @@ $adminLinks = [
 <nav class="admin-nav" aria-label="Điều hướng quản trị">
     <?php foreach ($adminLinks as [$file, $label, $path, $managerOnly]): ?>
         <?php $disabled = $managerOnly && !$adminIsManager; ?>
-        <?php if ($disabled): ?>
-            <span class="is-disabled" aria-disabled="true"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></span>
-        <?php else: ?>
-            <a href="<?php echo htmlspecialchars($adminBaseUrl . $path, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $adminPage === $file ? ' aria-current="page"' : ''; ?>>
-                <?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
-            </a>
-        <?php endif; ?>
+        <?php if ($disabled) continue; ?>
+        <a href="<?php echo htmlspecialchars($adminBaseUrl . $path, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $adminPage === $file ? ' aria-current="page"' : ''; ?>>
+            <?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
+        </a>
     <?php endforeach; ?>
 </nav>

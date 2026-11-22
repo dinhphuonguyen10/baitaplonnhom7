@@ -6,9 +6,18 @@ $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
 $appBaseUrl = rtrim($appBaseUrl, '/');
 $bodyClass = isset($bodyClass) && is_string($bodyClass) ? $bodyClass : '';
+$adminUsername = isset($_SESSION['admin_user_id'], $_SESSION['admin_username'])
+    ? (string) $_SESSION['admin_username']
+    : null;
 $customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
     ? (string) $_SESSION['username']
     : null;
+$accountUsername = $adminUsername !== null && $adminUsername !== ''
+    ? $adminUsername
+    : $customerUsername;
+$accountRole = $accountUsername === $adminUsername && $accountUsername !== null
+    ? 'admin'
+    : (($customerUsername !== null) ? 'customer' : null);
 $isCustomerLoggedIn = $customerUsername !== null && $customerUsername !== '';
 
 // Lấy danh mục sản phẩm từ CSDL để đồng nhất với Admin
@@ -44,6 +53,8 @@ if ($isCustomerLoggedIn && isset($_SESSION['user_id']) && isset($conn) && $conn 
     <link rel="stylesheet" href="<?php echo htmlspecialchars($appBaseUrl . '/assets/style.css?v=' . filemtime(__DIR__ . '/../assets/style.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <script>window.APP_BASE_URL = <?php echo json_encode($appBaseUrl, JSON_UNESCAPED_SLASHES); ?>;</script>
     <script>window.CUSTOMER_USERNAME = <?php echo json_encode($customerUsername, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
+    <script>window.ACCOUNT_USERNAME = <?php echo json_encode($accountUsername, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
+    <script>window.ACCOUNT_ROLE = <?php echo json_encode($accountRole, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;</script>
     <script>window.ASSET_VERSION = <?php echo json_encode((string)time()); ?>;</script>
 </head>
 
@@ -67,8 +78,17 @@ if ($isCustomerLoggedIn && isset($_SESSION['user_id']) && isset($conn) && $conn 
         <!-- Đăng nhập / đăng ký -->
         <div class="auth-cart-wrapper" style="display: flex; align-items: center; gap: 15px;">
             <div class="auth" id="auth-container">
-                <span class="auth-btn register-trigger" style="cursor: pointer;">Đăng ký</span> /
-                <span class="auth-btn login-trigger" style="cursor: pointer;">Đăng nhập</span>
+                <?php if ($accountRole === 'admin'): ?>
+                    <span style="font-weight: bold; color: var(--navy);">Xin chào, <?php echo htmlspecialchars($accountUsername, ENT_QUOTES, 'UTF-8'); ?></span> |
+                    <a class="auth-btn" href="<?php echo htmlspecialchars($appBaseUrl . '/admin/index.php', ENT_QUOTES, 'UTF-8'); ?>">Quản trị</a> |
+                    <a class="auth-btn" href="<?php echo htmlspecialchars($appBaseUrl . '/admin/logout.php', ENT_QUOTES, 'UTF-8'); ?>">Đăng xuất</a>
+                <?php elseif ($accountRole === 'customer'): ?>
+                    <span style="font-weight: bold; color: var(--navy);">Xin chào, <?php echo htmlspecialchars($accountUsername, ENT_QUOTES, 'UTF-8'); ?></span> |
+                    <span class="auth-btn logout-btn" style="cursor: pointer;">Đăng xuất</span>
+                <?php else: ?>
+                    <span class="auth-btn register-trigger" style="cursor: pointer;">Đăng ký</span> /
+                    <span class="auth-btn login-trigger" style="cursor: pointer;">Đăng nhập</span>
+                <?php endif; ?>
             </div>
 
             <div class="wishlist-wrapper">

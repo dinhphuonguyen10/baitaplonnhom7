@@ -12,6 +12,3 @@ if (!isset($_SESSION['admin_user_id']) || !isAdminAreaRole($_SESSION['admin_role
 }
 
 // Tác dụng: Đồng bộ vai trò admin sang cấp quản lý (manager) theo phân cấp hệ thống
-if (($_SESSION['admin_role'] ?? null) === 'admin') {
-    $_SESSION['admin_role'] = 'manager';
-}

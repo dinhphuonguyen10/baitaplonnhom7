@@ -30,6 +30,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($username === '' || $password === '') {
         $error = 'Vui lòng nhập tên đăng nhập và mật khẩu.';
     } else {
+        // Tác dụng: Làm sạch phiên cũ để tài khoản đăng nhập mới không kế thừa vai trò quản lý cũ
+        unset(
+            $_SESSION['user_id'],
+            $_SESSION['username'],
+            $_SESSION['role'],
+            $_SESSION['admin_user_id'],
+            $_SESSION['admin_username'],
+            $_SESSION['admin_role']
+        );
+
         // Tác dụng: Query bảng admins (tài khoản nội bộ) thay vì bảng users (khách hàng)
         $stmt = $conn->prepare('SELECT id, username, password, role FROM admins WHERE username = ? LIMIT 1');
 
@@ -48,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 session_regenerate_id(true);
 
                 // Tác dụng: Thiết lập phiên đăng nhập quản trị độc lập, tách biệt hoàn toàn với phiên mua sắm của khách hàng
+                unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['role']);
                 $_SESSION['admin_user_id']  = $user['id'];
                 $_SESSION['admin_username'] = $user['username'];
                 $_SESSION['admin_role']     = $user['role'];

@@ -2474,6 +2474,17 @@ function applyUserRole() {
     const authContainer = document.getElementById('auth-container');
     const adminFooterLink = document.getElementById('admin-footer-link');
 
+    if (typeof window.ACCOUNT_ROLE === 'string' && window.ACCOUNT_ROLE === 'admin' && typeof window.ACCOUNT_USERNAME === 'string') {
+        if (authContainer) {
+            authContainer.innerHTML = `
+                <span style="font-weight: bold; color: var(--navy);">Xin chào, ${window.ACCOUNT_USERNAME}</span> |
+                <a class="auth-btn" href="${appUrl('/admin/index.php')}">Quản trị</a> |
+                <a class="auth-btn" href="${appUrl('/admin/logout.php')}">Đăng xuất</a>
+            `;
+        }
+        return;
+    }
+
     if (adminFooterLink) {
         adminFooterLink.style.display = 'none';
     }

@@ -23,6 +23,7 @@ $sideMenu = [
     ['icon' => '♙', 'label' => 'Quản lý tài khoản nhân viên', 'href' => '/admin/users.php',     'file' => 'users.php', 'manager_only' => true],
     ['icon' => '▤', 'label' => 'Đơn hàng & Thanh toán',         'href' => '/admin/orders.php',    'file' => 'orders.php'],
     ['icon' => '☏', 'label' => 'Quản lý chat',                 'href' => '/admin/chat.php',      'file' => 'chat.php'],
+    ['icon' => '▣', 'label' => 'Quản lý banner',               'href' => '/admin/banners.php',   'file' => 'banners.php', 'manager_only' => true],
     ['icon' => '▥', 'label' => 'Báo cáo và thống kê',          'href' => '/admin/reports.php',   'file' => 'reports.php', 'manager_only' => true],
     ['icon' => '⌖', 'label' => 'Cửa hàng',                     'href' => '/admin/stores.php',    'file' => 'stores.php'],
     ['icon' => '⌂', 'label' => 'Về cửa hàng chính',           'href' => '/index.php',           'file' => 'storefront-home'],
@@ -36,15 +37,12 @@ $sideMenu = [
         <?php foreach ($sideMenu as $item): ?>
             <?php $disabled = !empty($item['manager_only']) && !$isManager; ?>
             <?php $active   = ($currentScript === $item['file']); ?>
-            <?php if ($disabled): ?>
-                <span class="nav-item is-disabled" aria-disabled="true">
-            <?php else: ?>
-                <a href="<?php echo $escape($appBaseUrl . $item['href']); ?>" class="nav-item<?php echo $active ? ' active' : ''; ?>">
-            <?php endif; ?>
+            <?php if ($disabled) continue; ?>
+            <a href="<?php echo $escape($appBaseUrl . $item['href']); ?>" class="nav-item<?php echo $active ? ' active' : ''; ?>">
                 <span class="nav-icon"><?php echo $escape($item['icon']); ?></span>
                 <span><?php echo $escape($item['label']); ?></span>
                 <?php if ($active): ?><span class="active-dot"></span><?php endif; ?>
-            <?php echo $disabled ? '</span>' : '</a>'; ?>
+            </a>
         <?php endforeach; ?>
     </nav>
     <div class="sidebar-bottom">

@@ -4,7 +4,14 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 // Chỉ xác nhận đăng nhập thành công khi tồn tại phiên khách hàng mua sắm hợp lệ
-if (isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
+if (isset($_SESSION['admin_user_id'], $_SESSION['admin_username'])) {
+    echo json_encode([
+        "status" => "success",
+        "username" => $_SESSION['admin_username'],
+        "role" => "admin",
+        "admin_user_id" => $_SESSION['admin_user_id']
+    ]);
+} elseif (isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
     echo json_encode([
         "status" => "success",
         "username" => $_SESSION['username'],

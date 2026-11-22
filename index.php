@@ -2,24 +2,52 @@
 $pageTitle = "ÉCRIN JEWELRY - Trang chủ";
 $bodyClass = 'home-page';
 include __DIR__ . '/include/header.php';
+
+$bannerConfigFile = __DIR__ . '/storage/banner/banners.json';
+$defaultBanners = [
+    ['src' => 'assets/banner/baner1.png', 'alt' => 'Bộ sưu tập trang sức mới Écrin Jewelry'],
+    ['src' => 'assets/banner/baner2.png', 'alt' => 'Trang sức Écrin trên nền lụa xanh thanh lịch'],
+    ['src' => 'assets/banner/baner3.png', 'alt' => 'Bộ trang sức hoa Écrin Jewelry'],
+    ['src' => 'assets/banner/baner4.png', 'alt' => 'Nhẫn và bông tai Écrin Jewelry'],
+];
+$banners = $defaultBanners;
+if (is_file($bannerConfigFile)) {
+    $savedBanners = json_decode((string) file_get_contents($bannerConfigFile), true);
+    if (is_array($savedBanners) && count($savedBanners) >= 1) {
+        $banners = [];
+        foreach ($savedBanners as $index => $banner) {
+            $src = is_array($banner) ? (string) ($banner['src'] ?? '') : '';
+            $alt = is_array($banner) ? (string) ($banner['alt'] ?? '') : '';
+            if ($src === '') {
+                $src = $defaultBanners[$index]['src'];
+            }
+            if ($alt === '') {
+                $alt = $defaultBanners[$index]['alt'];
+            }
+            $banners[] = ['src' => $src, 'alt' => $alt];
+        }
+    }
+}
 ?>
 
     <!-- BANNER -->
     <section class="banner" aria-label="Bộ sưu tập Écrin Jewelry">
         <div class="banner-left">
             <div class="slideshow">
-                <img src="assets/banner/baner1.png" alt="Bộ sưu tập trang sức mới Écrin Jewelry" class="slide active">
-                <img src="assets/banner/baner2.png" alt="Trang sức Écrin trên nền lụa xanh thanh lịch" class="slide">
-                <img src="assets/banner/baner3.png" alt="Bộ trang sức hoa Écrin Jewelry" class="slide">
-                <img src="assets/banner/baner4.png" alt="Nhẫn và bông tai Écrin Jewelry" class="slide">
+                <?php foreach ($banners as $bannerIndex => $banner): ?>
+                    <img src="<?php echo htmlspecialchars($banner['src'], ENT_QUOTES, 'UTF-8'); ?>"
+                         alt="<?php echo htmlspecialchars($banner['alt'], ENT_QUOTES, 'UTF-8'); ?>"
+                         class="slide<?php echo $bannerIndex === 0 ? ' active' : ''; ?>">
+                <?php endforeach; ?>
             </div>
             <button type="button" class="banner-arrow prev" aria-label="Ảnh trước">‹</button>
             <button type="button" class="banner-arrow next" aria-label="Ảnh tiếp theo">›</button>
             <div class="banner-dots" aria-label="Chọn ảnh">
-                <button type="button" class="dot active" aria-label="Ảnh 1" aria-current="true"></button>
-                <button type="button" class="dot" aria-label="Ảnh 2"></button>
-                <button type="button" class="dot" aria-label="Ảnh 3"></button>
-                <button type="button" class="dot" aria-label="Ảnh 4"></button>
+                <?php foreach ($banners as $bannerIndex => $banner): ?>
+                    <button type="button" class="dot<?php echo $bannerIndex === 0 ? ' active' : ''; ?>"
+                            aria-label="Ảnh <?php echo $bannerIndex + 1; ?>"
+                            <?php echo $bannerIndex === 0 ? 'aria-current="true"' : ''; ?>></button>
+                <?php endforeach; ?>
             </div>
         </div>
     </section>
