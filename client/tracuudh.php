@@ -978,7 +978,7 @@ if (!$isCustomerLoggedIn) {
     };
 
     window.cancelOrder = async function(orderId) {
-        if (!confirm('Bạn có chắc muốn hủy đơn hàng #BLUE' + orderId + '?')) return;
+        if (!confirm('Bạn có chắc muốn hủy đơn hàng ' + orderId + '?')) return;
         try {
             const resp = await fetch('huydon.php', {
                 method: 'POST',
@@ -1077,7 +1077,7 @@ if (!$isCustomerLoggedIn) {
 
         document.getElementById('modal-body').innerHTML = `
             <div class="modal-header">
-                <h2>Đơn hàng #BLUE${order.id}</h2>
+                <h2>Đơn hàng ${order.id}</h2>
                 <div class="modal-order-date">${formatDate(order.created_at)}</div>
             </div>
 

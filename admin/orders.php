@@ -453,37 +453,53 @@ $statusClasses = [
 
         .om-muted { color: #94a3b8; font-size: 12px; font-weight: 500; }
 
-        /* ── Expandable Details ── */
-        .om-details {
-            margin: 0;
-        }
-        .om-details summary {
-            display: inline-flex; align-items: center; gap: 5px;
-            padding: 5px 12px; border-radius: 8px;
-            font-size: 12px; font-weight: 600;
+        /* ── Order Detail Modal ── */
+        .om-detail-button {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 13px; border: 0; border-radius: 8px;
+            font-size: 12px; font-weight: 700;
             color: #4f46e5; background: #eef2ff;
-            cursor: pointer; list-style: none;
-            transition: background .2s, color .2s;
+            cursor: pointer; transition: .2s ease;
         }
-        .om-details summary::-webkit-details-marker { display: none; }
-        .om-details summary::before { content: '▸'; font-size: 11px; transition: transform .2s; }
-        .om-details[open] summary::before { transform: rotate(90deg); }
-        .om-details[open] summary { background: #4f46e5; color: #fff; }
-        .om-details-body {
-            margin-top: 10px; padding: 14px 16px;
-            border-radius: 10px; background: #f8f9fb;
-            border: 1px solid #ebeef2;
-            animation: omSlideDown .25s ease;
+        .om-detail-button:hover { background: #4f46e5; color: #fff; transform: translateY(-1px); }
+        .om-detail-button::before { content: '▾'; font-size: 11px; }
+        .om-detail-modal {
+            width: min(520px, calc(100vw - 32px));
+            max-height: calc(100vh - 32px);
+            padding: 0; border: 0; border-radius: 16px;
+            color: #1e293b;
+            box-shadow: 0 24px 80px rgba(15, 23, 42, .28);
         }
-        .om-details-body p {
-            margin: 5px 0; font-size: 13px; color: #475569;
+        .om-detail-modal::backdrop {
+            background: rgba(15, 23, 42, .55);
+            backdrop-filter: blur(3px);
         }
-        .om-details-body strong { color: var(--navy); }
+        .om-detail-modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 20px; border-bottom: 1px solid #e8edf3;
+            background: #fff;
+        }
+        .om-detail-modal-header h3 { margin: 0; color: #102a43; font-size: 17px; }
+        .om-detail-close {
+            width: 34px; height: 34px; border: 0; border-radius: 50%;
+            background: #f1f5f9; color: #475569;
+            font-size: 20px; line-height: 1; cursor: pointer;
+        }
+        .om-detail-modal-body {
+            max-height: calc(100vh - 110px); overflow-y: auto;
+            padding: 18px 20px 20px;
+            background: #fff;
+        }
+        .om-detail-modal-body p {
+            margin: 8px 0; font-size: 13px; color: #475569;
+            line-height: 1.55;
+        }
+        .om-detail-modal-body strong { color: #102a43; }
         .om-detail-items {
-            margin: 10px 0 0; padding-left: 16px;
+            margin: 10px 0 0; padding-left: 18px;
         }
         .om-detail-items li {
-            margin: 4px 0; font-size: 12.5px; color: #475569;
+            margin: 5px 0; font-size: 13px; color: #475569;
         }
 
         /* ── Payment Method Tag ── */
@@ -811,9 +827,14 @@ $statusClasses = [
                                             <?php endif; ?>
                                         </div>
                                         <!-- Chi tiết -->
-                                        <details class="om-details">
-                                            <summary>Chi tiết</summary>
-                                            <div class="om-details-body">
+                                        <button type="button"
+                                                class="om-detail-button"
+                                                data-order-detail="<?php echo (int) $o['id']; ?>">
+                                            Chi tiết
+                                        </button>
+                                        <div class="om-detail-source"
+                                             id="om-detail-source-<?php echo (int) $o['id']; ?>"
+                                             hidden>
                                                 <p><strong>Email:</strong> <?php echo $escape($o['email'] !== '' ? $o['email'] : 'Chưa cung cấp'); ?></p>
                                                 <p><strong>Địa chỉ:</strong> <?php echo $escape($o['address']); ?></p>
                                                 <p><strong>Thanh toán:</strong> <?php echo $escape($o['payment_method']); ?> — <?php echo $escape($o['payment_status']); ?></p>
@@ -827,8 +848,7 @@ $statusClasses = [
                                                 <?php else: ?>
                                                     <p>Đơn hàng chưa có chi tiết sản phẩm.</p>
                                                 <?php endif; ?>
-                                            </div>
-                                        </details>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -841,6 +861,13 @@ $statusClasses = [
         </section>
     </main>
 </div>
+<dialog class="om-detail-modal" id="om-detail-modal">
+    <div class="om-detail-modal-header">
+        <h3 id="om-detail-modal-title">Chi tiết đơn hàng</h3>
+        <button type="button" class="om-detail-close" id="om-detail-close" aria-label="Đóng">×</button>
+    </div>
+    <div class="om-detail-modal-body" id="om-detail-modal-body"></div>
+</dialog>
 <script>
     /* ═══ Filtering ═══ */
     const omSearch = document.getElementById('om-search');
@@ -889,6 +916,27 @@ $statusClasses = [
                 document.querySelector('.om-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
+    });
+
+    /* ═══ Order Detail Modal ═══ */
+    const detailModal = document.getElementById('om-detail-modal');
+    const detailModalTitle = document.getElementById('om-detail-modal-title');
+    const detailModalBody = document.getElementById('om-detail-modal-body');
+    const detailClose = document.getElementById('om-detail-close');
+
+    document.querySelectorAll('[data-order-detail]').forEach(button => {
+        button.addEventListener('click', () => {
+            const orderId = button.dataset.orderDetail;
+            const source = document.getElementById('om-detail-source-' + orderId);
+            detailModalTitle.textContent = 'Đơn hàng ' + orderId;
+            detailModalBody.innerHTML = source ? source.innerHTML : '<p>Không có dữ liệu chi tiết.</p>';
+            detailModal.showModal();
+        });
+    });
+
+    detailClose.addEventListener('click', () => detailModal.close());
+    detailModal.addEventListener('click', event => {
+        if (event.target === detailModal) detailModal.close();
     });
 </script>
 </body>

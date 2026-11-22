@@ -32,7 +32,7 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
 $checkoutQrImage = 'payment-qr-demo.svg';
 $checkoutQrImagePath = __DIR__ . '/../assets/' . $checkoutQrImage;
 $checkoutQrUrl = $appBaseUrl . '/assets/' . $checkoutQrImage . '?v=' . filemtime($checkoutQrImagePath);
-$checkoutQrAlt = 'Mã QR demo, không dùng để thanh toán';
+$checkoutQrAlt = 'Mã QR thanh toán minh họa';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -170,9 +170,9 @@ $checkoutQrAlt = 'Mã QR demo, không dùng để thanh toán';
                     </fieldset>
                     <div class="checkout-qr-panel" id="checkout-qr-panel" hidden>
                         <div>
-                            <span class="checkout-qr-eyebrow">QR minh họa</span>
-                            <h3>Mã QR demo</h3>
-                            <p>Mã này chỉ dùng để minh họa giao diện, không thể dùng để chuyển tiền.</p>
+                            <span class="checkout-qr-eyebrow">QR Banking</span>
+                            <h3>Mã QR thanh toán</h3>
+                            <p>Mã QR minh họa, không thể dùng để chuyển tiền thật.</p>
                             <div class="checkout-qr-meta">
                                 <span>Số tiền cần thanh toán</span>
                                 <strong id="checkout-qr-amount">0 đ</strong>
@@ -211,7 +211,7 @@ $checkoutQrAlt = 'Mã QR demo, không dùng để thanh toán';
                 </div>
                 <p class="checkout-receipt-payment">Thanh toán khi nhận hàng</p>
                 <div class="checkout-success-qr" id="checkout-success-qr" hidden>
-                    <strong>QR demo — không dùng để chuyển tiền</strong>
+                    <strong>QR thanh toán — không dùng để chuyển tiền</strong>
                     <img src="<?php echo htmlspecialchars($checkoutQrUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($checkoutQrAlt, ENT_QUOTES, 'UTF-8'); ?>">
                     <span>Đây chỉ là hình minh họa, không ghi nhận thanh toán thật.</span>
                 </div>

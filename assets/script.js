@@ -826,7 +826,7 @@ function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 
     const successQr = success.querySelector('.checkout-success-qr');
     if (paymentMethod === 'BANK_QR') {
         receiptPayment.textContent = success.dataset.qrDemo === 'true'
-            ? 'Thanh toán qua mã QR (demo)'
+            ? 'Thanh toán qua mã QR'
             : 'Thanh toán qua mã QR';
         if (successQr) {
             successQr.hidden = false;
@@ -1670,9 +1670,33 @@ function initCheckoutPage() {
                 renderCart();
                 renderCheckoutSummary();
             }
-            updateCartCount();
-            form.hidden = true;
-            renderCheckoutReceipt(result.order_id, customer, result.items || selectedItems, result.total_price, paymentMethod);
+
+// Cập nhật số lượng giỏ hàng
+updateCartCount();
+
+// Nếu khách hàng chọn thanh toán QR
+if (paymentMethod === 'BANK_QR') {
+
+    // Chuyển đến trang thanh toán riêng
+    window.location.href = appUrl(
+        '/client/payment.php?order_id=' +
+        encodeURIComponent(result.order_id)
+    );
+
+    return;
+}
+
+// Nếu chọn COD thì giữ nguyên luồng cũ
+form.hidden = true;
+
+renderCheckoutReceipt(
+    result.order_id,
+    customer,
+    result.items || selectedItems,
+    result.total_price,
+    paymentMethod
+);
+
         } catch (error) {
             console.error('Đặt hàng thất bại:', error);
             message.textContent = error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.';

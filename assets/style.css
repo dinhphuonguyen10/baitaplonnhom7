@@ -4361,9 +4361,10 @@ section, main {
     gap: 28px;
     margin-top: 18px;
     padding: 24px;
-    border: 1px solid #dce7f0;
-    border-radius: 16px;
-    background: linear-gradient(135deg, #f5f9fc 0%, #fff 100%);
+    border: 1px solid #29445c;
+    border-radius: 7px;
+    background: #102a43;
+    color: #f7f9fc;
 }
 
 .checkout-qr-panel[hidden],
@@ -4381,13 +4382,13 @@ section, main {
 
 .checkout-qr-panel h3 {
     margin: 5px 0 7px;
-    color: var(--navy);
+    color: #f7f9fc;
     font-size: 1.2rem;
 }
 
 .checkout-qr-panel p {
     margin: 0;
-    color: var(--text-mid);
+    color: #b9c5d1;
     font-size: .88rem;
     line-height: 1.6;
 }
@@ -4399,12 +4400,12 @@ section, main {
     gap: 12px;
     margin-top: 18px;
     padding-top: 14px;
-    border-top: 1px solid #e2eaf2;
-    color: var(--text-mid);
+    border-top: 1px solid #29445c;
+    color: #b9c5d1;
     font-size: .86rem;
 }
 
-.checkout-qr-meta strong { color: var(--navy); font-size: 1.12rem; white-space: nowrap; }
+.checkout-qr-meta strong { color: #fff; font-size: 1.12rem; white-space: nowrap; }
 
 .checkout-qr-image {
     width: 190px;
