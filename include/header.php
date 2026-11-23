@@ -6,18 +6,11 @@ $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
 $appBaseUrl = rtrim($appBaseUrl, '/');
 $bodyClass = isset($bodyClass) && is_string($bodyClass) ? $bodyClass : '';
-$adminUsername = isset($_SESSION['admin_user_id'], $_SESSION['admin_username'])
-    ? (string) $_SESSION['admin_username']
-    : null;
 $customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
     ? (string) $_SESSION['username']
     : null;
-$accountUsername = $adminUsername !== null && $adminUsername !== ''
-    ? $adminUsername
-    : $customerUsername;
-$accountRole = $accountUsername === $adminUsername && $accountUsername !== null
-    ? 'admin'
-    : (($customerUsername !== null) ? 'customer' : null);
+$accountUsername = $customerUsername;
+$accountRole = $customerUsername !== null ? 'customer' : null;
 $isCustomerLoggedIn = $customerUsername !== null && $customerUsername !== '';
 
 // Lấy danh mục sản phẩm từ CSDL để đồng nhất với Admin
