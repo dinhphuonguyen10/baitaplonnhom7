@@ -218,7 +218,10 @@ if ($totalReviews > 0) {
         .review-reply { max-width: 300px; color: #475569; line-height: 1.5; white-space: pre-wrap; }
         .review-reply strong { display: block; margin-bottom: 4px; color: var(--navy); font-size: 11px; }
         .review-reply-empty { color: var(--muted); font-size: 12px; }
-        .review-reply-action { background: #ecfdf3; color: #027a48; }
+        .review-reply-action { display: inline-flex; align-items: center; justify-content: center; min-width: 78px; padding: 8px 13px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font: inherit; font-size: 12px; font-weight: 700; line-height: 1.2; cursor: pointer; transition: background .16s ease, box-shadow .16s ease, transform .16s ease; }
+        .review-reply-action:hover { background: #2a5298; box-shadow: 0 3px 8px rgba(29, 52, 97, .18); transform: translateY(-1px); }
+        .review-reply-action:focus-visible { outline: 3px solid rgba(181, 140, 84, .38); outline-offset: 2px; }
+        .review-reply-action:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(29, 52, 97, .18); }
         .verified-badge { display: inline-block; margin-top: 5px; padding: 3px 8px; border-radius: 20px; background: #ecfdf3; color: #027a48; font-size: 11px; font-weight: 700; }
         .unverified-badge { background: #f3f4f6; color: #667085; }
         .review-actions { display: flex; gap: 6px; white-space: nowrap; }

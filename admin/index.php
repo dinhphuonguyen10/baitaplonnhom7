@@ -94,9 +94,49 @@ if ($itemStmt) {
     }
     $itemStmt->close();
 }
+$periodDays = (int) $periodStart->diff($periodEndExclusive)->days;
+$previousPeriodEndExclusive = $periodStart;
+$previousPeriodStart = $periodStart->modify('-' . $periodDays . ' days');
+$previousRangeStart = $previousPeriodStart->format('Y-m-d 00:00:00');
+$previousRangeEnd = $previousPeriodEndExclusive->format('Y-m-d 00:00:00');
+$comparisonPeriodLabel = $previousPeriodStart->format('d/m/Y') . ' - ' . $previousPeriodEndExclusive->modify('-1 day')->format('d/m/Y');
+$previousStats = ['revenue' => 0, 'orders' => 0];
+$previousStatStmt = $conn->prepare(
+    "SELECT
+        COALESCE(SUM(CASE WHEN status IN ('Đã giao hàng','Đã giao') THEN total_price ELSE 0 END), 0) AS revenue,
+        COUNT(*) AS orders
+     FROM orders
+     WHERE created_at >= ? AND created_at < ?"
+);
+if ($previousStatStmt) {
+    $previousStatStmt->bind_param('ss', $previousRangeStart, $previousRangeEnd);
+    $previousStatStmt->execute();
+    $previousStatResult = $previousStatStmt->get_result();
+    if ($previousStatResult) {
+        $previousStats = array_merge($previousStats, $previousStatResult->fetch_assoc() ?: []);
+    }
+    $previousStatStmt->close();
+}
 $averageOrder = (int) $stats['completed'] > 0
     ? (float) $stats['revenue'] / (int) $stats['completed']
     : 0;
+$formatComparison = static function (float $current, float $previous): array {
+    if ($previous == 0.0) {
+        return ['class' => 'is-neutral', 'text' => $current == 0.0 ? '0%' : '—'];
+    }
+    $change = (($current - $previous) / abs($previous)) * 100;
+    if (abs($change) < 0.05) {
+        return ['class' => 'is-neutral', 'text' => '0%'];
+    }
+    return [
+        'class' => $change > 0 ? 'is-up' : 'is-down',
+        'text' => ($change > 0 ? '↑ ' : '↓ ') . number_format(abs($change), 1, ',', '.') . '%',
+    ];
+};
+$comparisonNotes = [
+    'revenue' => $formatComparison((float) $stats['revenue'], (float) $previousStats['revenue']),
+    'orders' => $formatComparison((float) $stats['orders'], (float) $previousStats['orders']),
+];
 
 $statusCounts = [
     'Chờ xác nhận' => 0,
@@ -178,35 +218,49 @@ if ($topStmt) {
     $topStmt->close();
 }
 
-$currentDayStart = $today->format('Y-m-d 00:00:00');
-$currentDayEnd = $today->modify('+1 day')->format('Y-m-d 00:00:00');
-$previousDayStart = $today->modify('-1 day')->format('Y-m-d 00:00:00');
-$previousDayEnd = $today->format('Y-m-d 00:00:00');
-$hourlyCurrent = array_fill(0, 24, 0.0);
-$hourlyPrevious = array_fill(0, 24, 0.0);
-$hourlyStmt = $conn->prepare(
-    "SELECT HOUR(created_at) AS hour_of_day, COALESCE(SUM(total_price),0) AS revenue
-     FROM orders
-     WHERE status IN ('Đã giao hàng','Đã giao')
-       AND created_at >= ? AND created_at < ?
-     GROUP BY hour_of_day"
-);
-foreach ([[$currentDayStart, $currentDayEnd, &$hourlyCurrent], [$previousDayStart, $previousDayEnd, &$hourlyPrevious]] as $hourlyRange) {
-    if ($hourlyStmt) {
-        $hourlyStmt->bind_param('ss', $hourlyRange[0], $hourlyRange[1]);
-        $hourlyStmt->execute();
-        $hourlyResult = $hourlyStmt->get_result();
-        if ($hourlyResult) {
-            while ($row = $hourlyResult->fetch_assoc()) {
-                $hourlyRange[2][(int) $row['hour_of_day']] = (float) $row['revenue'];
+$loadDailyRevenue = static function (mysqli $connection, string $start, string $end): array {
+    $dailyRevenue = [];
+    $stmt = $connection->prepare(
+        "SELECT DATE(created_at) AS sale_date, COALESCE(SUM(total_price),0) AS revenue
+         FROM orders
+         WHERE status IN ('Đã giao hàng','Đã giao')
+           AND created_at >= ? AND created_at < ?
+         GROUP BY DATE(created_at)"
+    );
+    if ($stmt) {
+        $stmt->bind_param('ss', $start, $end);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $dailyRevenue[(string) $row['sale_date']] = (float) $row['revenue'];
             }
         }
+        $stmt->close();
     }
+    return $dailyRevenue;
+};
+$dailyCurrentRevenue = $loadDailyRevenue($conn, $rangeStart, $rangeEnd);
+$dailyPreviousRevenue = $loadDailyRevenue($conn, $previousRangeStart, $previousRangeEnd);
+$chartDays = [];
+for ($dayIndex = 0; $dayIndex < $periodDays; $dayIndex++) {
+    $currentDate = $periodStart->modify('+' . $dayIndex . ' days');
+    $previousDate = $previousPeriodStart->modify('+' . $dayIndex . ' days');
+    $currentKey = $currentDate->format('Y-m-d');
+    $previousKey = $previousDate->format('Y-m-d');
+    $chartDays[] = [
+        'label' => $currentDate->format('d/m'),
+        'current' => $dailyCurrentRevenue[$currentKey] ?? 0.0,
+        'previous' => $dailyPreviousRevenue[$previousKey] ?? 0.0,
+    ];
 }
-$hourlyStmt->close();
-
-$chartMax = max(array_merge($hourlyCurrent, $hourlyPrevious));
-$chartMax = $chartMax > 0 ? ceil($chartMax / 5000000) * 5000000 : 20000000;
+$chartValues = [];
+foreach ($chartDays as $chartDay) {
+    $chartValues[] = $chartDay['current'];
+    $chartValues[] = $chartDay['previous'];
+}
+$chartMax = max($chartValues);
+$chartMax = $chartMax > 0 ? ceil($chartMax / 5000000) * 5000000 : 5000000;
 $formatCompact = static function (float $value): string {
     if ($value >= 1000000000) return number_format($value / 1000000000, 1, ',', '.') . 't';
     if ($value >= 1000000) return number_format($value / 1000000, 0, ',', '.') . 'tr';
@@ -223,7 +277,6 @@ $periodLabels = [
     'custom' => 'Tùy chọn ngày',
 ];
 $periodLabel = $periodLabels[$period];
-$previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -242,6 +295,7 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
         .period-filter input { width: 145px; }
         .period-filter button { min-height: 39px; padding: 0 14px; border: 1px solid var(--navy); border-radius: 7px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
         .period-filter .reset-period { display: inline-flex; min-height: 39px; align-items: center; padding: 0 14px; border: 1px solid #dce2e9; border-radius: 7px; color: var(--navy); background: #fff; font-weight: 600; }
+        .period-comparison { margin: 8px 0 0; color: #718198; font-size: 12px; }
         .business-panel, .orders-panel, .best-panel, .revenue-panel { border: 1px solid #ebedf1; border-radius: 12px; background: #fff; box-shadow: var(--shadow); }
         .business-panel { margin-bottom: 18px; padding: 20px 20px 18px; }
         .business-panel h2, .orders-panel h2, .best-panel h2, .revenue-panel h2 { margin: 0; color: var(--navy); font-size: 18px; }
@@ -249,8 +303,11 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
         .business-card { min-height: 104px; padding: 20px 20px 16px; border-radius: 9px; background: #f1f2f4; }
         .business-label { display: flex; align-items: center; gap: 7px; color: #6f7d8d; font-size: 15px; }
         .business-value { margin-top: 9px; color: #17283d; font-size: 28px; line-height: 1; }
-        .business-note { display: block; margin-top: 8px; color: #00a878; font-size: 13px; }
-        .dashboard-middle { display: grid; grid-template-columns: 1.18fr .82fr; gap: 18px; margin-bottom: 18px; }
+        .business-comparison { display: inline-flex; align-items: center; margin-left: auto; white-space: nowrap; font-size: 11px; font-weight: 600; }
+        .business-comparison.is-up { color: #13845d; }
+        .business-comparison.is-down { color: #c14d46; }
+        .business-comparison.is-neutral { color: #718198; }
+        .dashboard-middle { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
         .orders-panel, .best-panel { min-height: 242px; padding: 20px; }
         .panel-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .text-link { color: #718198; font-size: 13px; white-space: nowrap; }
@@ -279,26 +336,25 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
         .product-sales strong { display: block; color: #17283d; font-size: 15px; }
         .product-sales small { color: #9aa4b0; font-size: 10px; }
         .revenue-panel { padding: 20px 20px 16px; }
-        .revenue-chart { margin-top: 24px; }
+        .revenue-chart { margin-top: 24px; overflow-x: auto; }
         .chart-area { display: grid; grid-template-columns: 58px minmax(0,1fr); height: 280px; }
         .chart-y { display: flex; flex-direction: column; justify-content: space-between; padding: 0 10px 24px 0; color: #718198; font-size: 13px; text-align: right; }
         .chart-plot { position: relative; height: 256px; border-bottom: 1px solid #dfe4ea; }
         .chart-grid { position: absolute; inset: 0 0 24px; display: flex; flex-direction: column; justify-content: space-between; }
         .chart-grid i { border-top: 1px solid #edf0f3; }
-        .chart-bars { position: absolute; inset: 0 0 24px; display: grid; grid-template-columns: repeat(24, minmax(4px,1fr)); align-items: end; gap: 3px; }
-        .chart-hour { height: 100%; display: flex; align-items: end; justify-content: center; gap: 2px; }
-        .chart-bar { width: 36%; min-width: 3px; max-width: 8px; min-height: 2px; border-radius: 2px 2px 0 0; }
+        .chart-bars { position: absolute; inset: 0 0 24px; display: grid; grid-template-columns: repeat(var(--chart-days), minmax(24px,1fr)); align-items: end; gap: 3px; }
+        .chart-day { height: 100%; display: flex; align-items: end; justify-content: center; gap: 2px; }
+        .chart-bar { width: 40%; min-width: 4px; max-width: 12px; min-height: 2px; border-radius: 2px 2px 0 0; }
         .bar-current { background: #0784f9; }
         .bar-previous { background: #91c8ff; }
-        .chart-x { position: absolute; right: 0; bottom: -20px; left: 0; display: grid; grid-template-columns: repeat(24,1fr); color: #718198; font-size: 11px; text-align: center; }
-        .chart-x span:nth-child(even) { visibility: hidden; }
+        .chart-x { position: absolute; right: 0; bottom: -20px; left: 0; display: grid; grid-template-columns: repeat(var(--chart-days), minmax(24px,1fr)); color: #718198; font-size: 10px; text-align: center; }
         .chart-legend { display: flex; justify-content: center; gap: 24px; margin-top: 22px; color: #718198; font-size: 13px; }
         .chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
         .chart-legend i { width: 12px; height: 12px; border-radius: 2px; }
         .legend-current { background: #0784f9; }
         .legend-previous { background: #91c8ff; }
         @media (max-width: 1050px) { .business-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } .dashboard-middle { grid-template-columns: 1fr; } }
-        @media (max-width: 560px) { .business-grid { grid-template-columns: 1fr; } .welcome-row { align-items: flex-start; gap: 14px; } .period-filter, .period-field, .period-filter select, .period-filter input { width: 100%; } .period-filter button, .period-filter .reset-period { flex: 1; justify-content: center; } .chart-area { grid-template-columns: 46px minmax(620px,1fr); } .revenue-chart { overflow-x: auto; } }
+        @media (max-width: 560px) { .business-grid { grid-template-columns: 1fr; } .welcome-row { align-items: flex-start; gap: 14px; } .period-filter, .period-field, .period-filter select, .period-filter input { width: 100%; } .period-filter button, .period-filter .reset-period { flex: 1; justify-content: center; } .chart-area { grid-template-columns: 46px minmax(0,1fr); } }
     </style>
 </head>
 <body>
@@ -342,18 +398,18 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
                     <button type="submit">Áp dụng</button>
                     <a class="reset-period" href="<?php echo $escape($appBaseUrl . '/admin/index.php'); ?>">Đặt lại</a>
                 </form>
+                <p class="period-comparison">So với kỳ trước: <?php echo $escape($comparisonPeriodLabel); ?></p>
             </div>
 
             <section class="business-panel" aria-label="Kết quả kinh doanh">
                 <h2>Kết quả kinh doanh</h2>
                 <div class="business-grid">
                     <article class="business-card">
-                        <span class="business-label">Doanh thu <span style="color:#00a878">↗</span></span>
+                        <span class="business-label">Doanh thu<?php if ($comparisonNotes['revenue']['text'] !== ''): ?><span class="business-comparison <?php echo $escape($comparisonNotes['revenue']['class']); ?>"><?php echo $escape($comparisonNotes['revenue']['text']); ?></span><?php endif; ?></span>
                         <strong class="business-value"><?php echo $escape($formatCompact((float) $stats['revenue'])); ?></strong>
-                        <span class="business-note">Trong <?php echo $escape(strtolower($periodLabel)); ?></span>
                     </article>
                     <article class="business-card">
-                        <span class="business-label">Tổng đơn</span>
+                        <span class="business-label">Tổng đơn<?php if ($comparisonNotes['orders']['text'] !== ''): ?><span class="business-comparison <?php echo $escape($comparisonNotes['orders']['class']); ?>"><?php echo $escape($comparisonNotes['orders']['text']); ?></span><?php endif; ?></span>
                         <strong class="business-value"><?php echo number_format((int) $stats['orders']); ?></strong>
                     </article>
                     <article class="business-card">
@@ -435,38 +491,38 @@ $previousPeriodLabel = $today->modify('-1 day')->format('d/m/Y');
             <section class="revenue-panel">
                 <div class="panel-title-row"><h2>Biểu đồ doanh thu</h2></div>
                 <div class="revenue-chart">
-                    <div class="chart-area">
+                    <div class="chart-area" style="--chart-days:<?php echo (int) $periodDays; ?>; width:max(100%, <?php echo 58 + ($periodDays * 34); ?>px)">
                         <div class="chart-y">
                             <?php for ($tick = 4; $tick >= 0; $tick--): ?>
                                 <span><?php echo $escape($formatCompact($chartMax * $tick / 4)); ?></span>
                             <?php endfor; ?>
                         </div>
-                        <div class="chart-plot">
+                        <div class="chart-plot" style="min-width:<?php echo $periodDays * 34; ?>px">
                             <div class="chart-grid">
                                 <?php for ($tick = 0; $tick < 5; $tick++): ?><i></i><?php endfor; ?>
                             </div>
                             <div class="chart-bars">
-                                <?php for ($hour = 0; $hour < 24; $hour++): ?>
+                                <?php foreach ($chartDays as $chartDay): ?>
                                     <?php
-                                    $currentHeight = $chartMax > 0 ? ($hourlyCurrent[$hour] / $chartMax) * 100 : 0;
-                                    $previousHeight = $chartMax > 0 ? ($hourlyPrevious[$hour] / $chartMax) * 100 : 0;
+                                    $currentHeight = $chartMax > 0 ? ($chartDay['current'] / $chartMax) * 100 : 0;
+                                    $previousHeight = $chartMax > 0 ? ($chartDay['previous'] / $chartMax) * 100 : 0;
                                     ?>
-                                    <div class="chart-hour">
+                                    <div class="chart-day">
                                         <i class="chart-bar bar-previous" style="height:<?php echo $escape(number_format($previousHeight, 2, '.', '')); ?>%"></i>
                                         <i class="chart-bar bar-current" style="height:<?php echo $escape(number_format($currentHeight, 2, '.', '')); ?>%"></i>
                                     </div>
-                                <?php endfor; ?>
+                                <?php endforeach; ?>
                             </div>
                             <div class="chart-x">
-                                <?php for ($hour = 0; $hour < 24; $hour++): ?>
-                                    <span><?php echo sprintf('%02d:00', $hour); ?></span>
-                                <?php endfor; ?>
+                                <?php foreach ($chartDays as $chartDay): ?>
+                                    <span><?php echo $escape($chartDay['label']); ?></span>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                     </div>
                     <div class="chart-legend">
                         <span><i class="legend-current"></i><?php echo $escape($periodLabel); ?> (<?php echo $escape($periodStart->format('d/m/Y')); ?> - <?php echo $escape($periodEnd->format('d/m/Y')); ?>)</span>
-                        <span><i class="legend-previous"></i>Kỳ trước (<?php echo $escape($previousPeriodLabel); ?>)</span>
+                        <span><i class="legend-previous"></i>Kỳ trước (<?php echo $escape($comparisonPeriodLabel); ?>)</span>
                     </div>
                 </div>
             </section>

@@ -64,6 +64,7 @@ if ($isDirectReviewRequest) {
         session_start();
     }
     require_once __DIR__ . '/../config/db.php';
+    require_once __DIR__ . '/../include/auto_reply_helper.php';
 
     $productIdInput = $_POST['product_id'] ?? null;
     $productId = is_scalar($productIdInput) ? filter_var($productIdInput, FILTER_VALIDATE_INT) : false;
@@ -314,6 +315,8 @@ if ($isDirectReviewRequest) {
             $insertImage->close();
         }
         $conn->commit();
+        // Chỉ gửi cảm ơn sau khi một đánh giá mới được lưu thành công.
+        sendAutoReply($conn, $userId, 'review_thankyou');
     } catch (mysqli_sql_exception $exception) {
         $conn->rollback();
         foreach ($storedImagePaths as $imagePath) {

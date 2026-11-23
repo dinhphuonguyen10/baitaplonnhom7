@@ -78,9 +78,9 @@ if ($stmt->execute()) {
 
     echo json_encode(["status" => "success", "message" => $messageData]);
 
-    // Gửi tin chào tự động nếu đây là tin nhắn đầu tiên của khách
+    // Gửi tin chăm sóc một lần mỗi ngày, ở tin nhắn đầu tiên trong ngày.
     $countStmt = $conn->prepare(
-        "SELECT COUNT(*) AS cnt FROM chat_messages WHERE user_id = ? AND sender = 'customer'"
+        "SELECT COUNT(*) AS cnt FROM chat_messages WHERE user_id = ? AND sender = 'customer' AND DATE(created_at) = CURDATE()"
     );
     if ($countStmt) {
         $countStmt->bind_param('i', $userId);
@@ -88,7 +88,7 @@ if ($stmt->execute()) {
         $countRow = $countStmt->get_result()->fetch_assoc();
         $countStmt->close();
         if ((int)($countRow['cnt'] ?? 0) === 1) {
-            // Chỉ gửi auto-reply khi đây là tin nhắn đầu tiên
+            // Tin vừa lưu là tin đầu tiên của khách trong ngày.
             sendAutoReply($conn, $userId, 'new_message');
         }
     }
