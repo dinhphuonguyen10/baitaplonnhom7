@@ -10,8 +10,22 @@ include __DIR__ . '/../include/header.php';
 $userId = isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer' ? (int)$_SESSION['user_id'] : 0;
 $escape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 
+// Phân trang danh sách yêu thích (5 dòng: 3 cột × 5 dòng = 15 sản phẩm/trang)
+$itemsPerPage = 15;
+$currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset = ($currentPage - 1) * $itemsPerPage;
+$totalWishlistItems = 0;
+
 $wishlistItems = [];
 if ($userId > 0) {
+    // 1. Đếm tổng số lượng yêu thích bằng SQL
+    $cntStmt = $conn->prepare("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = ?");
+    $cntStmt->bind_param('i', $userId);
+    $cntStmt->execute();
+    $totalWishlistItems = (int)($cntStmt->get_result()->fetch_assoc()['total'] ?? 0);
+    $cntStmt->close();
+
+    // 2. Truy vấn phân trang LIMIT & OFFSET hoàn toàn bằng SQL
     $stmt = $conn->prepare("
         SELECT w.id AS wishlist_id,
                p.id, p.name, p.category_id, p.price_sale, p.price_original, p.stock, p.image, p.discount, p.gift, p.description,
@@ -41,8 +55,9 @@ if ($userId > 0) {
         WHERE w.user_id = ?
         GROUP BY p.id
         ORDER BY w.id DESC
+        LIMIT ? OFFSET ?
     ");
-    $stmt->bind_param('i', $userId);
+    $stmt->bind_param('iii', $userId, $itemsPerPage, $offset);
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
@@ -50,6 +65,8 @@ if ($userId > 0) {
     }
     $stmt->close();
 }
+
+$totalPages = $totalWishlistItems > 0 ? (int)ceil($totalWishlistItems / $itemsPerPage) : 1;
 ?>
 
 <main class="category-page wishlist-page">
@@ -64,7 +81,7 @@ if ($userId > 0) {
             <p>Danh sách các món trang sức ÉCRIN bạn đã lưu lại để tham khảo hoặc mua sắm.</p>
         </div>
         <div class="wishlist-header-meta">
-            <span class="wishlist-total-badge" id="wishlist-total-badge"><?php echo count($wishlistItems); ?> sản phẩm</span>
+            <span class="wishlist-total-badge" id="wishlist-total-badge"><?php echo $totalWishlistItems; ?> sản phẩm</span>
         </div>
     </section>
 
@@ -136,6 +153,18 @@ if ($userId > 0) {
         <?php endif; ?>
     </div>
 
+    <!-- PHÂN TRANG WISHLIST (5 DÒNG: 15 SẢN PHẨM) -->
+    <?php if ($totalPages > 1): ?>
+        <nav class="pagination-controls" aria-label="Phân trang sản phẩm yêu thích">
+            <a href="?page=<?php echo max(1, $currentPage - 1); ?>" class="pagination-btn pagination-prev <?php echo $currentPage <= 1 ? 'disabled' : ''; ?>" aria-label="Trang trước">‹</a>
+            <?php for ($p = 1; $p <= $totalPages; $p++): ?>
+                <a href="?page=<?php echo $p; ?>" class="pagination-btn <?php echo $p === $currentPage ? 'active' : ''; ?>"><?php echo $p; ?></a>
+            <?php endfor; ?>
+            <a href="?page=<?php echo min($totalPages, $currentPage + 1); ?>" class="pagination-btn pagination-next <?php echo $currentPage >= $totalPages ? 'disabled' : ''; ?>" aria-label="Trang sau">›</a>
+        </nav>
+    <?php endif; ?>
+    <div id="guest-wishlist-pagination"></div>
+
     <!-- KHUNG TRỐNG (NẾU CHƯA CÓ SẢN PHẨM YÊU THÍCH) -->
     <div class="empty-wishlist" id="empty-wishlist" style="<?php echo empty($wishlistItems) ? 'display: block;' : 'display: none;'; ?>">
         <div class="empty-wishlist-icon">♡</div>
@@ -170,7 +199,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (favProducts.length > 0) {
                     emptyBox.style.display = 'none';
                     badge.textContent = favProducts.length + ' sản phẩm';
-                    container.innerHTML = favProducts.map(p => {
+
+                    // Phân trang Client-side cho khách vãng lai (15 sản phẩm = 5 dòng)
+                    const WISHLIST_PER_PAGE = 15;
+                    const urlParams = new URLSearchParams(window.location.search);
+                    let guestPage = parseInt(urlParams.get('page'), 10) || 1;
+                    const totalGuestPages = Math.ceil(favProducts.length / WISHLIST_PER_PAGE);
+                    if (guestPage > totalGuestPages) guestPage = totalGuestPages;
+                    if (guestPage < 1) guestPage = 1;
+
+                    const startIdx = (guestPage - 1) * WISHLIST_PER_PAGE;
+                    const pagedProducts = favProducts.slice(startIdx, startIdx + WISHLIST_PER_PAGE);
+
+                    container.innerHTML = pagedProducts.map(p => {
                         const priceSaleRaw = (typeof p.price_sale_raw !== 'undefined') ? p.price_sale_raw : parsePrice(p.price_sale);
                         const hasDiscount = Boolean((p.discount && p.discount.trim() !== '') || (p.price_original_raw > p.price_sale_raw));
                         const stock = Number(p.stock) || 0;
@@ -207,6 +248,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         `;
                     }).join('');
+
+                    // Render phân trang cho khách vãng lai nếu > 1 trang
+                    const guestPagEl = document.getElementById('guest-wishlist-pagination');
+                    if (guestPagEl && totalGuestPages > 1) {
+                        let pagHtml = '<nav class="pagination-controls" aria-label="Phân trang sản phẩm yêu thích">';
+                        pagHtml += `<a href="?page=${Math.max(1, guestPage - 1)}" class="pagination-btn pagination-prev ${guestPage <= 1 ? 'disabled' : ''}">‹</a>`;
+                        for (let p = 1; p <= totalGuestPages; p++) {
+                            pagHtml += `<a href="?page=${p}" class="pagination-btn ${p === guestPage ? 'active' : ''}">${p}</a>`;
+                        }
+                        pagHtml += `<a href="?page=${Math.min(totalGuestPages, guestPage + 1)}" class="pagination-btn pagination-next ${guestPage >= totalGuestPages ? 'disabled' : ''}">›</a>`;
+                        pagHtml += '</nav>';
+                        guestPagEl.innerHTML = pagHtml;
+                    }
                 } else {
                     container.innerHTML = '';
                     emptyBox.style.display = 'block';

@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->bind_param("siddissiiii", $name, $categoryId, $price, $priceOriginal, $stock, $newImagePath, $description, $isFeatured, $isSuggested, $isNew, $id);
             } else {
                 $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, price_original = ?, stock = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
-                $stmt->bind_param("siddsiiii", $name, $categoryId, $price, $priceOriginal, $stock, $description, $isFeatured, $isSuggested, $isNew, $id);
+                $stmt->bind_param("siddsiiiii", $name, $categoryId, $price, $priceOriginal, $stock, $description, $isFeatured, $isSuggested, $isNew, $id);
             }
 
             if ($stmt->execute()) {

@@ -217,12 +217,39 @@ if ($addressTable && $addressTable->num_rows > 0) {
     }
 }
 
-// Tự đồng bộ Triggers tự động tính giảm giá và giá gốc cho products
+// 1. Tự đồng bộ SQL Function: Tính toán và định dạng phần trăm giảm giá
+$conn->query("DROP FUNCTION IF EXISTS fn_format_discount");
+$conn->query("CREATE FUNCTION fn_format_discount(sale DECIMAL(12,2), orig DECIMAL(12,2)) 
+RETURNS VARCHAR(50) DETERMINISTIC
+BEGIN
+    IF orig > 0 AND sale < orig THEN
+        RETURN CONCAT('-', ROUND((1 - (sale / orig)) * 100), '%');
+    END IF;
+    RETURN NULL;
+END");
+
+// 2. Tự đồng bộ SQL Function: Lọc thời gian đơn hàng chuẩn phong cách sàn TMĐT (Shopee)
+$conn->query("DROP FUNCTION IF EXISTS fn_order_time_condition");
+$conn->query("CREATE FUNCTION fn_order_time_condition(order_date DATETIME, filter_time VARCHAR(20))
+RETURNS TINYINT(1) DETERMINISTIC
+BEGIN
+    IF filter_time = '30days' THEN
+        RETURN order_date >= DATE_SUB(NOW(), INTERVAL 30 DAY);
+    ELSEIF filter_time = '6months' THEN
+        RETURN order_date >= DATE_SUB(NOW(), INTERVAL 6 MONTH);
+    ELSEIF filter_time = 'this_year' THEN
+        RETURN YEAR(order_date) = YEAR(NOW());
+    ELSE
+        RETURN 1;
+    END IF;
+END");
+
+// 3. Tự đồng bộ SQL Triggers: Tự động quản lý giá gốc (price_original) và phần trăm giảm (discount)
 $conn->query("DROP TRIGGER IF EXISTS trg_products_before_insert");
 $conn->query("CREATE TRIGGER trg_products_before_insert BEFORE INSERT ON products FOR EACH ROW
 BEGIN
     IF NEW.price_original > 0 AND NEW.price_sale < NEW.price_original THEN
-        SET NEW.discount = CONCAT('-', ROUND((1 - (NEW.price_sale / NEW.price_original)) * 100), '%');
+        SET NEW.discount = fn_format_discount(NEW.price_sale, NEW.price_original);
     ELSE
         SET NEW.price_original = 0.00;
         SET NEW.discount = NULL;
@@ -239,7 +266,7 @@ BEGIN
     -- Nếu admin chủ động truyền giá gốc mới hợp lệ (> 0)
     ELSEIF NEW.price_original IS NOT NULL AND NEW.price_original > 0 THEN
         IF NEW.price_sale < NEW.price_original THEN
-            SET NEW.discount = CONCAT('-', ROUND((1 - (NEW.price_sale / NEW.price_original)) * 100), '%');
+            SET NEW.discount = fn_format_discount(NEW.price_sale, NEW.price_original);
         ELSE
             SET NEW.price_original = 0.00;
             SET NEW.discount = NULL;
@@ -247,7 +274,7 @@ BEGIN
     -- Nếu giá bán giảm so với giá bán cũ
     ELSEIF NEW.price_sale < OLD.price_sale THEN
         SET NEW.price_original = OLD.price_sale;
-        SET NEW.discount = CONCAT('-', ROUND((1 - (NEW.price_sale / OLD.price_sale)) * 100), '%');
+        SET NEW.discount = fn_format_discount(NEW.price_sale, OLD.price_sale);
     -- Nếu giá bán tăng so với giá bán cũ (không hiện giá cũ, xóa giảm giá)
     ELSEIF NEW.price_sale > OLD.price_sale THEN
         SET NEW.price_original = 0.00;

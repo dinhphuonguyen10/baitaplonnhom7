@@ -14,8 +14,13 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = (int) $_SESSION['user_id'];
 $statusFilter = isset($_GET['status']) ? trim($_GET['status']) : '';
+$timeFilter   = isset($_GET['time']) ? trim($_GET['time']) : '30days';
 
-// Xây dựng truy vấn
+// Xây dựng truy vấn orders dùng SQL Function fn_order_time_condition
+$whereClauses = ["user_id = ?", "fn_order_time_condition(created_at, ?) = 1"];
+$types = 'is';
+$params = [$user_id, $timeFilter];
+
 if ($statusFilter !== '' && $statusFilter !== 'all') {
     // Hỗ trợ nhóm trạng thái
     $statusGroups = [
@@ -28,20 +33,18 @@ if ($statusFilter !== '' && $statusFilter !== 'all') {
     if (isset($statusGroups[$statusFilter])) {
         $statuses = $statusGroups[$statusFilter];
         $placeholders = implode(',', array_fill(0, count($statuses), '?'));
-        $sql = "SELECT * FROM orders WHERE user_id = ? AND status IN ($placeholders) ORDER BY created_at DESC";
-        $types = 'i' . str_repeat('s', count($statuses));
-        $params = array_merge([$user_id], $statuses);
+        $whereClauses[] = "status IN ($placeholders)";
+        $types .= str_repeat('s', count($statuses));
+        $params = array_merge($params, $statuses);
     } else {
         // Lọc theo 1 trạng thái cụ thể
-        $sql = "SELECT * FROM orders WHERE user_id = ? AND status = ? ORDER BY created_at DESC";
-        $types = 'is';
-        $params = [$user_id, $statusFilter];
+        $whereClauses[] = "status = ?";
+        $types .= 's';
+        $params[] = $statusFilter;
     }
-} else {
-    $sql = "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC";
-    $types = 'i';
-    $params = [$user_id];
 }
+
+$sql = "SELECT * FROM orders WHERE " . implode(' AND ', $whereClauses) . " ORDER BY created_at DESC";
 
 $stmt = $conn->prepare($sql);
 $stmt->bind_param($types, ...$params);
@@ -76,7 +79,7 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// Đếm số lượng đơn theo từng nhóm trạng thái
+// Đếm số lượng đơn theo từng nhóm trạng thái (đồng bộ theo khoảng thời gian đã chọn qua SQL)
 $counts = [
     'all' => 0,
     'processing' => 0,
@@ -85,8 +88,8 @@ $counts = [
     'cancelled' => 0,
 ];
 
-$countStmt = $conn->prepare("SELECT status, COUNT(*) as cnt FROM orders WHERE user_id = ? GROUP BY status");
-$countStmt->bind_param("i", $user_id);
+$countStmt = $conn->prepare("SELECT status, COUNT(*) as cnt FROM orders WHERE user_id = ? AND fn_order_time_condition(created_at, ?) = 1 GROUP BY status");
+$countStmt->bind_param("is", $user_id, $timeFilter);
 $countStmt->execute();
 $countResult = $countStmt->get_result();
 

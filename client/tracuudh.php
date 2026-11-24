@@ -712,10 +712,21 @@ if (!$isCustomerLoggedIn) {
             <span class="separator">&gt;</span>
             <strong class="current" aria-current="page">Đơn hàng của tôi</strong>
         </nav>
-        <!-- Page Header -->
-        <div class="orders-page-header">
-            <div class="orders-icon">📦</div>
-            <h1>Đơn hàng của tôi</h1>
+        <!-- Header & Time Filter (Shopee Style) -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <div class="orders-page-header" style="margin-bottom: 0;">
+                <div class="orders-icon">📦</div>
+                <h1>Đơn hàng của tôi</h1>
+            </div>
+            <div class="orders-time-filter" style="display: flex; align-items: center; gap: 8px; background: #fff; padding: 6px 14px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <label for="order-time-select" style="font-size: 0.88rem; font-weight: 600; color: #555;">📅 Thời gian:</label>
+                <select id="order-time-select" style="border: 1px solid #ddd; padding: 6px 12px; border-radius: 8px; font-size: 0.88rem; color: var(--navy); font-weight: 600; outline: none; cursor: pointer;">
+                    <option value="30days" selected>30 ngày gần nhất</option>
+                    <option value="6months">6 tháng gần nhất</option>
+                    <option value="this_year">Trong năm nay</option>
+                    <option value="all">Tất cả thời gian</option>
+                </select>
+            </div>
         </div>
 
         <!-- Tabs -->
@@ -760,6 +771,7 @@ if (!$isCustomerLoggedIn) {
     const BASE = window.APP_BASE_URL || '';
     const ORDERS_PER_PAGE = 5;
     let currentTab = 'all';
+    let currentTime = '30days';
     let currentPage = 1;
     let ordersCache = {};
 
@@ -813,8 +825,8 @@ if (!$isCustomerLoggedIn) {
     }
 
     // ===== FETCH ORDERS =====
-    async function fetchOrders(status) {
-        const url = `${BASE}/api/orders/my_orders.php?status=${encodeURIComponent(status)}`;
+    async function fetchOrders(status, time) {
+        const url = `${BASE}/api/orders/my_orders.php?status=${encodeURIComponent(status)}&time=${encodeURIComponent(time || currentTime)}`;
         const resp = await fetch(url);
         const data = await resp.json();
         if (data.status !== 'success') throw new Error(data.message || 'Lỗi tải đơn hàng');
@@ -942,7 +954,7 @@ if (!$isCustomerLoggedIn) {
         container.innerHTML = '<div class="orders-loading"><div class="spinner"></div><p>Đang tải đơn hàng...</p></div>';
 
         try {
-            const data = await fetchOrders(status);
+            const data = await fetchOrders(status, currentTime);
             const orders = data.orders || [];
             updateBadges(data.counts || {});
 
@@ -989,6 +1001,13 @@ if (!$isCustomerLoggedIn) {
             currentPage = 1;
             loadAndRender(currentTab, 1);
         });
+    });
+
+    // ===== TIME FILTER CHANGE =====
+    document.getElementById('order-time-select')?.addEventListener('change', function() {
+        currentTime = this.value;
+        currentPage = 1;
+        loadAndRender(currentTab, 1);
     });
 
     // ===== GLOBAL FUNCTIONS =====
