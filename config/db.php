@@ -128,6 +128,112 @@ if (!isset($prodColumns['is_new'])) {
     $needUpdateView = true;
 }
 
+$productLifecycleColumns = [
+    'status' => "ALTER TABLE products ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active' AFTER is_new",
+    'is_deleted' => "ALTER TABLE products ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER status",
+    'deleted_at' => "ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER is_deleted",
+    'deleted_by' => "ALTER TABLE products ADD COLUMN deleted_by VARCHAR(100) NULL DEFAULT NULL AFTER deleted_at",
+];
+foreach ($productLifecycleColumns as $columnName => $alterSql) {
+    if (!isset($prodColumns[$columnName])) {
+        if (!$conn->query($alterSql)) {
+            error_log('Product lifecycle column migration failed for ' . $columnName . ': ' . $conn->error);
+            throw new RuntimeException('Không thể cập nhật cấu trúc quản lý sản phẩm.');
+        }
+        $prodColumns[$columnName] = true;
+        $needUpdateView = true;
+    }
+}
+
+$productIndexes = [];
+$productIndexResult = $conn->query('SHOW INDEX FROM products');
+if (!$productIndexResult) {
+    throw new RuntimeException('Không thể kiểm tra chỉ mục bảng sản phẩm: ' . $conn->error);
+}
+while ($productIndexRow = $productIndexResult->fetch_assoc()) {
+    $productIndexes[$productIndexRow['Key_name']] = true;
+}
+foreach ([
+    'idx_products_status_deleted' => 'ALTER TABLE products ADD INDEX idx_products_status_deleted (is_deleted, status)',
+    'idx_products_cat_deleted' => 'ALTER TABLE products ADD INDEX idx_products_cat_deleted (category_id, is_deleted, status)',
+    'idx_products_deleted_at' => 'ALTER TABLE products ADD INDEX idx_products_deleted_at (is_deleted, deleted_at)',
+] as $indexName => $alterSql) {
+    if (!isset($productIndexes[$indexName]) && !$conn->query($alterSql)) {
+        error_log('Product lifecycle index migration failed for ' . $indexName . ': ' . $conn->error);
+        throw new RuntimeException('Không thể tạo chỉ mục quản lý sản phẩm.');
+    }
+}
+
+$productChecks = [];
+$productChecksResult = $conn->query(
+    "SELECT CONSTRAINT_NAME
+     FROM information_schema.TABLE_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'products'
+       AND CONSTRAINT_TYPE = 'CHECK'"
+);
+if (!$productChecksResult) {
+    throw new RuntimeException('Không thể kiểm tra ràng buộc bảng sản phẩm: ' . $conn->error);
+}
+while ($productCheckRow = $productChecksResult->fetch_assoc()) {
+    $productChecks[$productCheckRow['CONSTRAINT_NAME']] = true;
+}
+foreach ([
+    'chk_products_status' => "ALTER TABLE products ADD CONSTRAINT chk_products_status CHECK (status IN ('active', 'inactive', 'hidden'))",
+    'chk_products_is_deleted' => 'ALTER TABLE products ADD CONSTRAINT chk_products_is_deleted CHECK (is_deleted IN (0, 1))',
+] as $constraintName => $alterSql) {
+    if (!isset($productChecks[$constraintName]) && !$conn->query($alterSql)) {
+        error_log('Product lifecycle check migration failed for ' . $constraintName . ': ' . $conn->error);
+        throw new RuntimeException('Không thể tạo ràng buộc trạng thái sản phẩm.');
+    }
+}
+if (!isset($productChecks['chk_products_deleted_metadata'])) {
+    if (!$conn->query(
+        "UPDATE products
+         SET deleted_at = COALESCE(deleted_at, NOW())
+         WHERE is_deleted = 1 AND deleted_at IS NULL"
+    ) || !$conn->query(
+        "UPDATE products
+         SET deleted_at = NULL, deleted_by = NULL
+         WHERE is_deleted = 0 AND (deleted_at IS NOT NULL OR deleted_by IS NOT NULL)"
+    )) {
+        error_log('Product soft-delete metadata normalization failed: ' . $conn->error);
+        throw new RuntimeException('Không thể chuẩn hóa thông tin xóa mềm sản phẩm.');
+    }
+    if (!$conn->query(
+        "ALTER TABLE products
+         ADD CONSTRAINT chk_products_deleted_metadata
+         CHECK (
+             (is_deleted = 0 AND deleted_at IS NULL AND deleted_by IS NULL)
+             OR (is_deleted = 1 AND deleted_at IS NOT NULL)
+         )"
+    )) {
+        error_log('Product soft-delete metadata constraint migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể tạo ràng buộc thông tin xóa mềm sản phẩm.');
+    }
+}
+
+// Ensure view dependencies exist before creating view_product_details.
+$wishlistTable = $conn->query("SHOW TABLES LIKE 'wishlists'");
+if (!$wishlistTable) {
+    throw new RuntimeException('Không thể kiểm tra bảng danh sách yêu thích: ' . $conn->error);
+}
+if ($wishlistTable->num_rows === 0 && !$conn->query("CREATE TABLE wishlists (
+    id int(10) unsigned NOT NULL AUTO_INCREMENT,
+    user_id int(10) unsigned NOT NULL,
+    product_id int(10) unsigned NOT NULL,
+    created_at datetime NOT NULL DEFAULT current_timestamp(),
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq_user_product (user_id, product_id),
+    KEY idx_user (user_id),
+    KEY idx_product (product_id),
+    CONSTRAINT fk_wishlists_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_wishlists_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci")) {
+    error_log('Wishlist table migration failed: ' . $conn->error);
+    throw new RuntimeException('Không thể khởi tạo bảng danh sách yêu thích.');
+}
+
 // Xóa bỏ các view cũ không còn dùng để code gọn gàng, tránh nhầm lẫn
 $conn->query("DROP VIEW IF EXISTS view_featured_products");
 $conn->query("DROP VIEW IF EXISTS view_suggested_products");
@@ -135,7 +241,7 @@ $conn->query("DROP VIEW IF EXISTS view_new_products");
 
 // Khởi tạo hoặc cập nhật VIEW view_product_details tính toán hoàn toàn bằng SQL
 if ($needUpdateView || true) {
-    $conn->query("CREATE OR REPLACE VIEW view_product_details AS
+    $viewUpdate = $conn->query("CREATE OR REPLACE VIEW view_product_details AS
         SELECT 
             p.id,
             p.name,
@@ -150,6 +256,10 @@ if ($needUpdateView || true) {
             p.is_featured,
             p.is_suggested,
             p.is_new,
+            p.status,
+            p.is_deleted,
+            p.deleted_at,
+            p.deleted_by,
             c.slug AS category,
             c.name AS category_name,
             COALESCE((
@@ -177,23 +287,188 @@ if ($needUpdateView || true) {
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
         GROUP BY p.id, c.slug, c.name");
+    if (!$viewUpdate) {
+        error_log('Product details view migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể cập nhật danh sách sản phẩm.');
+    }
 }
 
-// Tự đồng bộ bảng wishlists (danh sách yêu thích / thả tim) nếu chưa tồn tại
-$wishlistTable = $conn->query("SHOW TABLES LIKE 'wishlists'");
-if ($wishlistTable && $wishlistTable->num_rows === 0) {
-    $conn->query("CREATE TABLE IF NOT EXISTS wishlists (
-        id int(10) unsigned NOT NULL AUTO_INCREMENT,
-        user_id int(10) unsigned NOT NULL,
-        product_id int(10) unsigned NOT NULL,
-        created_at datetime NOT NULL DEFAULT current_timestamp(),
-        PRIMARY KEY (id),
-        UNIQUE KEY uniq_user_product (user_id, product_id),
-        KEY idx_user (user_id),
-        KEY idx_product (product_id),
-        CONSTRAINT fk_wishlists_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-        CONSTRAINT fk_wishlists_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+// Keep product-linked records when a product is removed; order_items is already RESTRICT.
+$productForeignKeys = [];
+$productForeignKeysResult = $conn->query(
+    "SELECT kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, rc.DELETE_RULE, rc.UPDATE_RULE
+     FROM information_schema.KEY_COLUMN_USAGE kcu
+     INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+       ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+      AND rc.TABLE_NAME = kcu.TABLE_NAME
+      AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+     WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+       AND kcu.REFERENCED_TABLE_NAME = 'products'
+       AND kcu.REFERENCED_COLUMN_NAME = 'id'
+       AND kcu.COLUMN_NAME = 'product_id'"
+);
+if (!$productForeignKeysResult) {
+    throw new RuntimeException('Không thể kiểm tra khóa ngoại sản phẩm: ' . $conn->error);
+}
+while ($productForeignKey = $productForeignKeysResult->fetch_assoc()) {
+    $productForeignKeys[] = $productForeignKey;
+}
+foreach ($productForeignKeys as $productForeignKey) {
+    $deleteRule = strtoupper((string)$productForeignKey['DELETE_RULE']);
+    if (in_array($deleteRule, ['RESTRICT', 'NO ACTION'], true)) {
+        continue;
+    }
+
+    $rawTableName = (string)$productForeignKey['TABLE_NAME'];
+    $tableName = str_replace('`', '``', $rawTableName);
+    $constraintName = str_replace('`', '``', (string)$productForeignKey['CONSTRAINT_NAME']);
+    $newConstraintName = str_replace('`', '``', 'fk_' . $rawTableName . '_product_restrict');
+    $updateRule = strtoupper((string)$productForeignKey['UPDATE_RULE']);
+    if (!in_array($updateRule, ['CASCADE', 'RESTRICT', 'SET NULL', 'NO ACTION'], true)) {
+        throw new RuntimeException('Quy tắc cập nhật khóa ngoại sản phẩm không hợp lệ.');
+    }
+    $alterForeignKeySql = "ALTER TABLE `{$tableName}` DROP FOREIGN KEY `{$constraintName}`,
+        ADD CONSTRAINT `{$newConstraintName}` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`)
+        ON DELETE RESTRICT ON UPDATE {$updateRule}";
+    if (!$conn->query($alterForeignKeySql)) {
+        error_log('Product foreign-key migration failed for ' . $productForeignKey['TABLE_NAME'] . ': ' . $conn->error);
+        throw new RuntimeException('Không thể bảo vệ dữ liệu liên quan đến sản phẩm.');
+    }
+}
+
+$orderItemsOrderForeignKey = $conn->query(
+    "SELECT kcu.TABLE_NAME, kcu.CONSTRAINT_NAME, rc.DELETE_RULE, rc.UPDATE_RULE
+     FROM information_schema.KEY_COLUMN_USAGE kcu
+     INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+       ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+      AND rc.TABLE_NAME = kcu.TABLE_NAME
+      AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+     WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+       AND kcu.TABLE_NAME = 'order_items'
+       AND kcu.COLUMN_NAME = 'order_id'
+       AND kcu.REFERENCED_TABLE_NAME = 'orders'
+       AND kcu.REFERENCED_COLUMN_NAME = 'id'
+     LIMIT 1"
+);
+if (!$orderItemsOrderForeignKey) {
+    throw new RuntimeException('Không thể kiểm tra khóa ngoại chi tiết đơn hàng.');
+}
+$orderItemsOrderForeignKeyRow = $orderItemsOrderForeignKey->fetch_assoc();
+if ($orderItemsOrderForeignKeyRow
+    && !in_array(strtoupper((string)$orderItemsOrderForeignKeyRow['DELETE_RULE']), ['RESTRICT', 'NO ACTION'], true)) {
+    $constraintName = str_replace('`', '``', (string)$orderItemsOrderForeignKeyRow['CONSTRAINT_NAME']);
+    $newConstraintName = 'fk_order_items_order_restrict';
+    $updateRule = strtoupper((string)$orderItemsOrderForeignKeyRow['UPDATE_RULE']);
+    if (!in_array($updateRule, ['CASCADE', 'RESTRICT', 'SET NULL', 'NO ACTION'], true)) {
+        throw new RuntimeException('Quy tắc cập nhật khóa ngoại chi tiết đơn hàng không hợp lệ.');
+    }
+    if (!$conn->query(
+        "ALTER TABLE order_items DROP FOREIGN KEY `{$constraintName}`,
+         ADD CONSTRAINT `{$newConstraintName}` FOREIGN KEY (order_id) REFERENCES orders (id)
+         ON DELETE RESTRICT ON UPDATE {$updateRule}"
+    )) {
+        error_log('Order-item foreign-key migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể bảo vệ lịch sử chi tiết đơn hàng.');
+    }
+} elseif (!$orderItemsOrderForeignKeyRow) {
+    $orphanOrderItems = $conn->query(
+        'SELECT COUNT(*) AS total
+         FROM order_items oi
+         LEFT JOIN orders o ON o.id = oi.order_id
+         WHERE o.id IS NULL'
+    );
+    if (!$orphanOrderItems) {
+        throw new RuntimeException('Không thể kiểm tra chi tiết đơn hàng mồ côi: ' . $conn->error);
+    }
+    $orphanOrderItemCount = (int)($orphanOrderItems->fetch_assoc()['total'] ?? 0);
+    if ($orphanOrderItemCount === 0
+        && !$conn->query(
+            'ALTER TABLE order_items
+             ADD CONSTRAINT fk_order_items_order
+             FOREIGN KEY (order_id) REFERENCES orders (id)
+             ON DELETE RESTRICT ON UPDATE CASCADE'
+        )) {
+        error_log('Order-item foreign-key setup failed: ' . $conn->error);
+        throw new RuntimeException('Không thể bảo vệ lịch sử chi tiết đơn hàng.');
+    }
+    if ($orphanOrderItemCount > 0) {
+        error_log('Order-item foreign key was not added because ' . $orphanOrderItemCount . ' orphaned references exist.');
+    }
+}
+
+$chatProductTable = $conn->query(
+    "SELECT 1 FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chat_messages'
+     LIMIT 1"
+);
+if (!$chatProductTable) {
+    throw new RuntimeException('Không thể kiểm tra bảng lịch sử chat: ' . $conn->error);
+}
+if ($chatProductTable->num_rows > 0) {
+    $chatProductColumn = $conn->query(
+        "SELECT 1 FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'chat_messages'
+           AND COLUMN_NAME = 'product_id'
+         LIMIT 1"
+    );
+    if (!$chatProductColumn) {
+        throw new RuntimeException('Không thể kiểm tra cột sản phẩm trong lịch sử chat: ' . $conn->error);
+    }
+    if ($chatProductColumn->num_rows > 0) {
+        $chatProductIndexExists = $conn->query(
+        "SELECT 1 FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'chat_messages'
+           AND INDEX_NAME = 'idx_chat_messages_product'
+         LIMIT 1"
+        );
+        if (!$chatProductIndexExists) {
+            throw new RuntimeException('Không thể kiểm tra chỉ mục lịch sử chat: ' . $conn->error);
+        }
+        if ($chatProductIndexExists->num_rows === 0
+            && !$conn->query('ALTER TABLE chat_messages ADD INDEX idx_chat_messages_product (product_id)')) {
+            error_log('Chat product index migration failed: ' . $conn->error);
+            throw new RuntimeException('Không thể tạo chỉ mục lịch sử sản phẩm trong chat.');
+        }
+
+        $chatProductForeignKey = $conn->query(
+            "SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+             WHERE CONSTRAINT_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'chat_messages'
+               AND COLUMN_NAME = 'product_id'
+               AND REFERENCED_TABLE_NAME = 'products'
+             LIMIT 1"
+        );
+        if (!$chatProductForeignKey) {
+            throw new RuntimeException('Không thể kiểm tra khóa ngoại lịch sử chat: ' . $conn->error);
+        }
+        if ($chatProductForeignKey->num_rows === 0) {
+            $orphanChatProducts = $conn->query(
+                'SELECT COUNT(*) AS total
+                 FROM chat_messages cm
+                 LEFT JOIN products p ON p.id = cm.product_id
+                 WHERE cm.product_id IS NOT NULL AND p.id IS NULL'
+            );
+            if (!$orphanChatProducts) {
+                throw new RuntimeException('Không thể kiểm tra dữ liệu chat liên quan đến sản phẩm: ' . $conn->error);
+            }
+            $orphanCount = (int)($orphanChatProducts->fetch_assoc()['total'] ?? 0);
+            if ($orphanCount === 0
+                && !$conn->query(
+                    'ALTER TABLE chat_messages
+                     ADD CONSTRAINT fk_chat_messages_product
+                     FOREIGN KEY (product_id) REFERENCES products (id)
+                     ON DELETE RESTRICT ON UPDATE CASCADE'
+                )) {
+                error_log('Chat product foreign-key migration failed: ' . $conn->error);
+                throw new RuntimeException('Không thể bảo vệ liên kết sản phẩm trong lịch sử chat.');
+            }
+            if ($orphanCount > 0) {
+                error_log('Chat product foreign key was not added because ' . $orphanCount . ' orphaned references exist.');
+            }
+        }
+    }
 }
 
 // Keep saved checkout locations available in databases created before map support.
@@ -243,72 +518,6 @@ BEGIN
         RETURN 1;
     END IF;
 END");
-
-// 4. Tự đồng bộ cột Soft Delete và Trạng thái sản phẩm (Status, IsDeleted, DeletedAt, DeletedBy)
-$colStatusCheck = $conn->query("SHOW COLUMNS FROM products LIKE 'status'");
-if ($colStatusCheck && $colStatusCheck->num_rows === 0) {
-    $conn->query("ALTER TABLE products ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active' AFTER is_new");
-    $conn->query("ALTER TABLE products ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
-    $conn->query("ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER is_deleted");
-    $conn->query("ALTER TABLE products ADD COLUMN deleted_by VARCHAR(100) NULL DEFAULT NULL AFTER deleted_at");
-    $conn->query("ALTER TABLE products ADD INDEX idx_products_status_deleted (is_deleted, status)");
-    $conn->query("ALTER TABLE products ADD INDEX idx_products_cat_deleted (category_id, is_deleted, status)");
-    $conn->query("ALTER TABLE products ADD CONSTRAINT chk_products_status CHECK (status IN ('active', 'inactive', 'hidden'))");
-    $conn->query("ALTER TABLE products ADD CONSTRAINT chk_products_is_deleted CHECK (is_deleted IN (0, 1))");
-}
-
-// Đảm bảo VIEW view_product_details luôn có đầy đủ cột status, is_deleted, deleted_at, deleted_by
-$viewColCheck = $conn->query("SHOW COLUMNS FROM view_product_details LIKE 'is_deleted'");
-if ($viewColCheck && $viewColCheck->num_rows === 0) {
-    $conn->query("CREATE OR REPLACE VIEW view_product_details AS
-    SELECT 
-        p.id,
-        p.name,
-        p.price_sale,
-        p.price_original,
-        p.discount,
-        p.gift,
-        p.image,
-        p.stock,
-        p.category_id,
-        p.description,
-        p.is_featured,
-        p.is_suggested,
-        p.is_new,
-        p.status,
-        p.is_deleted,
-        p.deleted_at,
-        p.deleted_by,
-        c.slug AS category,
-        c.name AS category_name,
-        COALESCE((
-            SELECT SUM(oi.quantity)
-            FROM order_items oi
-            JOIN orders o ON o.id = oi.order_id
-            WHERE oi.product_id = p.id
-              AND (o.status IS NULL OR o.status NOT IN ('Đã hủy', 'huy', 'cancelled'))
-        ), 0) AS sold_count,
-        COALESCE((
-            SELECT COUNT(0)
-            FROM wishlists w
-            WHERE w.product_id = p.id
-        ), 0) AS wishlist_count,
-        COALESCE((
-            SELECT ROUND(AVG(r.rating), 1)
-            FROM reviews r
-            WHERE r.product_id = p.id
-              AND r.rating BETWEEN 1 AND 5
-        ), 0) AS average_rating,
-        COALESCE((
-            SELECT COUNT(0)
-            FROM reviews r
-            WHERE r.product_id = p.id
-              AND r.rating BETWEEN 1 AND 5
-        ), 0) AS review_count
-    FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
-    GROUP BY p.id, c.slug, c.name");
-}
 
 $conn->query("DROP TRIGGER IF EXISTS trg_products_before_insert");
 $conn->query("CREATE TRIGGER trg_products_before_insert BEFORE INSERT ON products FOR EACH ROW

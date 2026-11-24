@@ -19,7 +19,12 @@ $totalWishlistItems = 0;
 $wishlistItems = [];
 if ($userId > 0) {
     // 1. Đếm tổng số lượng yêu thích bằng SQL
-    $cntStmt = $conn->prepare("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = ?");
+    $cntStmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM wishlists w
+        INNER JOIN products p ON p.id = w.product_id
+        WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+    ");
     $cntStmt->bind_param('i', $userId);
     $cntStmt->execute();
     $totalWishlistItems = (int)($cntStmt->get_result()->fetch_assoc()['total'] ?? 0);
@@ -52,7 +57,7 @@ if ($userId > 0) {
               )
             GROUP BY r.product_id
         ) review_stats ON review_stats.product_id = p.id
-        WHERE w.user_id = ?
+        WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
         GROUP BY p.id
         ORDER BY w.id DESC
         LIMIT ? OFFSET ?

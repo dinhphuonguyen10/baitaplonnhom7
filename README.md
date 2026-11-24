@@ -3,7 +3,7 @@
 
 Website bán trang sức xây dựng bằng PHP, MySQL, HTML, CSS và JavaScript, chạy local qua XAMPP.
 
-Phạm vi hiện tại của nhóm là các chức năng phía khách hàng và giao diện admin. Admin mới là giao diện mẫu; đăng nhập/phân quyền được giữ để truy cập, còn các thao tác quản trị và dữ liệu thống kê chưa triển khai.
+Phạm vi hiện tại gồm các chức năng phía khách hàng và một số nghiệp vụ Admin. Quản lý sản phẩm có thêm trạng thái kinh doanh, xóa mềm, thùng rác, khôi phục và bảo vệ dữ liệu liên quan; một số khu vực Admin khác vẫn là giao diện mẫu.
 
 
 # Cấu trúc dự án
@@ -88,6 +88,8 @@ Database trong `database/baitaplon.sql` hiện có các bảng cho tài khoản/
 Trang quản lý đơn hàng phía Admin đọc trực tiếp đơn hàng và chi tiết sản phẩm từ các bảng `orders`/`order_items`; trang tổng quan cũng hiển thị số đơn và số đơn đang chờ xác nhận.
 
 Giỏ hàng được lưu theo tài khoản/khách trong trình duyệt. Trang đặt hàng tải danh sách tỉnh/thành và xã/phường từ `provinces.open-api.vn`; chỉ yêu cầu dữ liệu địa giới, không gửi thông tin người đặt hàng đến dịch vụ này. API đặt hàng tự bổ sung cột email cho bảng `orders` nếu cơ sở dữ liệu cũ chưa có cột đó.
+
+Quản lý vòng đời sản phẩm dùng MySQL/MariaDB qua MySQLi (dự án hiện không kết nối SQL Server). `products.status` phân biệt `active`, `inactive` và `hidden`; hết hàng được xác định riêng bằng `stock = 0`. Xóa trong Admin là xóa mềm qua `is_deleted`, `deleted_at` và `deleted_by`. Sản phẩm đã xóa mềm được xem/khôi phục trong Thùng rác; xóa cứng chỉ được phép khi không còn đơn hàng hoặc dữ liệu liên quan. Khóa ngoại của sản phẩm và chi tiết đơn hàng dùng `RESTRICT` để tránh xóa dây chuyền làm mất lịch sử.
 
 
 ## Cấu hình PHP và database

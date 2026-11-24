@@ -22,8 +22,63 @@ if (!empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
 $sort     = isset($_GET['sort']) ? trim($_GET['sort']) : '';
 
+if (array_key_exists('ids', $_GET)) {
+    $rawIds = $_GET['ids'];
+    if (!is_string($rawIds)) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Danh sách mã sản phẩm không hợp lệ.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $productIds = [];
+    if (trim($rawIds) !== '') {
+        foreach (explode(',', $rawIds) as $rawId) {
+            $productId = filter_var($rawId, FILTER_VALIDATE_INT);
+            if ($productId === false || $productId < 1) {
+                http_response_code(400);
+                echo json_encode(['status' => 'error', 'message' => 'Danh sách mã sản phẩm không hợp lệ.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $productIds[$productId] = $productId;
+        }
+    }
+    $productIds = array_values($productIds);
+    if (count($productIds) > 100) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Chỉ được kiểm tra tối đa 100 sản phẩm mỗi lần.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($productIds === []) {
+        $result = $conn->query('SELECT * FROM view_product_details WHERE 1 = 0');
+    } else {
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+        $stmt = $conn->prepare(
+            "SELECT * FROM view_product_details
+             WHERE is_deleted = 0 AND status = 'active' AND id IN ({$placeholders})"
+        );
+        if (!$stmt) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Không thể kiểm tra trạng thái sản phẩm.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $types = str_repeat('i', count($productIds));
+        $stmt->bind_param($types, ...$productIds);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Không thể kiểm tra trạng thái sản phẩm.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $result = $stmt->get_result();
+    }
+    if (!$result) {
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => 'Không thể kiểm tra trạng thái sản phẩm.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 // 1. TRANG CHỦ - Sản phẩm nổi bật: Top 10 sản phẩm có nhiều lượt bán nhất (bán chạy nhất)
-if ($category === 'featured') {
+} elseif ($category === 'featured') {
     $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' ORDER BY sold_count DESC, id DESC LIMIT 10");
 }
 // 2. TRANG CHỦ - Gợi ý cho bạn: Top 10 sản phẩm có nhiều lượt tim nhất (yêu thích nhất)

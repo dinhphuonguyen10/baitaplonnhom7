@@ -36,7 +36,7 @@ if ($method === 'GET') {
             JOIN products p ON w.product_id = p.id
             JOIN categories c ON p.category_id = c.id
             LEFT JOIN order_items oi ON p.id = oi.product_id
-            WHERE w.user_id = ?
+            WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
             GROUP BY p.id
             ORDER BY w.id DESC
         ");
@@ -71,7 +71,13 @@ if ($method === 'GET') {
     }
 
     // Mặc định lấy danh sách IDs
-    $stmt = $conn->prepare("SELECT product_id FROM wishlists WHERE user_id = ? ORDER BY id DESC");
+    $stmt = $conn->prepare("
+        SELECT w.product_id
+        FROM wishlists w
+        INNER JOIN products p ON p.id = w.product_id
+        WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+        ORDER BY w.id DESC
+    ");
     $stmt->bind_param('i', $userId);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -117,25 +123,57 @@ if ($method === 'POST') {
     if ($action === 'sync') {
         $syncIds = $data['sync_ids'] ?? [];
         if (is_array($syncIds)) {
-            $stmt = $conn->prepare("INSERT IGNORE INTO wishlists (user_id, product_id) VALUES (?, ?)");
+            $stmt = $conn->prepare("
+                INSERT IGNORE INTO wishlists (user_id, product_id)
+                SELECT ?, p.id
+                FROM products p
+                WHERE p.id = ? AND p.is_deleted = 0 AND p.status = 'active'
+            ");
+            if (!$stmt) {
+                http_response_code(500);
+                echo json_encode(['status' => 'error', 'message' => 'Không thể đồng bộ danh sách yêu thích.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             foreach ($syncIds as $pid) {
                 $pid = (int)$pid;
                 if ($pid > 0) {
                     $stmt->bind_param('ii', $userId, $pid);
-                    $stmt->execute();
+                    if (!$stmt->execute()) {
+                        $stmt->close();
+                        http_response_code(500);
+                        echo json_encode(['status' => 'error', 'message' => 'Không thể đồng bộ danh sách yêu thích.'], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
                 }
             }
             $stmt->close();
         }
 
-        // Trả về danh sách ID mới nhất
-        $cRes = $conn->query("SELECT product_id FROM wishlists WHERE user_id = {$userId}");
-        $newIds = [];
-        if ($cRes) {
-            while ($r = $cRes->fetch_assoc()) {
-                $newIds[] = (int)$r['product_id'];
-            }
+        // Trả về ID các sản phẩm vẫn được phép hiển thị cho khách hàng.
+        $cStmt = $conn->prepare("
+            SELECT w.product_id
+            FROM wishlists w
+            INNER JOIN products p ON p.id = w.product_id
+            WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+        ");
+        if (!$cStmt) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Không thể tải danh sách yêu thích.'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
+        $cStmt->bind_param('i', $userId);
+        if (!$cStmt->execute()) {
+            $cStmt->close();
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Không thể tải danh sách yêu thích.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $cRes = $cStmt->get_result();
+        $newIds = [];
+        while ($r = $cRes->fetch_assoc()) {
+            $newIds[] = (int)$r['product_id'];
+        }
+        $cStmt->close();
 
         echo json_encode([
             'status' => 'success',
@@ -152,7 +190,7 @@ if ($method === 'POST') {
     }
 
     // Kiểm tra sản phẩm có tồn tại trong CSDL không
-    $chkProd = $conn->prepare("SELECT id, name FROM products WHERE id = ? LIMIT 1");
+    $chkProd = $conn->prepare("SELECT id, name, status, is_deleted FROM products WHERE id = ? LIMIT 1");
     $chkProd->bind_param('i', $productId);
     $chkProd->execute();
     $prodRow = $chkProd->get_result()->fetch_assoc();
@@ -182,6 +220,14 @@ if ($method === 'POST') {
             $favorited = false;
             $msg = "Đã bỏ yêu thích '{$prodName}'";
         } else {
+            if ((int)$prodRow['is_deleted'] === 1 || $prodRow['status'] !== 'active') {
+                http_response_code(409);
+                echo json_encode([
+                    'status' => 'unavailable',
+                    'message' => 'Sản phẩm hiện không còn được kinh doanh.'
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             // Chưa tim -> Thêm vào wishlists
             $insStmt = $conn->prepare("INSERT INTO wishlists (user_id, product_id) VALUES (?, ?)");
             $insStmt->bind_param('ii', $userId, $productId);
@@ -192,8 +238,16 @@ if ($method === 'POST') {
         }
 
         // Lấy tổng số lượng yêu thích hiện tại của user
-        $cntRes = $conn->query("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = {$userId}");
-        $totalCount = (int)($cntRes ? $cntRes->fetch_assoc()['total'] : 0);
+        $cntStmt = $conn->prepare("
+            SELECT COUNT(*) AS total
+            FROM wishlists w
+            INNER JOIN products p ON p.id = w.product_id
+            WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+        ");
+        $cntStmt->bind_param('i', $userId);
+        $cntStmt->execute();
+        $totalCount = (int)($cntStmt->get_result()->fetch_assoc()['total'] ?? 0);
+        $cntStmt->close();
 
         echo json_encode([
             'status' => 'success',
@@ -212,8 +266,16 @@ if ($method === 'POST') {
         $delStmt->execute();
         $delStmt->close();
 
-        $cntRes = $conn->query("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = {$userId}");
-        $totalCount = (int)($cntRes ? $cntRes->fetch_assoc()['total'] : 0);
+        $cntStmt = $conn->prepare("
+            SELECT COUNT(*) AS total
+            FROM wishlists w
+            INNER JOIN products p ON p.id = w.product_id
+            WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+        ");
+        $cntStmt->bind_param('i', $userId);
+        $cntStmt->execute();
+        $totalCount = (int)($cntStmt->get_result()->fetch_assoc()['total'] ?? 0);
+        $cntStmt->close();
 
         echo json_encode([
             'status' => 'success',

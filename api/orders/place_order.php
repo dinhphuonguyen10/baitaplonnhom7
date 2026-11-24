@@ -284,11 +284,8 @@ try {
         if (!$product || (int)$product['is_deleted'] === 1) {
             throw new DomainException('Sản phẩm không tồn tại hoặc đã ngừng cung cấp.');
         }
-        if (($product['status'] ?? 'active') === 'inactive') {
-            throw new DomainException('Sản phẩm "' . $product['name'] . '" đã ngừng kinh doanh, không thể đặt mua.');
-        }
-        if (($product['status'] ?? 'active') === 'hidden') {
-            throw new DomainException('Sản phẩm "' . $product['name'] . '" hiện không khả dụng.');
+        if (($product['status'] ?? '') !== 'active') {
+            throw new DomainException('Sản phẩm "' . $product['name'] . '" hiện không còn được kinh doanh.');
         }
         if ((int) $product['stock'] < $quantity) {
             throw new DomainException('Sản phẩm "' . $product['name'] . '" không đủ số lượng tồn kho.');

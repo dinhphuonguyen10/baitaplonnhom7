@@ -9,7 +9,7 @@ $productId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 $product = null;
 
 if ($productId !== false && $productId !== null && $productId > 0) {
-    $stmt = $conn->prepare('SELECT * FROM view_product_details WHERE id = ? LIMIT 1');
+    $stmt = $conn->prepare("SELECT * FROM view_product_details WHERE id = ? AND is_deleted = 0 AND status = 'active' LIMIT 1");
     if (!$stmt) {
         throw new RuntimeException('Không thể chuẩn bị truy vấn chi tiết sản phẩm: ' . $conn->error);
     }
@@ -21,10 +21,6 @@ if ($productId !== false && $productId !== null && $productId > 0) {
     $product = $stmt->get_result()->fetch_assoc() ?: null;
     $stmt->close();
 
-    // Loại bỏ sản phẩm đã xóa mềm hoặc bị ẩn khỏi Client
-    if ($product && ((int)($product['is_deleted'] ?? 0) === 1 || ($product['status'] ?? 'active') === 'hidden')) {
-        $product = null;
-    }
 }
 
 if ($product === null) {
@@ -71,7 +67,7 @@ $descriptionByCategory = [
             ? $imagePath
             : $appBaseUrl . '/' . ltrim($imagePath, '/') . '?v=' . $imgVersion;
         $stock = (int) $product['stock'];
-        $isDiscontinued = ($product['status'] ?? 'active') === 'inactive';
+        $isDiscontinued = ($product['status'] ?? '') !== 'active';
         $canBuy = $stock > 0 && !$isDiscontinued;
         $original = (float)$product['price_original'];
         $sale = (float)$product['price_sale'];
