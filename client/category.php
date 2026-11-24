@@ -99,13 +99,6 @@ include __DIR__ . '/../include/header.php';
                             <span class="check-box-text">Đang giảm giá</span>
                         </label>
                     </li>
-                    <li>
-                        <label class="custom-check-item">
-                            <input type="checkbox" id="filter-has-gift" class="filter-checkbox" value="has_gift">
-                            <span class="check-box-custom"></span>
-                            <span class="check-box-text">Có quà tặng</span>
-                        </label>
-                    </li>
                 </ul>
             </div>
 
@@ -131,7 +124,6 @@ include __DIR__ . '/../include/header.php';
                         <button type="button" class="shopee-sort-btn active" data-sort="best_selling">Bán chạy</button>
                         <button type="button" class="shopee-sort-btn" data-sort="popular">Gợi ý</button>
                         <button type="button" class="shopee-sort-btn" data-sort="newest">Mới nhất</button>
-                        <button type="button" class="shopee-sort-btn" data-sort="name_asc">Tên A-Z</button>
 
                         <div class="shopee-sort-price-dropdown" id="shopee-sort-price-dropdown">
                             <button type="button" class="shopee-sort-btn price-dropdown-toggle" id="price-dropdown-toggle" aria-haspopup="true" aria-expanded="false">

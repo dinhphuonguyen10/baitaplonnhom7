@@ -20,13 +20,10 @@ if (($_SESSION['role'] ?? '') !== 'customer' || !isset($_SESSION['user_id'])) {
 
 $userId = (int) $_SESSION['user_id'];
 $statusGroups = [
-    'pending' => ['Chờ xác nhận', 'Pending'],
-    'confirmed' => ['Đã xác nhận', 'Đang xử lý'],
-    'preparing' => ['Đang chuẩn bị hàng', 'Chuẩn bị đơn hàng', 'Đang chuẩn bị'],
-    'shipping' => ['Đang giao hàng', 'Đang vận chuyển', 'Đang giao'],
-    'delivered' => ['Đã giao hàng', 'Đã giao'],
-    'completed' => ['Hoàn thành'],
-    'cancelled' => ['Đã hủy', 'Canceled', 'cancelled', 'huy'],
+    'processing' => ['Chờ xác nhận', 'Đã xác nhận', 'Đang chuẩn bị hàng', 'Chuẩn bị đơn hàng', 'Đang xử lý', 'Đang chuẩn bị', 'Pending'],
+    'shipping'   => ['Đang giao hàng', 'Đang vận chuyển', 'Đang giao'],
+    'delivered'  => ['Đã giao hàng', 'Đã giao', 'Hoàn thành'],
+    'cancelled'  => ['Đã hủy', 'Canceled', 'cancelled', 'huy'],
 ];
 $statusFilter = isset($_GET['status']) && is_string($_GET['status']) ? trim($_GET['status']) : 'all';
 if ($statusFilter !== 'all' && !isset($statusGroups[$statusFilter])) {
@@ -39,20 +36,9 @@ if ($search !== '' && (!ctype_digit($search) || strlen($search) > 10)) {
     $respond(400, ['status' => 'error', 'message' => 'Mã đơn hàng chỉ gồm tối đa 10 chữ số.']);
 }
 
-$validateDate = static function (string $value): bool {
-    if ($value === '') {
-        return true;
-    }
-    $date = DateTime::createFromFormat('!Y-m-d', $value);
-    $errors = DateTime::getLastErrors();
-    return $date !== false
-        && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
-        && $date->format('Y-m-d') === $value;
-};
-$fromDate = isset($_GET['from']) && is_string($_GET['from']) ? trim($_GET['from']) : '';
-$toDate = isset($_GET['to']) && is_string($_GET['to']) ? trim($_GET['to']) : '';
-if (!$validateDate($fromDate) || !$validateDate($toDate) || ($fromDate !== '' && $toDate !== '' && $fromDate > $toDate)) {
-    $respond(400, ['status' => 'error', 'message' => 'Khoảng thời gian lọc không hợp lệ.']);
+$timeFilter = isset($_GET['time']) && is_string($_GET['time']) ? trim($_GET['time']) : '30days';
+if (!in_array($timeFilter, ['30days', '6months', 'all'], true)) {
+    $timeFilter = 'all';
 }
 
 $page = filter_var($_GET['page'] ?? 1, FILTER_VALIDATE_INT);
@@ -64,16 +50,13 @@ if ($page === false || $page < 1 || $page > 1000000 || $pageSize === false || $p
 $baseWhere = ['o.user_id = ?'];
 $baseTypes = 'i';
 $baseParams = [$userId];
-if ($fromDate !== '') {
-    $baseWhere[] = 'o.created_at >= ?';
-    $baseTypes .= 's';
-    $baseParams[] = $fromDate . ' 00:00:00';
+
+if ($timeFilter === '30days') {
+    $baseWhere[] = 'o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+} elseif ($timeFilter === '6months') {
+    $baseWhere[] = 'o.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)';
 }
-if ($toDate !== '') {
-    $baseWhere[] = 'o.created_at < DATE_ADD(?, INTERVAL 1 DAY)';
-    $baseTypes .= 's';
-    $baseParams[] = $toDate;
-}
+
 if ($search !== '') {
     $baseWhere[] = 'o.id = ?';
     $baseTypes .= 's';
@@ -93,12 +76,9 @@ try {
     $countStmt->execute();
     $counts = [
         'all' => 0,
-        'pending' => 0,
-        'confirmed' => 0,
-        'preparing' => 0,
+        'processing' => 0,
         'shipping' => 0,
         'delivered' => 0,
-        'completed' => 0,
         'cancelled' => 0,
     ];
     $statusToGroup = [];

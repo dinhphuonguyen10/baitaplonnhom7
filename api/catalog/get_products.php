@@ -383,7 +383,7 @@ elseif ($category !== '' || $searchQuery !== '') {
         $countStmt->close();
     }
 
-    $perPage = $suggestionMode ? 8 : 15;
+    $perPage = $suggestionMode ? 8 : 12;
     $totalPages = max(1, (int)ceil($totalItems / $perPage));
     $currentPage = $suggestionMode ? 1 : min($requestedPage, $totalPages);
     $offset = ($currentPage - 1) * $perPage;

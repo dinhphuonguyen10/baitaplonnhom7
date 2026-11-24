@@ -65,7 +65,8 @@ if (!isset($_SESSION['order_cancel_csrf']) || !is_string($_SESSION['order_cancel
     font-weight: 700;
 }
 
-.orders-filter-field input {
+.orders-filter-field input,
+.orders-filter-field select {
     min-height: 40px;
     min-width: 150px;
     border: 1px solid #ddd;
@@ -73,6 +74,12 @@ if (!isset($_SESSION['order_cancel_csrf']) || !is_string($_SESSION['order_cancel
     padding: 8px 10px;
     color: var(--navy, #0b2033);
     font: inherit;
+    background: #fff;
+}
+
+.orders-filter-field select {
+    cursor: pointer;
+    min-width: 170px;
 }
 
 .orders-filter-field--search input { min-width: 220px; }
@@ -789,38 +796,28 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
                 Tìm mã đơn hàng
                 <input id="order-search" type="search" inputmode="numeric" maxlength="11" placeholder="Ví dụ: #123">
             </label>
-            <label class="orders-filter-field" for="order-date-from">
-                Từ ngày
-                <input id="order-date-from" type="date">
+            <label class="orders-filter-field" for="order-time-select">
+                Thời gian
+                <select id="order-time-select">
+                    <option value="30days" selected>30 ngày gần nhất</option>
+                    <option value="6months">6 tháng gần nhất</option>
+                    <option value="all">Tất cả thời gian</option>
+                </select>
             </label>
-            <label class="orders-filter-field" for="order-date-to">
-                Đến ngày
-                <input id="order-date-to" type="date">
-            </label>
-            <button type="button" class="orders-filter-reset" id="orders-filter-reset">Xóa bộ lọc</button>
         </div>
 
         <div class="orders-tabs" role="tablist">
             <button class="orders-tab active" role="tab" data-status="all" aria-selected="true">
                 Tất cả <span class="tab-badge" id="badge-all">0</span>
             </button>
-            <button class="orders-tab" role="tab" data-status="pending" aria-selected="false">
-                Chờ xác nhận <span class="tab-badge" id="badge-pending">0</span>
-            </button>
-            <button class="orders-tab" role="tab" data-status="confirmed" aria-selected="false">
-                Đã xác nhận <span class="tab-badge" id="badge-confirmed">0</span>
-            </button>
-            <button class="orders-tab" role="tab" data-status="preparing" aria-selected="false">
-                Đang chuẩn bị <span class="tab-badge" id="badge-preparing">0</span>
+            <button class="orders-tab" role="tab" data-status="processing" aria-selected="false">
+                Chờ xử lý <span class="tab-badge" id="badge-processing">0</span>
             </button>
             <button class="orders-tab" role="tab" data-status="shipping" aria-selected="false">
-                Đang giao hàng <span class="tab-badge" id="badge-shipping">0</span>
+                Đang giao <span class="tab-badge" id="badge-shipping">0</span>
             </button>
             <button class="orders-tab" role="tab" data-status="delivered" aria-selected="false">
-                Đã giao hàng <span class="tab-badge" id="badge-delivered">0</span>
-            </button>
-            <button class="orders-tab" role="tab" data-status="completed" aria-selected="false">
-                Hoàn thành <span class="tab-badge" id="badge-completed">0</span>
+                Đã giao <span class="tab-badge" id="badge-delivered">0</span>
             </button>
             <button class="orders-tab" role="tab" data-status="cancelled" aria-selected="false">
                 Đã hủy <span class="tab-badge" id="badge-cancelled">0</span>
@@ -908,13 +905,13 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
 
     // ===== FETCH ORDERS =====
     async function fetchOrders(status, page) {
+        const timeSelect = document.getElementById('order-time-select');
         const params = new URLSearchParams({
             status,
             page: String(page),
             per_page: String(ORDERS_PER_PAGE),
             q: document.getElementById('order-search').value.trim(),
-            from: document.getElementById('order-date-from').value,
-            to: document.getElementById('order-date-to').value
+            time: timeSelect ? timeSelect.value : '30days'
         });
         const resp = await fetch(`${BASE}/api/orders/my_orders.php?${params}`);
         const data = await resp.json();
@@ -925,12 +922,9 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     // ===== UPDATE BADGES =====
     function updateBadges(counts) {
         document.getElementById('badge-all').textContent = counts.all || 0;
-        document.getElementById('badge-pending').textContent = counts.pending || 0;
-        document.getElementById('badge-confirmed').textContent = counts.confirmed || 0;
-        document.getElementById('badge-preparing').textContent = counts.preparing || 0;
+        document.getElementById('badge-processing').textContent = counts.processing || 0;
         document.getElementById('badge-shipping').textContent = counts.shipping || 0;
         document.getElementById('badge-delivered').textContent = counts.delivered || 0;
-        document.getElementById('badge-completed').textContent = counts.completed || 0;
         document.getElementById('badge-cancelled').textContent = counts.cancelled || 0;
     }
 
@@ -938,18 +932,15 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     function renderEmpty(container) {
         const msgs = {
             all: { icon: '📦', title: 'Chưa có đơn hàng nào', desc: 'Hãy khám phá sản phẩm và đặt đơn hàng đầu tiên nhé!' },
-            pending: { icon: '⏳', title: 'Không có đơn hàng chờ xác nhận', desc: 'Đơn hàng mới đặt sẽ hiển thị ở đây.' },
-            confirmed: { icon: '✓', title: 'Không có đơn hàng đã xác nhận', desc: 'Đơn hàng đã xác nhận sẽ hiển thị ở đây.' },
-            preparing: { icon: '📦', title: 'Không có đơn hàng đang chuẩn bị', desc: 'Đơn hàng đang được chuẩn bị sẽ hiển thị ở đây.' },
+            processing: { icon: '⏳', title: 'Không có đơn hàng chờ xử lý', desc: 'Đơn hàng đang chờ xử lý sẽ hiển thị ở đây.' },
             shipping: { icon: '🚚', title: 'Không có đơn hàng đang giao', desc: 'Các đơn hàng đang vận chuyển sẽ hiển thị ở đây.' },
-            delivered: { icon: '📬', title: 'Chưa có đơn hàng đã giao', desc: 'Đơn hàng đã giao sẽ hiển thị ở đây.' },
-            completed: { icon: '✅', title: 'Chưa có đơn hàng hoàn thành', desc: 'Đơn hàng đã hoàn tất sẽ hiển thị ở đây.' },
+            delivered: { icon: '✅', title: 'Chưa có đơn hàng đã giao', desc: 'Đơn hàng đã giao sẽ hiển thị ở đây.' },
             cancelled: { icon: '🚫', title: 'Không có đơn hàng đã hủy', desc: 'Rất vui vì bạn chưa phải hủy đơn nào!' },
         };
         const m = msgs[currentTab] || msgs.all;
+        const timeSelect = document.getElementById('order-time-select');
         const hasFilters = document.getElementById('order-search').value.trim()
-            || document.getElementById('order-date-from').value
-            || document.getElementById('order-date-to').value
+            || (timeSelect && timeSelect.value !== '30days')
             || currentTab !== 'all';
         container.innerHTML = `
             <div class="orders-empty">
@@ -1109,14 +1100,13 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
         window.clearTimeout(searchTimer);
         searchTimer = window.setTimeout(applyOrderFilters, 300);
     });
-    document.getElementById('order-date-from').addEventListener('change', applyOrderFilters);
-    document.getElementById('order-date-to').addEventListener('change', applyOrderFilters);
-    document.getElementById('orders-filter-reset').addEventListener('click', () => window.clearOrderFilters());
+    document.getElementById('order-time-select')?.addEventListener('change', applyOrderFilters);
+    document.getElementById('orders-filter-reset')?.addEventListener('click', () => window.clearOrderFilters());
 
     window.clearOrderFilters = function() {
         document.getElementById('order-search').value = '';
-        document.getElementById('order-date-from').value = '';
-        document.getElementById('order-date-to').value = '';
+        const timeSelect = document.getElementById('order-time-select');
+        if (timeSelect) timeSelect.value = '30days';
         document.querySelectorAll('.orders-tab').forEach(tab => {
             const selected = tab.dataset.status === 'all';
             tab.classList.toggle('active', selected);
