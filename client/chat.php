@@ -224,7 +224,7 @@ if ($isCustomerLoggedIn && $requestedProductId !== false && $requestedProductId 
     function appendProductCard(container, message) {
         const productId = Number(message.product_id);
         const imagePath = String(message.product_image ?? '').trim();
-        if (!productId || !message.product_name || !imagePath) return;
+        if (!productId || !message.product_name) return;
 
         const card = document.createElement('a');
         card.className = 'support-chat-product-card';
@@ -232,10 +232,16 @@ if ($isCustomerLoggedIn && $requestedProductId !== false && $requestedProductId 
         card.target = '_blank';
         card.rel = 'noopener noreferrer';
         const image = document.createElement('img');
-        image.src = /^https?:\/\//i.test(imagePath) ? imagePath : `${base}/${imagePath.replace(/^\/+/, '')}`;
+        const fallbackImageUrl = `${base}/assets/banner/logo.png`;
+        image.src = imagePath
+            ? (/^https?:\/\//i.test(imagePath) ? imagePath : `${base}/${imagePath.replace(/^\/+/, '')}`)
+            : fallbackImageUrl;
         image.alt = String(message.product_name);
         image.loading = 'lazy';
-        image.onerror = () => { image.src = `${base}/assets/banner/logo.png`; };
+        image.onerror = () => {
+            image.onerror = null;
+            image.src = fallbackImageUrl;
+        };
         const details = document.createElement('span');
         details.className = 'support-chat-product-info';
         const name = document.createElement('strong');

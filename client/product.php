@@ -88,7 +88,7 @@ $descriptionByCategory = [
                     class="product-detail-image"
                     src="<?php echo $escape($imageUrl); ?>"
                     alt="<?php echo $escape($product['name']); ?>"
-                    onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';"
+                    onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';"
                 >
             </div>
 

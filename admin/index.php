@@ -462,16 +462,22 @@ $periodLabel = $periodLabels[$period];
                         <?php if ($topProducts === []): ?>
                             <p class="page-subtitle">Chưa có sản phẩm bán ra trong khoảng thời gian này.</p>
                         <?php else: ?>
-                            <?php foreach ($topProducts as $index => $product): ?>
+                            <?php foreach ($topProducts as $product): ?>
                                 <?php $quantity = (int) $product['quantity_sold']; ?>
                                 <?php $progress = $topProducts ? min(100, $quantity / max(1, (int) $topProducts[0]['quantity_sold']) * 100) : 0; ?>
+                                <?php
+                                $productImage = trim((string) ($product['image'] ?? ''));
+                                $productImageUrl = preg_match('~^https?://~i', $productImage)
+                                    ? $productImage
+                                    : $appBaseUrl . '/' . ltrim($productImage !== '' ? $productImage : 'assets/banner/logo.png', '/');
+                                ?>
                                 <article class="best-item">
                                     <div class="product-thumb">
-                                        <?php if (!empty($product['image'])): ?>
-                                            <img src="<?php echo $escape($appBaseUrl . '/' . ltrim($product['image'], '/')); ?>" alt="">
-                                        <?php else: ?>
-                                            <?php echo $index === 0 ? '◇' : ($index === 1 ? '◈' : '✦'); ?>
-                                        <?php endif; ?>
+                                        <img
+                                            src="<?php echo $escape($productImageUrl); ?>"
+                                            alt=""
+                                            onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'"
+                                        >
                                     </div>
                                     <div class="product-info">
                                         <strong><?php echo $escape($product['product_name']); ?></strong>

@@ -154,7 +154,37 @@ $validateProductInput = static function (array $post) use ($conn, $parseMoneyCen
         ],
     ];
 };
-$resolveProductImage = static function ($file, string $inputPath, string $fallbackPath) use ($uploadDir): array {
+$productImageExtensionsByMime = [
+    'image/jpeg' => 'jpg',
+    'image/png' => 'png',
+    'image/webp' => 'webp',
+    'image/gif' => 'gif',
+];
+$defaultImageIsValid = false;
+if (preg_match('~^https?://~i', $defaultImagePath)) {
+    $defaultImageIsValid = filter_var($defaultImagePath, FILTER_VALIDATE_URL) !== false;
+} else {
+    $defaultImageRelativePath = ltrim(str_replace('\\', '/', $defaultImagePath), '/');
+    $assetsRoot = realpath(__DIR__ . '/../assets');
+    $defaultImageResolvedPath = realpath(__DIR__ . '/../' . $defaultImageRelativePath);
+    if (str_starts_with($defaultImageRelativePath, 'assets/')
+        && $assetsRoot !== false
+        && $defaultImageResolvedPath !== false
+        && is_file($defaultImageResolvedPath)
+        && str_starts_with($defaultImageResolvedPath, $assetsRoot . DIRECTORY_SEPARATOR)) {
+        $defaultImageInfo = @getimagesize($defaultImageResolvedPath);
+        $defaultImageSize = filesize($defaultImageResolvedPath);
+        $defaultImageMime = is_array($defaultImageInfo) ? (string)($defaultImageInfo['mime'] ?? '') : '';
+        $defaultImageIsValid = $defaultImageSize !== false
+            && $defaultImageSize > 0
+            && $defaultImageSize <= 5 * 1024 * 1024
+            && isset($productImageExtensionsByMime[$defaultImageMime]);
+    }
+}
+if (!$defaultImageIsValid) {
+    $defaultImagePath = 'assets/banner/logo.png';
+}
+$resolveProductImage = static function ($file, string $inputPath, string $fallbackPath) use ($uploadDir, $productImageExtensionsByMime): array {
     $uploadError = is_array($file) ? (int)($file['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
     if ($uploadError === UPLOAD_ERR_NO_FILE) {
         $path = trim($inputPath) !== '' ? trim($inputPath) : $fallbackPath;
@@ -166,7 +196,7 @@ $resolveProductImage = static function ($file, string $inputPath, string $fallba
                 || !in_array(strtolower((string)parse_url($path, PHP_URL_SCHEME)), ['http', 'https'], true)) {
                 throw new InvalidArgumentException('URL ảnh không hợp lệ.');
             }
-            return ['path' => $path, 'uploaded_path' => null];
+            return ['path' => $path];
         }
 
         $relativePath = ltrim(str_replace('\\', '/', $path), '/');
@@ -179,7 +209,16 @@ $resolveProductImage = static function ($file, string $inputPath, string $fallba
             || !str_starts_with($resolvedPath, $assetsRoot . DIRECTORY_SEPARATOR)) {
             throw new InvalidArgumentException('Ảnh phải là URL http/https hợp lệ hoặc tệp có sẵn trong thư mục assets.');
         }
-        return ['path' => $relativePath, 'uploaded_path' => null];
+        $imageInfo = @getimagesize($resolvedPath);
+        $fileSize = filesize($resolvedPath);
+        $mime = is_array($imageInfo) ? (string)($imageInfo['mime'] ?? '') : '';
+        if ($fileSize === false
+            || $fileSize <= 0
+            || $fileSize > 5 * 1024 * 1024
+            || !isset($productImageExtensionsByMime[$mime])) {
+            throw new InvalidArgumentException('Ảnh trong thư mục assets phải là JPEG, PNG, WebP hoặc GIF hợp lệ và tối đa 5 MB.');
+        }
+        return ['path' => $relativePath];
     }
 
     if ($uploadError !== UPLOAD_ERR_OK || !is_array($file) || !is_uploaded_file((string)($file['tmp_name'] ?? ''))) {
@@ -189,23 +228,32 @@ $resolveProductImage = static function ($file, string $inputPath, string $fallba
         throw new InvalidArgumentException('Ảnh tải lên phải có dung lượng tối đa 5 MB.');
     }
     $imageInfo = @getimagesize((string)$file['tmp_name']);
-    $extensionsByMime = [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-        'image/gif' => 'gif',
-    ];
     $mime = is_array($imageInfo) ? (string)($imageInfo['mime'] ?? '') : '';
-    if (!isset($extensionsByMime[$mime])) {
+    if (!isset($productImageExtensionsByMime[$mime])) {
         throw new InvalidArgumentException('Tệp tải lên không phải ảnh JPEG, PNG, WebP hoặc GIF hợp lệ.');
     }
 
-    $fileName = 'prod_' . bin2hex(random_bytes(8)) . '.' . $extensionsByMime[$mime];
-    $absolutePath = $uploadDir . $fileName;
+    $absolutePath = null;
+    for ($attempt = 0; $attempt < 5; $attempt++) {
+        $fileName = 'prod_' . bin2hex(random_bytes(16)) . '.' . $productImageExtensionsByMime[$mime];
+        $candidatePath = $uploadDir . $fileName;
+        $reservation = @fopen($candidatePath, 'x');
+        if ($reservation !== false) {
+            fclose($reservation);
+            $absolutePath = $candidatePath;
+            break;
+        }
+    }
+    if ($absolutePath === null) {
+        throw new RuntimeException('Không thể cấp tên tệp riêng cho ảnh sản phẩm.');
+    }
     if (!move_uploaded_file((string)$file['tmp_name'], $absolutePath)) {
+        if (!unlink($absolutePath)) {
+            error_log('Unable to remove reserved product image path: ' . $absolutePath);
+        }
         throw new RuntimeException('Không thể lưu ảnh sản phẩm đã tải lên.');
     }
-    return ['path' => 'assets/uploads/' . $fileName, 'uploaded_path' => $absolutePath];
+    return ['path' => 'assets/uploads/' . $fileName];
 };
 $skuExists = static function (string $sku, int $productId) use ($conn): bool {
     $stmt = $conn->prepare('SELECT id FROM products WHERE sku = ? AND id <> ? LIMIT 1');
@@ -295,7 +343,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $product = $validated['data'];
             $transactionStarted = false;
-            $uploadedImagePath = null;
             try {
                 $conn->begin_transaction();
                 $transactionStarted = true;
@@ -309,7 +356,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new InvalidArgumentException('Đường dẫn ảnh không hợp lệ.');
                 }
                 $image = $resolveProductImage($_FILES['image_file'] ?? null, $imageInput, $defaultImagePath);
-                $uploadedImagePath = $image['uploaded_path'];
 
                 $stmt = $conn->prepare(
                     'INSERT INTO products (
@@ -359,24 +405,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $conn->commit();
                 $transactionStarted = false;
-                $uploadedImagePath = null;
                 $message = "Đã thêm sản phẩm '{$product['name']}' thành công.";
                 $messageType = 'success';
             } catch (DomainException | InvalidArgumentException $e) {
                 if ($transactionStarted) {
                     $conn->rollback();
                 }
-                if ($uploadedImagePath !== null && is_file($uploadedImagePath)) {
-                    unlink($uploadedImagePath);
-                }
                 $message = $e->getMessage();
                 $messageType = 'error';
             } catch (mysqli_sql_exception $e) {
                 if ($transactionStarted) {
                     $conn->rollback();
-                }
-                if ($uploadedImagePath !== null && is_file($uploadedImagePath)) {
-                    unlink($uploadedImagePath);
                 }
                 if ((int)$e->getCode() === 1062) {
                     $message = 'Mã SKU đã được sử dụng cho sản phẩm khác.';
@@ -388,9 +427,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (Throwable $e) {
                 if ($transactionStarted) {
                     $conn->rollback();
-                }
-                if ($uploadedImagePath !== null && is_file($uploadedImagePath)) {
-                    unlink($uploadedImagePath);
                 }
                 error_log('Product creation failed: ' . $e->getMessage());
                 $message = 'Không thể thêm sản phẩm do lỗi hệ thống.';
@@ -411,7 +447,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $product = $validated['data'];
             $transactionStarted = false;
-            $uploadedImagePath = null;
             try {
                 $conn->begin_transaction();
                 $transactionStarted = true;
@@ -453,11 +488,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ? (int)($_FILES['image_file']['error'] ?? UPLOAD_ERR_NO_FILE)
                     : UPLOAD_ERR_NO_FILE;
                 if ($uploadError === UPLOAD_ERR_NO_FILE && trim($imageInput) === '') {
-                    $image = ['path' => (string)$oldProduct['image'], 'uploaded_path' => null];
+                    $image = ['path' => (string)$oldProduct['image']];
                 } else {
                     $image = $resolveProductImage($_FILES['image_file'] ?? null, $imageInput, (string)$oldProduct['image']);
                 }
-                $uploadedImagePath = $image['uploaded_path'];
 
                 $stmt = $conn->prepare(
                     'UPDATE products
@@ -521,24 +555,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $conn->commit();
                 $transactionStarted = false;
-                $uploadedImagePath = null;
                 $message = "Đã cập nhật sản phẩm '{$product['name']}' thành công.";
                 $messageType = 'success';
             } catch (DomainException | InvalidArgumentException $e) {
                 if ($transactionStarted) {
                     $conn->rollback();
                 }
-                if ($uploadedImagePath !== null && is_file($uploadedImagePath)) {
-                    unlink($uploadedImagePath);
-                }
                 $message = $e->getMessage();
                 $messageType = 'error';
             } catch (mysqli_sql_exception $e) {
                 if ($transactionStarted) {
                     $conn->rollback();
-                }
-                if ($uploadedImagePath !== null && is_file($uploadedImagePath)) {
-                    unlink($uploadedImagePath);
                 }
                 if ((int)$e->getCode() === 1062) {
                     $message = 'Mã SKU đã được sử dụng cho sản phẩm khác.';
@@ -550,9 +577,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (Throwable $e) {
                 if ($transactionStarted) {
                     $conn->rollback();
-                }
-                if ($uploadedImagePath !== null && is_file($uploadedImagePath)) {
-                    unlink($uploadedImagePath);
                 }
                 error_log('Product update failed: ' . $e->getMessage());
                 $message = 'Không thể cập nhật sản phẩm do lỗi hệ thống.';
@@ -994,7 +1018,7 @@ if (!$prodRes) {
                                         data-status="<?php echo $escape($prodStatus); ?>"
                                         data-stock="<?php echo $stockNum; ?>">
                                         <td>
-                                            <img src="<?php echo $escape($imgSrc); ?>" alt="" class="thumb-img" onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'">
+                                            <img src="<?php echo $escape($imgSrc); ?>" alt="" class="thumb-img" onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'">
                                         </td>
                                         <td class="prod-name-cell">
                                             <div class="prod-name"><?php echo $escape($p['name']); ?></div>
@@ -1306,7 +1330,7 @@ if (!$prodRes) {
 
                 <div class="form-field">
                     <label>Ảnh sản phẩm hiện tại:</label>
-                    <div><img id="edit-img-preview" src="" alt="" class="current-img-preview"></div>
+                    <div><img id="edit-img-preview" src="<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>" alt="" class="current-img-preview"></div>
                     <label>Đổi ảnh mới (nếu muốn):</label>
                     <input type="file" name="image_file" accept="image/*">
                     <input type="text" name="image_url_new" id="edit-img-url" placeholder="Hoặc nhập đường dẫn ảnh mới..." style="margin-top: 6px;">
@@ -1322,6 +1346,8 @@ if (!$prodRes) {
 </div>
 
 <script>
+const productImageFallbackUrl = <?php echo json_encode($appBaseUrl . '/assets/banner/logo.png', JSON_UNESCAPED_SLASHES); ?>;
+
 // Mẫu mô tả cuốn hút theo từng danh mục
 const descTemplates = {
     2: 'Lấy cảm hứng từ những đóa hoa tuyết đầu mùa và giọt sương mai thuần khiết, đôi bông tai được chế tác thủ công từ Bạc Ý 925 mạ bạch kim cao cấp, đính kết đá Zirconia đa diện phát sáng rực rỡ dưới mọi góc nhìn. Thiết kế thanh thoát tôn vinh trọn vẹn nét đài các, yêu kiều và là phụ kiện hoàn mỹ giúp nàng tự tin tỏa sáng rạng ngời trong các buổi dạ hội sang trọng lẫn phong cách thường nhật.',
@@ -1396,7 +1422,12 @@ function openEditModal(prod, imgSrc) {
     addStockInput.value = '';
     document.getElementById('stock-calc-hint').textContent = 'Hiện tại đang có ' + originalStock + ' sản phẩm trong kho.';
 
-    document.getElementById('edit-img-preview').src = imgSrc;
+    const imagePreview = document.getElementById('edit-img-preview');
+    imagePreview.onerror = () => {
+        imagePreview.onerror = null;
+        imagePreview.src = productImageFallbackUrl;
+    };
+    imagePreview.src = imgSrc || productImageFallbackUrl;
     document.getElementById('edit-img-url').value   = '';
     document.getElementById('editModal').classList.add('is-open');
 }

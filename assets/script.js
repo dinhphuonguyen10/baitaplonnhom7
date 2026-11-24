@@ -127,7 +127,7 @@ function createSliderItems(container, products) {
             <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
                 ${discountHTML}
                 <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id || ''}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
-                <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
+                <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.onerror=null;this.src='${appUrl('/assets/banner/logo.png')}';">
                 <div class="product-info">
                     <h3>${product.name}</h3>
                     <div class="product-price">
@@ -420,7 +420,7 @@ function renderCart() {
                 <label class="cart-item-select-label">
                     <input type="checkbox" class="cart-item-select" aria-label="Chọn ${escapeHtml(item.name)}" ${item.selected !== false ? 'checked' : ''}>
                 </label>
-                <img src="${imageUrl}" alt="${escapeHtml(item.name)}" class="cart-item-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
+                <img src="${imageUrl}" alt="${escapeHtml(item.name)}" class="cart-item-image" onerror="this.onerror=null;this.src='${appUrl('/assets/banner/logo.png')}';">
                 <div class="cart-item-details">
                     <p class="cart-item-name">${escapeHtml(item.name)}</p>
                     <div class="cart-item-actions">
@@ -867,7 +867,10 @@ function renderCheckoutSummary() {
         const image = document.createElement('img');
         image.src = getProductImageUrl(item.image);
         image.alt = '';
-        image.onerror = () => { image.src = appUrl('/assets/banner/logo.png'); };
+        image.onerror = () => {
+            image.onerror = null;
+            image.src = appUrl('/assets/banner/logo.png');
+        };
         const details = document.createElement('div');
         details.className = 'checkout-order-item-details';
         details.innerHTML = `<strong>${escapeHtml(item.name)}</strong><span>Số lượng: ${Number(item.quantity) || 0}</span>`;
@@ -1866,7 +1869,7 @@ function buildProductCardHTML(product) {
             <div class="product-image-wrap">
                 ${badgeHTML}
                 <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
-                <img src="${getProductImageUrl(product.image)}" alt="${product.name}" class="product-image" onerror="this.src='${appUrl('/assets/banner/logo.png')}';">
+                <img src="${getProductImageUrl(product.image)}" alt="${product.name}" class="product-image" onerror="this.onerror=null;this.src='${appUrl('/assets/banner/logo.png')}';">
             </div>
             <div class="product-info">
                 <h3>${product.name}</h3>
@@ -2290,7 +2293,10 @@ function initSearch() {
             image.src = imageUrl;
             image.alt = '';
             image.className = 'search-result-image';
-            image.onerror = () => { image.src = appUrl('/assets/banner/logo.png'); };
+            image.onerror = () => {
+                image.onerror = null;
+                image.src = appUrl('/assets/banner/logo.png');
+            };
 
             const info = document.createElement('div');
             info.className = 'search-result-info';

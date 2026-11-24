@@ -93,6 +93,8 @@ Quản lý vòng đời sản phẩm dùng MySQL/MariaDB qua MySQLi (dự án hi
 
 Thêm/sửa sản phẩm yêu cầu SKU duy nhất, giá gốc không âm và giá khuyến mãi (nếu có) thấp hơn giá gốc. `promotion_ends_at` xác định thời hạn khuyến mãi; các trang Client và API đặt hàng tự dùng giá gốc sau khi khuyến mãi hết hạn. Mỗi lần thay đổi giá được ghi vào `product_price_history` trong cùng transaction với cập nhật sản phẩm. Giá trong `order_items` được lưu thành snapshot khi tạo đơn, không bị thay đổi khi Admin cập nhật giá.
 
+Ảnh sản phẩm tải lên phải là JPEG, PNG, WebP hoặc GIF hợp lệ, tối đa 5 MB; ảnh có sẵn trong `assets` cũng được kiểm tra đường dẫn, MIME và dung lượng. Ảnh cũ không bị xóa khi thay ảnh hoặc chuyển sản phẩm vào thùng rác vì `order_items.image` có thể đang tham chiếu tệp snapshot. Giao diện dùng `assets/banner/logo.png` nếu ảnh rỗng, sai đường dẫn hoặc không tải được.
+
 
 ## Cấu hình PHP và database
 

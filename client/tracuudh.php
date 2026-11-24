@@ -883,7 +883,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
             const imgSrc = getProductImageUrl(item.image);
             productsHtml += `
                 <div class="order-product-row">
-                    <img class="order-product-img" src="${imgSrc}" alt="" onerror="this.src='${BASE}/assets/banner/logo.png'">
+                    <img class="order-product-img" src="${imgSrc}" alt="" onerror="this.onerror=null;this.src='${BASE}/assets/banner/logo.png'">
                     <div class="order-product-info">
                         <p class="product-name">${escHtml(item.product_name)}</p>
                         <p class="product-qty">x${item.quantity}</p>
@@ -1111,7 +1111,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
             const isDelivered = ['Đã giao hàng', 'Đã giao'].includes(order.status);
             itemsHtml += `
                 <div class="order-product-row">
-                    <img class="order-product-img" src="${imgSrc}" alt="" onerror="this.src='${BASE}/assets/banner/logo.png'">
+                    <img class="order-product-img" src="${imgSrc}" alt="" onerror="this.onerror=null;this.src='${BASE}/assets/banner/logo.png'">
                     <div class="order-product-info">
                         <p class="product-name">${escHtml(item.product_name)}</p>
                         <p class="product-qty">x${item.quantity}</p>

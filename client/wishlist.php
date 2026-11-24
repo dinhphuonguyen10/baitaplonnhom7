@@ -125,7 +125,7 @@ $totalPages = $totalWishlistItems > 0 ? (int)ceil($totalWishlistItems / $itemsPe
                 <div class="product-card" data-db-id="<?php echo $id; ?>" data-stock="<?php echo $stock; ?>" data-detail-url="<?php echo $escape($detailUrl); ?>" role="link" tabindex="0">
                     <div class="product-image-wrap">
                         <button class="wishlist-btn active" data-product-id="<?php echo $id; ?>" title="Bỏ yêu thích">♥</button>
-                        <img src="<?php echo $escape($imgSrc); ?>" alt="<?php echo $escape($name); ?>" class="product-image" onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';">
+                        <img src="<?php echo $escape($imgSrc); ?>" alt="<?php echo $escape($name); ?>" class="product-image" onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';">
                     </div>
                     <div class="product-info">
                         <h3><?php echo $escape($name); ?></h3>
@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div class="product-image-wrap">
                                     ${badgeHTML}
                                     <button class="wishlist-btn active" data-product-id="${p.id}" title="Bỏ yêu thích">♥</button>
-                                    <img src="${typeof getProductImageUrl === 'function' ? getProductImageUrl(p.image) : p.image}" alt="${p.name}" class="product-image">
+                                    <img src="${typeof getProductImageUrl === 'function' ? getProductImageUrl(p.image) : p.image}" alt="${p.name}" class="product-image" onerror="this.onerror=null;this.src='${window.APP_BASE_URL || ''}/assets/banner/logo.png'">
                                 </div>
                                 <div class="product-info">
                                     <h3>${p.name}</h3>

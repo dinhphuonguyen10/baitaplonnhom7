@@ -7,16 +7,6 @@ $roleLabel = $isManager ? 'Quản lý' : 'Nhân viên';
 $adminUsername = $_SESSION['admin_username'] ?? $_SESSION['username'] ?? 'Nhân viên ÉCRIN';
 $adminCurrentPage = 'chat.php';
 
-/* ── Logo fallback đồng bộ với config ── */
-$_chatLogoConf = __DIR__ . '/../storage/banner/logo.json';
-$_chatLogoSrc  = 'assets/banner/logo.png';
-if (is_file($_chatLogoConf)) {
-    $_chatLogoData = json_decode((string) file_get_contents($_chatLogoConf), true);
-    if (is_array($_chatLogoData) && !empty($_chatLogoData['src'])) {
-        $_chatLogoSrc = (string) $_chatLogoData['src'];
-    }
-}
-$chatLogoUrl = $appBaseUrl . '/' . ltrim($_chatLogoSrc, '/');
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -405,7 +395,7 @@ $chatLogoUrl = $appBaseUrl . '/' . ltrim($_chatLogoSrc, '/');
     function appendProductCard(container, message) {
         const productId = Number(message.product_id);
         const imagePath = String(message.product_image ?? '').trim();
-        if (!productId || !message.product_name || !imagePath) return;
+        if (!productId || !message.product_name) return;
 
         const card = document.createElement('a');
         card.className = 'chat-product-card';
@@ -413,10 +403,16 @@ $chatLogoUrl = $appBaseUrl . '/' . ltrim($_chatLogoSrc, '/');
         card.target = '_blank';
         card.rel = 'noopener noreferrer';
         const image = document.createElement('img');
-        image.src = /^https?:\/\//i.test(imagePath) ? imagePath : `${base}/${imagePath.replace(/^\/+/, '')}`;
+        const fallbackImageUrl = `${base}/assets/banner/logo.png`;
+        image.src = imagePath
+            ? (/^https?:\/\//i.test(imagePath) ? imagePath : `${base}/${imagePath.replace(/^\/+/, '')}`)
+            : fallbackImageUrl;
         image.alt = String(message.product_name);
         image.loading = 'lazy';
-        image.onerror = () => { image.src = `<?php echo $escape($chatLogoUrl); ?>`; };
+        image.onerror = () => {
+            image.onerror = null;
+            image.src = fallbackImageUrl;
+        };
         const details = document.createElement('span');
         details.className = 'chat-product-info';
         const name = document.createElement('strong');
