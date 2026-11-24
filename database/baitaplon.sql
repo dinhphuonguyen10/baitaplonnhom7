@@ -1,6 +1,16 @@
 
+SET @OLD_CHARACTER_SET_CLIENT = @@CHARACTER_SET_CLIENT;
+SET @OLD_CHARACTER_SET_RESULTS = @@CHARACTER_SET_RESULTS;
+SET @OLD_COLLATION_CONNECTION = @@COLLATION_CONNECTION;
+SET @OLD_TIME_ZONE = @@TIME_ZONE;
+SET @OLD_UNIQUE_CHECKS = @@UNIQUE_CHECKS;
+SET UNIQUE_CHECKS = 0;
 SET @OLD_FOREIGN_KEY_CHECKS = @@FOREIGN_KEY_CHECKS;
 SET FOREIGN_KEY_CHECKS = 0;
+SET @OLD_SQL_MODE = @@SQL_MODE;
+SET @OLD_SQL_NOTES = @@SQL_NOTES;
+SET SQL_NOTES = 0;
+SET @saved_cs_client = @@character_set_client;
 
 CREATE TABLE `addresses` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -546,6 +556,9 @@ UNLOCK TABLES;
 --
 -- Final view structure for view `view_product_details`
 --
+
+DROP VIEW IF EXISTS `view_top_rated_products`;
+DROP VIEW IF EXISTS `view_product_details`;
 
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;
