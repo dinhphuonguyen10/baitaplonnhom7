@@ -149,11 +149,27 @@ UNLOCK TABLES;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `categories` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(32) NOT NULL,
   `name` varchar(150) NOT NULL,
   `slug` varchar(80) NOT NULL,
+  `description` text DEFAULT NULL,
+  `image` varchar(500) DEFAULT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted_by` varchar(100) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_categories_name` (`name`),
-  UNIQUE KEY `uq_categories_slug` (`slug`)
+  UNIQUE KEY `uq_categories_slug` (`slug`),
+  UNIQUE KEY `uq_categories_code` (`code`),
+  KEY `idx_categories_public` (`is_deleted`,`status`),
+  CONSTRAINT `chk_categories_name_nonempty` CHECK (char_length(trim(`name`)) > 0),
+  CONSTRAINT `chk_categories_code_nonempty` CHECK (char_length(trim(`code`)) > 0),
+  CONSTRAINT `chk_categories_status` CHECK (`status` in ('active','inactive')),
+  CONSTRAINT `chk_categories_is_deleted` CHECK (`is_deleted` in (0,1)),
+  CONSTRAINT `chk_categories_deleted_metadata` CHECK (((`is_deleted` = 0) and (`deleted_at` is null) and (`deleted_by` is null)) or ((`is_deleted` = 1) and (`deleted_at` is not null)))
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -163,7 +179,7 @@ CREATE TABLE `categories` (
 
 LOCK TABLES `categories` WRITE;
 /*!40000 ALTER TABLE `categories` DISABLE KEYS */;
-INSERT INTO `categories` VALUES (2,'Bông tai','bong-tai'),(3,'Dây chuyền','day-chuyen'),(4,'Nhẫn','nhan'),(5,'Vòng tay','vong-tay'),(6,'Set quà tặng','set-qua-tang');
+INSERT INTO `categories` (`id`,`code`,`name`,`slug`) VALUES (2,'DM-000002','Bông tai','bong-tai'),(3,'DM-000003','Dây chuyền','day-chuyen'),(4,'DM-000004','Nhẫn','nhan'),(5,'DM-000005','Vòng tay','vong-tay'),(6,'DM-000006','Set quà tặng','set-qua-tang');
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -308,7 +324,7 @@ CREATE TABLE `products` (
   CONSTRAINT `chk_products_status` CHECK (`status` in ('active','inactive','hidden')),
   CONSTRAINT `chk_products_is_deleted` CHECK (`is_deleted` in (0,1)),
   CONSTRAINT `chk_products_deleted_metadata` CHECK (((`is_deleted` = 0) and (`deleted_at` is null) and (`deleted_by` is null)) or ((`is_deleted` = 1) and (`deleted_at` is not null))),
-  CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON UPDATE CASCADE
+  CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=129 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `product_price_history` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -674,6 +690,8 @@ SELECT
     p.is_deleted,
     p.deleted_at,
     p.deleted_by,
+    c.status AS category_status,
+    c.is_deleted AS category_is_deleted,
     c.slug AS category,
     c.name AS category_name,
     COALESCE((
@@ -700,7 +718,7 @@ SELECT
     ), 0) AS review_count
 FROM products p
 LEFT JOIN categories c ON c.id = p.category_id
-GROUP BY p.id, c.slug, c.name;
+GROUP BY p.id, c.slug, c.name, c.status, c.is_deleted;
 
 --
 -- Final view structure for view `view_top_rated_products`

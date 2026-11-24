@@ -6,7 +6,13 @@ $categoryTitle = "Danh mục sản phẩm";
 $categoryKey = $slug;
 
 if ($slug !== '') {
-    $stmt = $conn->prepare("SELECT id, name, slug FROM categories WHERE slug = ? OR name = ? OR CAST(id AS CHAR) = ? LIMIT 1");
+    $stmt = $conn->prepare(
+        "SELECT id, name, slug
+         FROM categories
+         WHERE status = 'active' AND is_deleted = 0
+           AND (slug = ? OR name = ? OR CAST(id AS CHAR) = ?)
+         LIMIT 1"
+    );
     $stmt->bind_param("sss", $slug, $slug, $slug);
     $stmt->execute();
     $res = $stmt->get_result();

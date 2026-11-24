@@ -101,6 +101,158 @@ if ($storesTable && $storesTable->num_rows > 0) {
     }
 }
 
+// Keep category lifecycle and management fields compatible with existing MySQL databases.
+$categoryColumns = [];
+$categoryColumnsResult = $conn->query('SHOW COLUMNS FROM categories');
+if (!$categoryColumnsResult) {
+    error_log('Category schema inspection failed: ' . $conn->error);
+    throw new RuntimeException('Không thể kiểm tra cấu trúc danh mục.');
+}
+while ($categoryColumn = $categoryColumnsResult->fetch_assoc()) {
+    $categoryColumns[$categoryColumn['Field']] = $categoryColumn;
+}
+
+$categoryColumnMigrations = [
+    'code' => 'ALTER TABLE categories ADD COLUMN code VARCHAR(32) NULL AFTER id',
+    'description' => 'ALTER TABLE categories ADD COLUMN description TEXT NULL AFTER slug',
+    'image' => 'ALTER TABLE categories ADD COLUMN image VARCHAR(500) NULL AFTER description',
+    'status' => "ALTER TABLE categories ADD COLUMN status ENUM('active', 'inactive') NOT NULL DEFAULT 'active' AFTER image",
+    'is_deleted' => 'ALTER TABLE categories ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER status',
+    'deleted_at' => 'ALTER TABLE categories ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER is_deleted',
+    'deleted_by' => 'ALTER TABLE categories ADD COLUMN deleted_by VARCHAR(100) NULL DEFAULT NULL AFTER deleted_at',
+    'created_at' => 'ALTER TABLE categories ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    'updated_at' => 'ALTER TABLE categories ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+];
+foreach ($categoryColumnMigrations as $columnName => $alterSql) {
+    if (!isset($categoryColumns[$columnName])) {
+        if (!$conn->query($alterSql)) {
+            error_log('Category column migration failed for ' . $columnName . ': ' . $conn->error);
+            throw new RuntimeException('Không thể cập nhật cấu trúc quản lý danh mục.');
+        }
+        $categoryColumns[$columnName] = ['Null' => $columnName === 'code' ? 'YES' : 'NO'];
+    }
+}
+
+$invalidCategoryNames = $conn->query(
+    "SELECT id
+     FROM categories
+     WHERE TRIM(name) = ''
+     LIMIT 1"
+);
+if (!$invalidCategoryNames) {
+    throw new RuntimeException('Không thể kiểm tra tên danh mục: ' . $conn->error);
+}
+if ($invalidCategoryNames->num_rows > 0) {
+    throw new RuntimeException('Có danh mục chưa có tên hợp lệ. Hãy sửa tên trước khi tiếp tục.');
+}
+$duplicateNormalizedCategoryNames = $conn->query(
+    "SELECT LOWER(TRIM(name)) AS normalized_name
+     FROM categories
+     GROUP BY LOWER(TRIM(name))
+     HAVING COUNT(*) > 1
+     LIMIT 1"
+);
+if (!$duplicateNormalizedCategoryNames) {
+    throw new RuntimeException('Không thể kiểm tra tên danh mục trùng lặp: ' . $conn->error);
+}
+if ($duplicateNormalizedCategoryNames->num_rows > 0) {
+    throw new RuntimeException('Có danh mục trùng tên sau khi bỏ khoảng trắng thừa. Hãy xử lý trước khi tiếp tục.');
+}
+if (!$conn->query('UPDATE categories SET name = TRIM(name) WHERE name <> TRIM(name)')) {
+    error_log('Category name normalization failed: ' . $conn->error);
+    throw new RuntimeException('Không thể chuẩn hóa tên danh mục.');
+}
+if (!$conn->query(
+    "UPDATE categories
+     SET code = CONCAT('DM-', LPAD(id, 6, '0'))
+     WHERE code IS NULL OR TRIM(code) = ''"
+)) {
+    error_log('Category code backfill failed: ' . $conn->error);
+    throw new RuntimeException('Không thể tạo mã cho danh mục hiện có.');
+}
+$duplicateCategoryCodes = $conn->query(
+    "SELECT code
+     FROM categories
+     GROUP BY code
+     HAVING COUNT(*) > 1
+     LIMIT 1"
+);
+if (!$duplicateCategoryCodes) {
+    throw new RuntimeException('Không thể kiểm tra mã danh mục trùng lặp: ' . $conn->error);
+}
+if ($duplicateCategoryCodes->num_rows > 0) {
+    throw new RuntimeException('Database đang có mã danh mục trùng nhau. Hãy xử lý trước khi tiếp tục.');
+}
+if (!$conn->query(
+    "UPDATE categories
+     SET deleted_at = COALESCE(deleted_at, NOW())
+     WHERE is_deleted = 1 AND deleted_at IS NULL"
+) || !$conn->query(
+    "UPDATE categories
+     SET deleted_at = NULL, deleted_by = NULL
+     WHERE is_deleted = 0 AND (deleted_at IS NOT NULL OR deleted_by IS NOT NULL)"
+)) {
+    error_log('Category soft-delete metadata normalization failed: ' . $conn->error);
+    throw new RuntimeException('Không thể chuẩn hóa thông tin xóa mềm danh mục.');
+}
+
+$categoryCodeColumnResult = $conn->query("SHOW COLUMNS FROM categories LIKE 'code'");
+$categoryCodeColumn = $categoryCodeColumnResult ? $categoryCodeColumnResult->fetch_assoc() : null;
+if (!$categoryCodeColumnResult) {
+    throw new RuntimeException('Không thể kiểm tra mã danh mục: ' . $conn->error);
+}
+if ($categoryCodeColumn && $categoryCodeColumn['Null'] === 'YES'
+    && !$conn->query('ALTER TABLE categories MODIFY code VARCHAR(32) NOT NULL')) {
+    error_log('Category code nullability migration failed: ' . $conn->error);
+    throw new RuntimeException('Không thể bắt buộc mã danh mục.');
+}
+
+$categoryIndexes = [];
+$categoryIndexResult = $conn->query('SHOW INDEX FROM categories');
+if (!$categoryIndexResult) {
+    throw new RuntimeException('Không thể kiểm tra chỉ mục danh mục: ' . $conn->error);
+}
+while ($categoryIndex = $categoryIndexResult->fetch_assoc()) {
+    $categoryIndexes[$categoryIndex['Key_name']] = true;
+}
+if (!isset($categoryIndexes['uq_categories_code'])
+    && !$conn->query('ALTER TABLE categories ADD UNIQUE INDEX uq_categories_code (code)')) {
+    error_log('Category code unique index migration failed: ' . $conn->error);
+    throw new RuntimeException('Không thể tạo ràng buộc mã danh mục duy nhất.');
+}
+if (!isset($categoryIndexes['idx_categories_public'])
+    && !$conn->query('ALTER TABLE categories ADD INDEX idx_categories_public (is_deleted, status)')) {
+    error_log('Category public index migration failed: ' . $conn->error);
+    throw new RuntimeException('Không thể tạo chỉ mục trạng thái danh mục.');
+}
+
+$categoryChecks = [];
+$categoryChecksResult = $conn->query(
+    "SELECT CONSTRAINT_NAME
+     FROM information_schema.TABLE_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'categories'
+       AND CONSTRAINT_TYPE = 'CHECK'"
+);
+if (!$categoryChecksResult) {
+    throw new RuntimeException('Không thể kiểm tra ràng buộc danh mục: ' . $conn->error);
+}
+while ($categoryCheck = $categoryChecksResult->fetch_assoc()) {
+    $categoryChecks[$categoryCheck['CONSTRAINT_NAME']] = true;
+}
+foreach ([
+    'chk_categories_name_nonempty' => 'ALTER TABLE categories ADD CONSTRAINT chk_categories_name_nonempty CHECK (CHAR_LENGTH(TRIM(name)) > 0)',
+    'chk_categories_code_nonempty' => 'ALTER TABLE categories ADD CONSTRAINT chk_categories_code_nonempty CHECK (CHAR_LENGTH(TRIM(code)) > 0)',
+    'chk_categories_status' => "ALTER TABLE categories ADD CONSTRAINT chk_categories_status CHECK (status IN ('active', 'inactive'))",
+    'chk_categories_is_deleted' => 'ALTER TABLE categories ADD CONSTRAINT chk_categories_is_deleted CHECK (is_deleted IN (0, 1))',
+    'chk_categories_deleted_metadata' => 'ALTER TABLE categories ADD CONSTRAINT chk_categories_deleted_metadata CHECK ((is_deleted = 0 AND deleted_at IS NULL AND deleted_by IS NULL) OR (is_deleted = 1 AND deleted_at IS NOT NULL))',
+] as $constraintName => $alterSql) {
+    if (!isset($categoryChecks[$constraintName]) && !$conn->query($alterSql)) {
+        error_log('Category check constraint migration failed for ' . $constraintName . ': ' . $conn->error);
+        throw new RuntimeException('Không thể tạo ràng buộc dữ liệu danh mục.');
+    }
+}
+
 // Tự đồng bộ cấu trúc bảng products và VIEW view_product_details
 $prodColumns = [];
 $prodColsRes = $conn->query("SHOW COLUMNS FROM products");
@@ -401,6 +553,8 @@ if ($needUpdateView || true) {
             p.is_deleted,
             p.deleted_at,
             p.deleted_by,
+            c.status AS category_status,
+            c.is_deleted AS category_is_deleted,
             c.slug AS category,
             c.name AS category_name,
             COALESCE((
@@ -427,7 +581,7 @@ if ($needUpdateView || true) {
             ), 0) AS review_count
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
-        GROUP BY p.id, c.slug, c.name");
+        GROUP BY p.id, c.slug, c.name, c.status, c.is_deleted");
     if (!$viewUpdate) {
         error_log('Product details view migration failed: ' . $conn->error);
         throw new RuntimeException('Không thể cập nhật danh sách sản phẩm.');

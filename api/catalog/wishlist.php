@@ -47,7 +47,7 @@ if ($method === 'GET') {
                    COALESCE(SUM(oi.quantity), 0) AS sold_count
             FROM wishlists w
             JOIN products p ON w.product_id = p.id
-            JOIN categories c ON p.category_id = c.id
+            JOIN categories c ON p.category_id = c.id AND c.status = 'active' AND c.is_deleted = 0
             LEFT JOIN order_items oi ON p.id = oi.product_id
             WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
             GROUP BY p.id
@@ -90,6 +90,7 @@ if ($method === 'GET') {
         SELECT w.product_id
         FROM wishlists w
         INNER JOIN products p ON p.id = w.product_id
+        INNER JOIN categories c ON c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
         WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
         ORDER BY w.id DESC
     ");
@@ -143,6 +144,10 @@ if ($method === 'POST') {
                 SELECT ?, p.id
                 FROM products p
                 WHERE p.id = ? AND p.is_deleted = 0 AND p.status = 'active'
+                  AND EXISTS (
+                      SELECT 1 FROM categories c
+                      WHERE c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
+                  )
             ");
             if (!$stmt) {
                 http_response_code(500);
@@ -169,6 +174,7 @@ if ($method === 'POST') {
             SELECT w.product_id
             FROM wishlists w
             INNER JOIN products p ON p.id = w.product_id
+            INNER JOIN categories c ON c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
             WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
         ");
         if (!$cStmt) {
@@ -205,7 +211,14 @@ if ($method === 'POST') {
     }
 
     // Kiểm tra sản phẩm có tồn tại trong CSDL không
-    $chkProd = $conn->prepare("SELECT id, name, status, is_deleted FROM products WHERE id = ? LIMIT 1");
+    $chkProd = $conn->prepare(
+        "SELECT p.id, p.name, p.status, p.is_deleted,
+                c.status AS category_status, c.is_deleted AS category_is_deleted
+         FROM products p
+         JOIN categories c ON c.id = p.category_id
+         WHERE p.id = ?
+         LIMIT 1"
+    );
     $chkProd->bind_param('i', $productId);
     $chkProd->execute();
     $prodRow = $chkProd->get_result()->fetch_assoc();
@@ -235,7 +248,8 @@ if ($method === 'POST') {
             $favorited = false;
             $msg = "Đã bỏ yêu thích '{$prodName}'";
         } else {
-            if ((int)$prodRow['is_deleted'] === 1 || $prodRow['status'] !== 'active') {
+            if ((int)$prodRow['is_deleted'] === 1 || $prodRow['status'] !== 'active'
+                || (int)$prodRow['category_is_deleted'] === 1 || $prodRow['category_status'] !== 'active') {
                 http_response_code(409);
                 echo json_encode([
                     'status' => 'unavailable',
@@ -258,6 +272,10 @@ if ($method === 'POST') {
             FROM wishlists w
             INNER JOIN products p ON p.id = w.product_id
             WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+              AND EXISTS (
+                  SELECT 1 FROM categories c
+                  WHERE c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
+              )
         ");
         $cntStmt->bind_param('i', $userId);
         $cntStmt->execute();
@@ -286,6 +304,10 @@ if ($method === 'POST') {
             FROM wishlists w
             INNER JOIN products p ON p.id = w.product_id
             WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+              AND EXISTS (
+                  SELECT 1 FROM categories c
+                  WHERE c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
+              )
         ");
         $cntStmt->bind_param('i', $userId);
         $cntStmt->execute();

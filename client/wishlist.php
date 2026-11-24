@@ -23,6 +23,7 @@ if ($userId > 0) {
         SELECT COUNT(*) AS total
         FROM wishlists w
         INNER JOIN products p ON p.id = w.product_id
+        INNER JOIN categories c ON c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
         WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
     ");
     $cntStmt->bind_param('i', $userId);
@@ -53,7 +54,7 @@ if ($userId > 0) {
                COALESCE(review_stats.review_count, 0) AS review_count
         FROM wishlists w
         JOIN products p ON w.product_id = p.id
-        JOIN categories c ON p.category_id = c.id
+        JOIN categories c ON p.category_id = c.id AND c.status = 'active' AND c.is_deleted = 0
         LEFT JOIN order_items oi ON p.id = oi.product_id
         LEFT JOIN (
             SELECT r.product_id, ROUND(AVG(r.rating), 1) AS average_rating, COUNT(*) AS review_count

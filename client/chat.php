@@ -9,7 +9,13 @@ include __DIR__ . '/../include/header.php';
 $chatProduct = null;
 $requestedProductId = filter_var($_GET['product_id'] ?? null, FILTER_VALIDATE_INT);
 if ($isCustomerLoggedIn && $requestedProductId !== false && $requestedProductId !== null && $requestedProductId > 0) {
-    $productStatement = $conn->prepare("SELECT id, name FROM products WHERE id = ? AND is_deleted = 0 AND status = 'active' LIMIT 1");
+    $productStatement = $conn->prepare(
+        "SELECT p.id, p.name
+         FROM products p
+         JOIN categories c ON c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
+         WHERE p.id = ? AND p.is_deleted = 0 AND p.status = 'active'
+         LIMIT 1"
+    );
     $productStatement->bind_param('i', $requestedProductId);
     $productStatement->execute();
     $chatProduct = $productStatement->get_result()->fetch_assoc() ?: null;

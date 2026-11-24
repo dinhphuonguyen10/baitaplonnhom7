@@ -82,38 +82,22 @@ if (is_file($bannerConfigFile)) {
             foreach ($displayCats as $cat):
                 $cSlug = $cat['slug'];
                 $cName = $cat['name'];
-                $cImg = $categoryIcons[$cSlug] ?? 'assets/banner/logo.png';
+                $categoryImage = trim((string)($cat['image'] ?? ''));
+                $cImg = $categoryImage !== ''
+                    ? (preg_match('~^https?://~i', $categoryImage)
+                        ? $categoryImage
+                        : $appBaseUrl . '/' . ltrim($categoryImage, '/'))
+                    : ($categoryIcons[$cSlug] ?? 'assets/banner/logo.png');
                 $cLink = $categoryLinks[$cSlug] ?? ('client/category.php?slug=' . urlencode($cSlug));
         ?>
             <a href="<?php echo htmlspecialchars($cLink, ENT_QUOTES, 'UTF-8'); ?>" class="item">
-                <img src="<?php echo htmlspecialchars($cImg, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($cName, ENT_QUOTES, 'UTF-8'); ?>" class="item-icon">
+                <img src="<?php echo htmlspecialchars($cImg, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($cName, ENT_QUOTES, 'UTF-8'); ?>" class="item-icon" onerror="this.onerror=null;this.src='<?php echo htmlspecialchars($appBaseUrl . '/assets/banner/logo.png', ENT_QUOTES, 'UTF-8'); ?>';">
                 <span><?php echo htmlspecialchars($cName, ENT_QUOTES, 'UTF-8'); ?></span>
             </a>
         <?php 
             endforeach;
-        else: 
+        endif;
         ?>
-            <a href="client/bong_tai.php" class="item">
-                <img src="assets/bôngtai/bong1.jpg" alt="Bông tai" class="item-icon">
-                <span>Bông tai</span>
-            </a>
-            <a href="client/day_chuyen.php" class="item">
-                <img src="assets/dây chuyền/dâychuyen/day1.jpg" alt="Dây chuyền" class="item-icon">
-                <span>Dây chuyền</span>
-            </a>
-            <a href="client/nhan.php" class="item">
-                <img src="assets/nhẫn/nhan1.png" alt="Nhẫn" class="item-icon">
-                <span>Nhẫn</span>
-            </a>
-            <a href="client/vong_tay.php" class="item">
-                <img src="assets/vòng tay/vong1.png" alt="Vòng tay" class="item-icon">
-                <span>Vòng tay</span>
-            </a>
-            <a href="client/category.php?slug=set-qua-tang" class="item">
-                <img src="assets/quà/set1.jpg" alt="Set quà tặng" class="item-icon">
-                <span>Set quà tặng</span>
-            </a>
-        <?php endif; ?>
     </section>
 
     <section class="category-page" id="search-results-section" hidden>

@@ -31,7 +31,13 @@ if (isset($data['product_id'])) {
         exit;
     }
 
-    $productCheck = $conn->prepare("SELECT id FROM products WHERE id = ? AND is_deleted = 0 AND status = 'active' LIMIT 1");
+    $productCheck = $conn->prepare(
+        "SELECT p.id
+         FROM products p
+         JOIN categories c ON c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
+         WHERE p.id = ? AND p.is_deleted = 0 AND p.status = 'active'
+         LIMIT 1"
+    );
     if (!$productCheck) {
         http_response_code(500);
         echo json_encode(["status" => "error", "message" => "Không thể kiểm tra sản phẩm được chia sẻ."]);
@@ -69,7 +75,7 @@ if ($stmt->execute()) {
     $insertedId = $stmt->insert_id;
     $stmt->close();
 
-    $stmt = $conn->prepare("SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN p.price_original ELSE p.price_sale END AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id AND p.is_deleted = 0 AND p.status = 'active' WHERE cm.id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN p.price_original ELSE p.price_sale END AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id AND p.is_deleted = 0 AND p.status = 'active' AND EXISTS (SELECT 1 FROM categories c WHERE c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0) WHERE cm.id = ? LIMIT 1");
     $stmt->bind_param("i", $insertedId);
     $stmt->execute();
     $result = $stmt->get_result();

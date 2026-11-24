@@ -103,16 +103,18 @@ try {
     $conn->begin_transaction();
 
     $product_stmt = $conn->prepare(
-        'SELECT id, name,
+        "SELECT p.id, p.name,
                 CASE
-                    WHEN promotion_ends_at IS NOT NULL AND promotion_ends_at <= NOW()
-                    THEN price_original
-                    ELSE price_sale
+                    WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                    THEN p.price_original
+                    ELSE p.price_sale
                 END AS effective_price,
-                image, stock, status, is_deleted
-         FROM products
-         WHERE id = ?
-         FOR UPDATE'
+                p.image, p.stock, p.status, p.is_deleted
+         FROM products p
+         INNER JOIN categories c
+           ON c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
+         WHERE p.id = ?
+         FOR UPDATE"
     );
     $stock_stmt = $conn->prepare(
         'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?'

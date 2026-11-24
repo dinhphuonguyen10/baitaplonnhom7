@@ -270,7 +270,12 @@ $skuExists = static function (string $sku, int $productId) use ($conn): bool {
     return $exists;
 };
 $assertCategoryExists = static function (int $categoryId) use ($conn): void {
-    $stmt = $conn->prepare('SELECT id FROM categories WHERE id = ? LIMIT 1');
+    $stmt = $conn->prepare(
+        "SELECT id
+         FROM categories
+         WHERE id = ? AND status = 'active' AND is_deleted = 0
+         FOR UPDATE"
+    );
     if (!$stmt) {
         throw new RuntimeException('Không thể kiểm tra danh mục sản phẩm: ' . $conn->error);
     }
@@ -282,7 +287,7 @@ $assertCategoryExists = static function (int $categoryId) use ($conn): void {
     $exists = $stmt->get_result()->num_rows === 1;
     $stmt->close();
     if (!$exists) {
-        throw new DomainException('Danh mục không tồn tại.');
+        throw new DomainException('Danh mục không tồn tại, đã bị xóa hoặc đang ngừng hoạt động.');
     }
 };
 $recordPriceHistory = static function (
@@ -487,7 +492,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $uploadError = is_array($_FILES['image_file'] ?? null)
                     ? (int)($_FILES['image_file']['error'] ?? UPLOAD_ERR_NO_FILE)
                     : UPLOAD_ERR_NO_FILE;
-                if ($uploadError === UPLOAD_ERR_NO_FILE && trim($imageInput) === '') {
+                $removeImage = ($_POST['remove_image'] ?? '') === '1';
+                $hasReplacementImage = $uploadError !== UPLOAD_ERR_NO_FILE || trim($imageInput) !== '';
+                if ($removeImage && $hasReplacementImage) {
+                    throw new InvalidArgumentException('Hãy chọn gỡ ảnh hoặc thay ảnh mới, không chọn đồng thời.');
+                }
+                if ($removeImage) {
+                    $image = ['path' => $defaultImagePath];
+                } elseif ($uploadError === UPLOAD_ERR_NO_FILE && trim($imageInput) === '') {
                     $image = ['path' => (string)$oldProduct['image']];
                 } else {
                     $image = $resolveProductImage($_FILES['image_file'] ?? null, $imageInput, (string)$oldProduct['image']);
@@ -778,7 +790,12 @@ $countTrash = (int)($cntTrashRes ? $cntTrashRes->fetch_assoc()['cnt'] : 0);
 
 // Lấy danh sách danh mục (cho dropdown chọn)
 $categories = [];
-$catRes = $conn->query("SELECT id, name FROM categories ORDER BY id ASC");
+$catRes = $conn->query(
+    "SELECT id, name
+     FROM categories
+     WHERE status = 'active' AND is_deleted = 0
+     ORDER BY id ASC"
+);
 if ($catRes) {
     while ($row = $catRes->fetch_assoc()) {
         $categories[] = $row;
@@ -1334,6 +1351,10 @@ if (!$prodRes) {
                     <label>Đổi ảnh mới (nếu muốn):</label>
                     <input type="file" name="image_file" accept="image/*">
                     <input type="text" name="image_url_new" id="edit-img-url" placeholder="Hoặc nhập đường dẫn ảnh mới..." style="margin-top: 6px;">
+                    <label style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+                        <input type="checkbox" name="remove_image" id="edit-remove-image" value="1">
+                        <span>Gỡ ảnh khỏi sản phẩm, dùng ảnh mặc định</span>
+                    </label>
                 </div>
             </div>
 
@@ -1393,6 +1414,16 @@ function closeAddModal() {
 // Modal Sửa sản phẩm
 let originalStock = 0;
 let basePriceForDiscount = 0;
+let currentEditImageSrc = productImageFallbackUrl;
+
+function setEditImagePreview(src) {
+    const imagePreview = document.getElementById('edit-img-preview');
+    imagePreview.onerror = () => {
+        imagePreview.onerror = null;
+        imagePreview.src = productImageFallbackUrl;
+    };
+    imagePreview.src = src || productImageFallbackUrl;
+}
 
 function openEditModal(prod, imgSrc) {
     document.getElementById('edit-id').value          = prod.id;
@@ -1422,12 +1453,9 @@ function openEditModal(prod, imgSrc) {
     addStockInput.value = '';
     document.getElementById('stock-calc-hint').textContent = 'Hiện tại đang có ' + originalStock + ' sản phẩm trong kho.';
 
-    const imagePreview = document.getElementById('edit-img-preview');
-    imagePreview.onerror = () => {
-        imagePreview.onerror = null;
-        imagePreview.src = productImageFallbackUrl;
-    };
-    imagePreview.src = imgSrc || productImageFallbackUrl;
+    currentEditImageSrc = imgSrc || productImageFallbackUrl;
+    document.getElementById('edit-remove-image').checked = false;
+    setEditImagePreview(currentEditImageSrc);
     document.getElementById('edit-img-url').value   = '';
     document.getElementById('editModal').classList.add('is-open');
 }
@@ -1469,6 +1497,20 @@ document.getElementById('edit-promotion-price')?.addEventListener('input', funct
 function closeEditModal() {
     document.getElementById('editModal').classList.remove('is-open');
 }
+
+document.getElementById('edit-remove-image').addEventListener('change', function() {
+    setEditImagePreview(this.checked ? productImageFallbackUrl : currentEditImageSrc);
+});
+document.querySelector('#editModal input[name="image_file"]').addEventListener('change', function() {
+    if (this.files.length > 0) {
+        document.getElementById('edit-remove-image').checked = false;
+    }
+});
+document.getElementById('edit-img-url').addEventListener('input', function() {
+    if (this.value.trim() !== '') {
+        document.getElementById('edit-remove-image').checked = false;
+    }
+});
 
 // Tính năng tự động cộng kho khi nhập thêm hàng
 document.getElementById('add-stock-input').addEventListener('input', function() {
