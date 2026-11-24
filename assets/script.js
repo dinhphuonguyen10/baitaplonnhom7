@@ -2154,13 +2154,15 @@ function initSearch() {
     const searchInput = document.querySelector('.search');
     if (!searchInput) return;
 
-    // 1. Wrap the search input in a wrapper for absolute positioning of results
-    const wrapper = document.createElement('div');
-    wrapper.className = 'search-wrapper';
-    searchInput.parentNode.insertBefore(wrapper, searchInput);
-    wrapper.appendChild(searchInput);
+    let wrapper = searchInput.closest('.search-wrapper');
+    if (!wrapper) {
+        wrapper = document.createElement('div');
+        wrapper.className = 'search-wrapper';
+        searchInput.parentNode.insertBefore(wrapper, searchInput);
+        wrapper.appendChild(searchInput);
+    }
 
-    // 2. Create the search results dropdown element
+    // Create the search results dropdown element
     const dropdown = document.createElement('div');
     dropdown.className = 'search-results-dropdown';
     wrapper.appendChild(dropdown);

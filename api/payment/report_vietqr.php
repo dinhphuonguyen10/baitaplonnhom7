@@ -83,7 +83,7 @@ try {
         $conn->commit();
         $transactionStarted = false;
         if ($result === 'success') {
-            respond('success', 'Cửa hàng đã xác nhận khoản thanh toán này.', 'Đã thanh toán');
+            respond('success', 'Cửa hàng đã xác nhận khoản thanh toán này.', 'Đã thanh toán', 200);
         }
         respond('error', 'Đơn hàng đã được xác nhận thanh toán.', 'Đã thanh toán', 409);
     }
@@ -96,7 +96,8 @@ try {
         respond(
             'success',
             'Yêu cầu thanh toán của bạn đang chờ cửa hàng xác nhận.',
-            'Chờ xác nhận thanh toán'
+            'Chờ xác nhận thanh toán',
+            200
         );
     }
 
@@ -201,7 +202,8 @@ try {
         respond(
             'success',
             'Đã gửi yêu cầu. Đơn hàng đang chờ cửa hàng xác nhận thanh toán.',
-            $newPaymentStatus
+            $newPaymentStatus,
+            200
         );
     }
 
