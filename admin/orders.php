@@ -35,7 +35,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     } else {
         try {
             $conn->begin_transaction();
-            $currentStatusStmt = $conn->prepare('SELECT status FROM orders WHERE id = ? FOR UPDATE');
+            $currentStatusStmt = $conn->prepare(
+                'SELECT status, inventory_status, payment_method, payment_status,
+                        (expires_at IS NOT NULL AND expires_at <= NOW()) AS is_expired
+                 FROM orders
+                 WHERE id = ?
+                 FOR UPDATE'
+            );
             $currentStatusStmt->bind_param('i', $orderId);
             $currentStatusStmt->execute();
             $currentOrder = $currentStatusStmt->get_result()->fetch_assoc();
@@ -50,6 +56,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
                 $conn->commit();
                 $orderNotice = 'Đơn hàng đã ở trạng thái này.';
             } else {
+                if (
+                    (int) $currentOrder['is_expired'] === 1
+                    && $currentOrder['inventory_status'] === 'reserved'
+                    && $normalizedCurrentStatus === 'Chờ xác nhận'
+                    && $newStatus !== 'Đã hủy'
+                ) {
+                    throw new DomainException('Đơn hàng đã hết thời gian giữ tồn kho; không thể tiếp tục xử lý.');
+                }
+                if (
+                    $currentOrder['payment_method'] === 'BANK_QR'
+                    && $currentOrder['payment_status'] !== 'Đã thanh toán'
+                    && $newStatus !== 'Đã hủy'
+                ) {
+                    throw new DomainException('Chỉ xử lý đơn thanh toán QR sau khi đã xác nhận thanh toán.');
+                }
                 if (!in_array($newStatus, getAllowedOrderStatusTransitions($currentStatus), true)) {
                     throw new DomainException(
                         'Không thể chuyển trạng thái từ "' . $normalizedCurrentStatus . '" sang "' . $newStatus . '".'
@@ -57,10 +78,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
                 }
 
                 if ($newStatus === 'Đã hủy') {
+                    if ($currentOrder['inventory_status'] === 'reserved') {
+                        if (!releaseReservedOrderInventory($conn, $orderId)) {
+                            throw new RuntimeException('Không thể hoàn tồn kho cho đơn hàng.');
+                        }
+                    } elseif ($currentOrder['inventory_status'] !== 'legacy') {
+                        throw new DomainException('Tồn kho của đơn hàng đã được xử lý; không thể hủy trạng thái này.');
+                    }
                     $updateStatusStmt = $conn->prepare(
                         "UPDATE orders
                          SET status = ?, cancelled_at = COALESCE(cancelled_at, NOW()),
                              cancellation_reason = COALESCE(NULLIF(cancellation_reason, ''), 'Hủy bởi quản trị viên')
+                         WHERE id = ?"
+                    );
+                } elseif ($newStatus === 'Đang giao hàng') {
+                    if ($currentOrder['inventory_status'] === 'released') {
+                        throw new DomainException('Đơn hàng đã hoàn tồn kho và không thể chuyển sang giao hàng.');
+                    }
+                    $updateStatusStmt = $conn->prepare(
+                        "UPDATE orders
+                         SET status = ?,
+                             inventory_status = CASE
+                                 WHEN inventory_status = 'reserved' THEN 'committed'
+                                 ELSE inventory_status
+                             END
                          WHERE id = ?"
                     );
                 } else {
@@ -117,6 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'confi
                  WHERE id = ?
                    AND payment_method = 'COD'
                    AND payment_status = 'Chưa thanh toán'
+                   AND (
+                       status NOT IN ('Chờ xác nhận', 'Pending')
+                       OR expires_at IS NULL
+                       OR expires_at > NOW()
+                   )
                    AND status NOT IN ('Đã hủy', 'Canceled', 'cancelled', 'huy')"
             );
             if (!$updateStmt) {

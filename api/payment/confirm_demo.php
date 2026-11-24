@@ -75,7 +75,8 @@ try {
     // Khóa đơn hàng để tránh xác nhận đồng thời
     $stmt = $conn->prepare(
         "SELECT id, user_id, total_price,
-                payment_method, payment_status, status
+                payment_method, payment_status, status,
+                (expires_at IS NOT NULL AND expires_at <= NOW()) AS is_expired
          FROM orders
          WHERE id = ? AND user_id = ?
          FOR UPDATE"
@@ -109,6 +110,13 @@ try {
             'Đơn hàng đã được thanh toán trước đó.',
             'Đã thanh toán'
         );
+    }
+
+    if (
+        (int) $order['is_expired'] === 1
+        && in_array($order['status'], ['Chờ xác nhận', 'Pending'], true)
+    ) {
+        throw new DomainException('Đơn hàng đã hết thời gian thanh toán.');
     }
 
     // 7. Cập nhật kết quả giao dịch

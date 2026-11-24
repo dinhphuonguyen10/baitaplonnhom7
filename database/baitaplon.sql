@@ -294,12 +294,18 @@ CREATE TABLE `orders` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `cancelled_at` datetime DEFAULT NULL,
   `cancellation_reason` varchar(500) DEFAULT NULL,
+  `inventory_status` varchar(20) NOT NULL DEFAULT 'legacy',
+  `inventory_reserved_at` datetime DEFAULT NULL,
+  `inventory_released_at` datetime DEFAULT NULL,
+  `expires_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_orders_user` (`user_id`),
   KEY `idx_orders_address` (`address_id`),
   KEY `idx_orders_created_at` (`created_at`),
   KEY `idx_orders_user_created` (`user_id`,`created_at`,`id`),
+  KEY `idx_orders_inventory_expiry` (`inventory_status`,`status`,`payment_status`,`expires_at`,`id`),
   CONSTRAINT `chk_orders_amounts` CHECK (`total_price` >= 0 AND `shipping_fee` >= 0 AND `discount_amount` >= 0),
+  CONSTRAINT `chk_orders_inventory_status` CHECK (`inventory_status` IN ('legacy','reserved','released','committed')),
   CONSTRAINT `fk_orders_address` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_orders_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

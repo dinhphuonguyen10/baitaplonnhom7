@@ -35,6 +35,10 @@ if ($ordersTable->num_rows > 0) {
         'discount_amount' => 'ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER shipping_fee',
         'cancelled_at' => 'ALTER TABLE orders ADD COLUMN cancelled_at DATETIME NULL DEFAULT NULL AFTER created_at',
         'cancellation_reason' => 'ALTER TABLE orders ADD COLUMN cancellation_reason VARCHAR(500) NULL DEFAULT NULL AFTER cancelled_at',
+        'inventory_status' => "ALTER TABLE orders ADD COLUMN inventory_status VARCHAR(20) NOT NULL DEFAULT 'legacy' AFTER cancellation_reason",
+        'inventory_reserved_at' => 'ALTER TABLE orders ADD COLUMN inventory_reserved_at DATETIME NULL DEFAULT NULL AFTER inventory_status',
+        'inventory_released_at' => 'ALTER TABLE orders ADD COLUMN inventory_released_at DATETIME NULL DEFAULT NULL AFTER inventory_reserved_at',
+        'expires_at' => 'ALTER TABLE orders ADD COLUMN expires_at DATETIME NULL DEFAULT NULL AFTER inventory_released_at',
     ];
     foreach ($orderColumnMigrations as $columnName => $alterSql) {
         if (!isset($orderColumns[$columnName]) && !$conn->query($alterSql)) {
@@ -68,6 +72,40 @@ if ($ordersTable->num_rows > 0) {
     )) {
         error_log('Order list index migration failed: ' . $conn->error);
         throw new RuntimeException('Không thể tối ưu truy vấn đơn hàng.');
+    }
+
+    $inventoryIndexResult = $conn->query("SHOW INDEX FROM orders WHERE Key_name = 'idx_orders_inventory_expiry'");
+    if (!$inventoryIndexResult) {
+        error_log('Order inventory index inspection failed: ' . $conn->error);
+        throw new RuntimeException('Không thể kiểm tra chỉ mục tồn kho đơn hàng.');
+    }
+    if ($inventoryIndexResult->num_rows === 0 && !$conn->query(
+        'ALTER TABLE orders
+         ADD INDEX idx_orders_inventory_expiry (inventory_status, status, payment_status, expires_at, id)'
+    )) {
+        error_log('Order inventory index migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể tối ưu truy vấn hết hạn tồn kho.');
+    }
+
+    $inventoryConstraint = $conn->query(
+        "SELECT CONSTRAINT_NAME
+         FROM information_schema.TABLE_CONSTRAINTS
+         WHERE CONSTRAINT_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'orders'
+           AND CONSTRAINT_NAME = 'chk_orders_inventory_status'
+           AND CONSTRAINT_TYPE = 'CHECK'"
+    );
+    if (!$inventoryConstraint) {
+        error_log('Order inventory constraint inspection failed: ' . $conn->error);
+        throw new RuntimeException('Không thể kiểm tra trạng thái tồn kho đơn hàng.');
+    }
+    if ($inventoryConstraint->num_rows === 0 && !$conn->query(
+        "ALTER TABLE orders
+         ADD CONSTRAINT chk_orders_inventory_status
+         CHECK (inventory_status IN ('legacy', 'reserved', 'released', 'committed'))"
+    )) {
+        error_log('Order inventory constraint migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể bảo vệ trạng thái tồn kho đơn hàng.');
     }
 
     $orderAmountConstraint = $conn->query(
@@ -1107,3 +1145,10 @@ BEGIN
         SET NEW.discount = NULL;
     END IF;
 END");
+
+if ($ordersTable->num_rows > 0) {
+    require_once __DIR__ . '/../include/order_inventory.php';
+    if (PHP_SAPI !== 'cli') {
+        expireOrderInventoryReservations($conn);
+    }
+}

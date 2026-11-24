@@ -46,7 +46,7 @@ try {
     $conn->begin_transaction();
 
     $orderStmt = $conn->prepare(
-        'SELECT id, status
+        'SELECT id, status, inventory_status
          FROM orders
          WHERE id = ? AND user_id = ?
          FOR UPDATE'
@@ -67,22 +67,13 @@ try {
     }
     $previousStatus = (string) $order['status'];
 
-    $itemsStmt = $conn->prepare('SELECT product_id, quantity FROM order_items WHERE order_id = ?');
-    $itemsStmt->bind_param('i', $orderId);
-    $itemsStmt->execute();
-    $itemsResult = $itemsStmt->get_result();
-    $restockStmt = $conn->prepare('UPDATE products SET stock = stock + ? WHERE id = ?');
-    while ($item = $itemsResult->fetch_assoc()) {
-        if ($item['product_id'] === null) {
-            continue;
+    if ($order['inventory_status'] === 'reserved') {
+        if (!releaseReservedOrderInventory($conn, $orderId)) {
+            throw new RuntimeException('Không thể hoàn tồn kho cho đơn hàng.');
         }
-        $quantity = (int) $item['quantity'];
-        $productId = (int) $item['product_id'];
-        $restockStmt->bind_param('ii', $quantity, $productId);
-        $restockStmt->execute();
+    } elseif ($order['inventory_status'] !== 'legacy') {
+        throw new DomainException('Tồn kho của đơn hàng đã được xử lý; vui lòng tải lại trang.');
     }
-    $itemsStmt->close();
-    $restockStmt->close();
 
     $updateStmt = $conn->prepare(
         "UPDATE orders

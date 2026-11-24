@@ -359,31 +359,73 @@ try {
     if ($user_id === null) {
         $order_stmt = $conn->prepare(
             "INSERT INTO orders
-                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount, payment_method)
-             VALUES (NULL, NULL, ?, ?, ?, ?, ?, 0.00, ?, ?)"
+                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount,
+                 payment_method, inventory_status, inventory_reserved_at, expires_at)
+             VALUES (NULL, NULL, ?, ?, ?, ?, ?, 0.00, ?, ?, 'reserved', NOW(),
+                     CASE WHEN ? = 'BANK_QR' THEN DATE_ADD(NOW(), INTERVAL 30 MINUTE)
+                          ELSE DATE_ADD(NOW(), INTERVAL 24 HOUR) END)"
         );
     } elseif ($address_id === null) {
         $order_stmt = $conn->prepare(
             "INSERT INTO orders
-                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount, payment_method)
-             VALUES (?, NULL, ?, ?, ?, ?, ?, 0.00, ?, ?)"
+                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount,
+                 payment_method, inventory_status, inventory_reserved_at, expires_at)
+             VALUES (?, NULL, ?, ?, ?, ?, ?, 0.00, ?, ?, 'reserved', NOW(),
+                     CASE WHEN ? = 'BANK_QR' THEN DATE_ADD(NOW(), INTERVAL 30 MINUTE)
+                          ELSE DATE_ADD(NOW(), INTERVAL 24 HOUR) END)"
         );
     } else {
         $order_stmt = $conn->prepare(
             "INSERT INTO orders
-                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount, payment_method)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 0.00, ?, ?)"
+                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount,
+                 payment_method, inventory_status, inventory_reserved_at, expires_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0.00, ?, ?, 'reserved', NOW(),
+                     CASE WHEN ? = 'BANK_QR' THEN DATE_ADD(NOW(), INTERVAL 30 MINUTE)
+                          ELSE DATE_ADD(NOW(), INTERVAL 24 HOUR) END)"
         );
     }
     if (!$order_stmt) {
         throw new RuntimeException('Không thể tạo đơn hàng.');
     }
     if ($user_id === null) {
-        $order_stmt->bind_param('sssssss', $full_name, $phone, $email, $address, $total_price, $total_discount, $payment_method);
+        $order_stmt->bind_param(
+            'ssssssss',
+            $full_name,
+            $phone,
+            $email,
+            $address,
+            $total_price,
+            $total_discount,
+            $payment_method,
+            $payment_method
+        );
     } elseif ($address_id === null) {
-        $order_stmt->bind_param('isssssss', $user_id, $full_name, $phone, $email, $address, $total_price, $total_discount, $payment_method);
+        $order_stmt->bind_param(
+            'issssssss',
+            $user_id,
+            $full_name,
+            $phone,
+            $email,
+            $address,
+            $total_price,
+            $total_discount,
+            $payment_method,
+            $payment_method
+        );
     } else {
-        $order_stmt->bind_param('iisssssss', $user_id, $address_id, $full_name, $phone, $email, $address, $total_price, $total_discount, $payment_method);
+        $order_stmt->bind_param(
+            'iissssssss',
+            $user_id,
+            $address_id,
+            $full_name,
+            $phone,
+            $email,
+            $address,
+            $total_price,
+            $total_discount,
+            $payment_method,
+            $payment_method
+        );
     }
     $order_stmt->execute();
     if ($order_stmt->affected_rows !== 1) {

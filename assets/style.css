@@ -370,6 +370,17 @@ section, main {
     margin: 0;
 }
 
+.cart-item-stock {
+    margin: -4px 0 0;
+    color: #536579;
+    font-size: 0.78rem;
+}
+
+.cart-item-stock.unavailable {
+    color: #b42318;
+    font-weight: 600;
+}
+
 .cart-item-price {
     color: var(--gold);
     font-weight: 700;
@@ -404,6 +415,11 @@ section, main {
     background: var(--navy);
     color: var(--white);
     border-color: var(--navy);
+}
+
+.cart-qty-controls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .cart-qty {

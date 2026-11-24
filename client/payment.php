@@ -24,7 +24,8 @@ if (!$orderId || $orderId < 1) {
 // Lấy đơn hàng thuộc tài khoản hiện tại
 $stmt = $conn->prepare(
     "SELECT id, total_price, payment_method,
-            payment_status, status, created_at
+            payment_status, status, created_at,
+            (expires_at IS NOT NULL AND expires_at <= NOW()) AS is_expired
      FROM orders
      WHERE id = ? AND user_id = ?
      LIMIT 1"
@@ -44,6 +45,12 @@ if (!$order || $order['payment_method'] !== 'BANK_QR') {
 
 if (in_array($order['status'], ['Đã hủy', 'Canceled'], true)) {
     exit('Đơn hàng đã bị hủy, không thể thanh toán.');
+}
+if (
+    (int) $order['is_expired'] === 1
+    && in_array($order['status'], ['Chờ xác nhận', 'Pending'], true)
+) {
+    exit('Đơn hàng đã hết thời gian thanh toán. Vui lòng đặt lại đơn hàng.');
 }
 
 // Tạo token bảo vệ yêu cầu xác nhận
