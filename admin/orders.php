@@ -149,7 +149,9 @@ if (!$emailColumn) {
     $emailField = $emailColumn->num_rows > 0 ? 'o.email' : "'' AS email";
     $sql = "SELECT o.id, o.full_name, o.phone, {$emailField}, o.address, o.total_price,
                    o.status, o.payment_status, o.payment_method, o.created_at,
-                   oi.product_name, oi.quantity, oi.price
+                   oi.product_sku, oi.attributes_snapshot, oi.category_name_snapshot,
+                   oi.product_name, oi.quantity,
+                   oi.price, oi.original_price, oi.discount_amount, oi.line_total
             FROM orders o
             LEFT JOIN order_items oi ON oi.order_id = o.id
             ORDER BY o.created_at DESC, o.id DESC, oi.id ASC";
@@ -177,9 +179,15 @@ if (!$emailColumn) {
             }
             if ($row['product_name'] !== null) {
                 $orders[$orderId]['items'][] = [
+                    'sku' => $row['product_sku'],
+                    'attributes' => $row['attributes_snapshot'],
+                    'category' => $row['category_name_snapshot'],
                     'name' => $row['product_name'],
                     'quantity' => (int) $row['quantity'],
                     'price' => (float) $row['price'],
+                    'original_price' => (float) $row['original_price'],
+                    'discount_amount' => (float) $row['discount_amount'],
+                    'line_total' => (float) $row['line_total'],
                 ];
             }
         }
@@ -897,7 +905,15 @@ $statusClasses = [
                                                     <strong>Sản phẩm:</strong>
                                                     <ul class="om-detail-items">
                                                         <?php foreach ($o['items'] as $item): ?>
-                                                            <li><?php echo $escape($item['name']); ?> × <?php echo $escape($item['quantity']); ?> — <?php echo $escape(number_format($item['price'], 0, ',', '.')); ?>đ / sp</li>
+                                                            <li>
+                                                                <?php echo $escape($item['name']); ?>
+                                                                <?php if ($item['sku'] !== null): ?> · SKU <?php echo $escape($item['sku']); ?><?php endif; ?>
+                                                                <?php if ($item['attributes'] !== ''): ?> · <?php echo $escape($item['attributes']); ?><?php endif; ?>
+                                                                <?php if ($item['category'] !== ''): ?> · <?php echo $escape($item['category']); ?><?php endif; ?>
+                                                                · <?php echo $escape($item['quantity']); ?> × <?php echo $escape(number_format($item['price'], 0, ',', '.')); ?>đ
+                                                                <?php if ($item['discount_amount'] > 0): ?> · giảm <?php echo $escape(number_format($item['discount_amount'], 0, ',', '.')); ?>đ<?php endif; ?>
+                                                                · thành tiền <?php echo $escape(number_format($item['line_total'], 0, ',', '.')); ?>đ
+                                                            </li>
                                                         <?php endforeach; ?>
                                                     </ul>
                                                 <?php else: ?>

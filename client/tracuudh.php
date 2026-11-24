@@ -972,7 +972,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
 
         visibleItems.forEach(item => {
             const quantity = Number(item.quantity) || 0;
-            const totalPrice = Number(item.price) * quantity;
+            const totalPrice = Number(item.line_total ?? (Number(item.price) * quantity));
             const imgSrc = getProductImageUrl(item.image);
             productsHtml += `
                 <div class="order-product-row">
@@ -980,6 +980,8 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
                     <div class="order-product-info">
                         <p class="product-name">${escHtml(item.product_name)}</p>
                         <p class="product-qty">${formatMoney(item.price)} × ${quantity}</p>
+                        ${item.product_sku ? `<p class="product-qty">SKU: ${escHtml(item.product_sku)}</p>` : ''}
+                        ${item.category_name_snapshot ? `<p class="product-qty">${escHtml(item.category_name_snapshot)}</p>` : ''}
                     </div>
                     <div class="order-product-price">${formatMoney(totalPrice)}</div>
                     ${renderReviewAction(item, isDelivered)}
@@ -1202,17 +1204,28 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
             const order = data.order;
             ordersCache[order.id] = order;
             const items = order.items || [];
-            const itemSubtotal = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0);
+            const itemSubtotal = items.reduce((sum, item) =>
+                sum + Number(item.original_price ?? item.price) * Number(item.quantity), 0);
             const isDelivered = ['Đã giao hàng', 'Đã giao', 'Hoàn thành'].includes(order.status);
             const itemHtml = items.map(item => {
                 const quantity = Number(item.quantity) || 0;
-                const lineTotal = Number(item.price) * quantity;
+                const lineTotal = Number(item.line_total ?? (Number(item.price) * quantity));
+                const productSnapshot = [
+                    item.product_sku ? `SKU: ${item.product_sku}` : '',
+                    item.category_name_snapshot || '',
+                    item.attributes_snapshot || ''
+                ].filter(Boolean).join(' · ');
+                const priceDetails = Number(item.discount_amount) > 0
+                    ? `Giá gốc ${formatMoney(item.original_price)} · Giảm ${formatMoney(item.discount_amount)}`
+                    : `Đơn giá ${formatMoney(item.price)}`;
                 return `
                     <div class="order-product-row">
                         <img class="order-product-img" src="${escHtml(getProductImageUrl(item.image))}" alt="" onerror="this.onerror=null;this.src='${BASE}/assets/banner/logo.png'">
                         <div class="order-product-info">
                             <p class="product-name">${escHtml(item.product_name)}</p>
                             <p class="product-qty">${formatMoney(item.price)} × ${quantity}</p>
+                            ${productSnapshot ? `<p class="product-qty">${escHtml(productSnapshot)}</p>` : ''}
+                            <p class="product-qty">${priceDetails}</p>
                         </div>
                         <div class="order-product-price">${formatMoney(lineTotal)}</div>
                         ${renderReviewAction(item, isDelivered)}

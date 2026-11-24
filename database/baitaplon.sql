@@ -229,13 +229,20 @@ CREATE TABLE `order_items` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `order_id` int(10) unsigned NOT NULL,
   `product_id` int(10) unsigned DEFAULT NULL,
+  `product_sku` varchar(100) DEFAULT NULL,
+  `attributes_snapshot` varchar(500) NOT NULL DEFAULT '',
+  `category_name_snapshot` varchar(255) NOT NULL DEFAULT '',
   `product_name` varchar(255) NOT NULL,
   `quantity` int(10) unsigned NOT NULL,
   `price` decimal(12,2) NOT NULL,
+  `original_price` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `discount_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `line_total` decimal(12,2) NOT NULL DEFAULT 0.00,
   `image` varchar(500) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_order_items_order` (`order_id`),
   KEY `idx_order_items_product` (`product_id`),
+  CONSTRAINT `chk_order_items_snapshot_amounts` CHECK (`quantity` > 0 AND `price` >= 0 AND `original_price` >= `price` AND `discount_amount` >= 0 AND `line_total` >= 0 AND `line_total` = `price` * `quantity` AND `discount_amount` = (`original_price` - `price`) * `quantity`),
   CONSTRAINT `fk_order_items_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_order_items_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -247,7 +254,20 @@ CREATE TABLE `order_items` (
 
 LOCK TABLES `order_items` WRITE;
 /*!40000 ALTER TABLE `order_items` DISABLE KEYS */;
-INSERT INTO `order_items` VALUES (1,1,74,'Vòng tay Tối Giản Tinh Tế',1,1290000.00,'assets/vòng tay/vong15.png'),(2,2,4,'Set quà tặng Trọn Vẹn Yêu Thương',28,990000.00,'assets/quà/set1.jpg'),(3,3,3,'Nhẫn Kim Cương Ánh Tuyết Éclat',24,790000.00,'assets/nhẫn/nhan1.png'),(4,4,9,'Set quà tặng Hương Sắc Nàng Thơ',20,1050000.00,'assets/quà/set2.jpg'),(5,5,2,'Dây chuyền Trái Tim Đại Dương',18,650000.00,'assets/dây chuyền/dâychuyen/day1.jpg'),(6,6,1,'Bông tai Hoa Tuyết Dạ Quang',16,390000.00,'assets/bôngtai/bong1.jpg'),(7,7,14,'Set quà tặng Tình Nồng Say Đắm',15,1110000.00,'assets/quà/set3.jpg'),(8,8,8,'Nhẫn Vương Miện Nữ Hoàng',12,860000.00,'assets/nhẫn/nhan2.png'),(9,9,10,'Vòng tay Khắc Kỷ Niệm Vĩnh Hằng',10,640000.00,'assets/vòng tay/vong2.png'),(10,10,74,'Vòng tay Tối Giản Tinh Tế',8,1290000.00,'assets/vòng tay/vong15.png'),(11,11,6,'Bông tai Giọt Sương Pha Lê',6,440000.00,'assets/bôngtai/bong2.jpg'),(12,12,7,'Dây chuyền Vầng Trăng Yêu Thương',5,710000.00,'assets/dây chuyền/dâychuyen/day2.jpg'),(13,13,13,'Nhẫn Tình Nồng Vĩnh Cửu',4,930000.00,'assets/nhẫn/nhan3.png');
+INSERT INTO `order_items` (`id`,`order_id`,`product_id`,`product_sku`,`attributes_snapshot`,`category_name_snapshot`,`product_name`,`quantity`,`price`,`original_price`,`discount_amount`,`line_total`,`image`) VALUES
+(1,1,74,NULL,'','','Vòng tay Tối Giản Tinh Tế',1,1290000.00,1290000.00,0.00,1290000.00,'assets/vòng tay/vong15.png'),
+(2,2,4,NULL,'','','Set quà tặng Trọn Vẹn Yêu Thương',28,990000.00,990000.00,0.00,27720000.00,'assets/quà/set1.jpg'),
+(3,3,3,NULL,'','','Nhẫn Kim Cương Ánh Tuyết Éclat',24,790000.00,790000.00,0.00,18960000.00,'assets/nhẫn/nhan1.png'),
+(4,4,9,NULL,'','','Set quà tặng Hương Sắc Nàng Thơ',20,1050000.00,1050000.00,0.00,21000000.00,'assets/quà/set2.jpg'),
+(5,5,2,NULL,'','','Dây chuyền Trái Tim Đại Dương',18,650000.00,650000.00,0.00,11700000.00,'assets/dây chuyền/dâychuyen/day1.jpg'),
+(6,6,1,NULL,'','','Bông tai Hoa Tuyết Dạ Quang',16,390000.00,390000.00,0.00,6240000.00,'assets/bôngtai/bong1.jpg'),
+(7,7,14,NULL,'','','Set quà tặng Tình Nồng Say Đắm',15,1110000.00,1110000.00,0.00,16650000.00,'assets/quà/set3.jpg'),
+(8,8,8,NULL,'','','Nhẫn Vương Miện Nữ Hoàng',12,860000.00,860000.00,0.00,10320000.00,'assets/nhẫn/nhan2.png'),
+(9,9,10,NULL,'','','Vòng tay Khắc Kỷ Niệm Vĩnh Hằng',10,640000.00,640000.00,0.00,6400000.00,'assets/vòng tay/vong2.png'),
+(10,10,74,NULL,'','','Vòng tay Tối Giản Tinh Tế',8,1290000.00,1290000.00,0.00,10320000.00,'assets/vòng tay/vong15.png'),
+(11,11,6,NULL,'','','Bông tai Giọt Sương Pha Lê',6,440000.00,440000.00,0.00,2640000.00,'assets/bôngtai/bong2.jpg'),
+(12,12,7,NULL,'','','Dây chuyền Vầng Trăng Yêu Thương',5,710000.00,710000.00,0.00,3550000.00,'assets/dây chuyền/dâychuyen/day2.jpg'),
+(13,13,13,NULL,'','','Nhẫn Tình Nồng Vĩnh Cửu',4,930000.00,930000.00,0.00,3720000.00,'assets/nhẫn/nhan3.png');
 /*!40000 ALTER TABLE `order_items` ENABLE KEYS */;
 UNLOCK TABLES;
 

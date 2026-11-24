@@ -42,6 +42,21 @@ if ($ordersTable->num_rows > 0) {
             throw new RuntimeException('Không thể cập nhật cấu trúc đơn hàng.');
         }
     }
+    foreach ([
+        'total_price' => 'ALTER TABLE orders MODIFY COLUMN total_price DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+        'shipping_fee' => 'ALTER TABLE orders MODIFY COLUMN shipping_fee DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+        'discount_amount' => 'ALTER TABLE orders MODIFY COLUMN discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+    ] as $columnName => $alterSql) {
+        $columnResult = $conn->query("SHOW COLUMNS FROM orders LIKE '{$columnName}'");
+        $column = $columnResult ? $columnResult->fetch_assoc() : null;
+        if (!$column) {
+            throw new RuntimeException('Không thể xác minh cột tiền đơn hàng ' . $columnName . '.');
+        }
+        if (strtolower((string) $column['Type']) !== 'decimal(12,2)' && !$conn->query($alterSql)) {
+            error_log('Order money type migration failed for ' . $columnName . ': ' . $conn->error);
+            throw new RuntimeException('Không thể chuẩn hóa kiểu tiền đơn hàng.');
+        }
+    }
 
     $orderIndexResult = $conn->query("SHOW INDEX FROM orders WHERE Key_name = 'idx_orders_user_created'");
     if (!$orderIndexResult) {
@@ -465,6 +480,20 @@ foreach ($productPricingColumns as $columnName => $alterSql) {
         $needUpdateView = true;
     }
 }
+foreach ([
+    'price_sale' => 'ALTER TABLE products MODIFY COLUMN price_sale DECIMAL(12,2) NOT NULL',
+    'price_original' => 'ALTER TABLE products MODIFY COLUMN price_original DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+] as $columnName => $alterSql) {
+    $columnResult = $conn->query("SHOW COLUMNS FROM products LIKE '{$columnName}'");
+    $column = $columnResult ? $columnResult->fetch_assoc() : null;
+    if (!$column) {
+        throw new RuntimeException('Không thể xác minh cột giá sản phẩm ' . $columnName . '.');
+    }
+    if (strtolower((string) $column['Type']) !== 'decimal(12,2)' && !$conn->query($alterSql)) {
+        error_log('Product money type migration failed for ' . $columnName . ': ' . $conn->error);
+        throw new RuntimeException('Không thể chuẩn hóa kiểu tiền sản phẩm.');
+    }
+}
 
 // Remove legacy price triggers before normalizing data; they used to rewrite price_original.
 if (!$conn->query('DROP TRIGGER IF EXISTS trg_products_before_insert')
@@ -844,6 +873,96 @@ if ($orderItemsOrderForeignKeyRow
     if ($orphanOrderItemCount > 0) {
         error_log('Order-item foreign key was not added because ' . $orphanOrderItemCount . ' orphaned references exist.');
     }
+}
+
+$orderItemColumnsResult = $conn->query('SHOW COLUMNS FROM order_items');
+if (!$orderItemColumnsResult) {
+    throw new RuntimeException('Không thể kiểm tra cấu trúc chi tiết đơn hàng.');
+}
+$orderItemColumns = [];
+while ($column = $orderItemColumnsResult->fetch_assoc()) {
+    $orderItemColumns[$column['Field']] = $column;
+}
+$orderItemNeedsAmountBackfill = false;
+foreach (['original_price', 'discount_amount', 'line_total'] as $amountColumn) {
+    if (!isset($orderItemColumns[$amountColumn]) || $orderItemColumns[$amountColumn]['Null'] === 'YES') {
+        $orderItemNeedsAmountBackfill = true;
+    }
+}
+$orderItemColumnMigrations = [
+    'product_sku' => 'ALTER TABLE order_items ADD COLUMN product_sku VARCHAR(100) NULL DEFAULT NULL AFTER product_id',
+    'attributes_snapshot' => "ALTER TABLE order_items ADD COLUMN attributes_snapshot VARCHAR(500) NOT NULL DEFAULT '' AFTER product_sku",
+    'category_name_snapshot' => "ALTER TABLE order_items ADD COLUMN category_name_snapshot VARCHAR(255) NOT NULL DEFAULT '' AFTER attributes_snapshot",
+    'original_price' => 'ALTER TABLE order_items ADD COLUMN original_price DECIMAL(12,2) NULL DEFAULT NULL AFTER price',
+    'discount_amount' => 'ALTER TABLE order_items ADD COLUMN discount_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER original_price',
+    'line_total' => 'ALTER TABLE order_items ADD COLUMN line_total DECIMAL(12,2) NULL DEFAULT NULL AFTER discount_amount',
+];
+foreach ($orderItemColumnMigrations as $columnName => $alterSql) {
+    if (!isset($orderItemColumns[$columnName]) && !$conn->query($alterSql)) {
+        error_log('Order-item snapshot migration failed for ' . $columnName . ': ' . $conn->error);
+        throw new RuntimeException('Không thể cập nhật cấu trúc snapshot chi tiết đơn hàng.');
+    }
+}
+
+if ($orderItemNeedsAmountBackfill) {
+    $orderItemAmountBackfill = $conn->query(
+        'UPDATE order_items
+         SET original_price = COALESCE(original_price, price),
+             discount_amount = COALESCE(discount_amount, 0.00),
+             line_total = COALESCE(line_total, price * quantity)
+         WHERE original_price IS NULL OR discount_amount IS NULL OR line_total IS NULL'
+    );
+    if (!$orderItemAmountBackfill) {
+        error_log('Order-item amount backfill failed: ' . $conn->error);
+        throw new RuntimeException('Không thể bảo toàn giá trị chi tiết đơn hàng cũ.');
+    }
+}
+
+foreach ([
+    'price' => 'ALTER TABLE order_items MODIFY COLUMN price DECIMAL(12,2) NOT NULL',
+    'original_price' => 'ALTER TABLE order_items MODIFY COLUMN original_price DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+    'discount_amount' => 'ALTER TABLE order_items MODIFY COLUMN discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+    'line_total' => 'ALTER TABLE order_items MODIFY COLUMN line_total DECIMAL(12,2) NOT NULL DEFAULT 0.00',
+] as $columnName => $alterSql) {
+    $columnResult = $conn->query("SHOW COLUMNS FROM order_items LIKE '{$columnName}'");
+    $column = $columnResult ? $columnResult->fetch_assoc() : null;
+    if (!$column) {
+        throw new RuntimeException('Không thể xác minh cột tiền ' . $columnName . ' của chi tiết đơn hàng.');
+    }
+    $needsAmountTypeMigration = $column['Null'] === 'YES'
+        || strtolower((string) $column['Type']) !== 'decimal(12,2)';
+    if ($needsAmountTypeMigration && !$conn->query($alterSql)) {
+        error_log('Order-item amount constraint migration failed for ' . $columnName . ': ' . $conn->error);
+        throw new RuntimeException('Không thể bảo vệ giá trị tiền của chi tiết đơn hàng.');
+    }
+}
+
+$orderItemAmountConstraint = $conn->query(
+    "SELECT CONSTRAINT_NAME
+     FROM information_schema.TABLE_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'order_items'
+       AND CONSTRAINT_NAME = 'chk_order_items_snapshot_amounts'
+       AND CONSTRAINT_TYPE = 'CHECK'"
+);
+if (!$orderItemAmountConstraint) {
+    throw new RuntimeException('Không thể kiểm tra ràng buộc tiền chi tiết đơn hàng.');
+}
+if ($orderItemAmountConstraint->num_rows === 0 && !$conn->query(
+    'ALTER TABLE order_items
+     ADD CONSTRAINT chk_order_items_snapshot_amounts
+     CHECK (
+         quantity > 0
+         AND price >= 0
+         AND original_price >= price
+         AND discount_amount >= 0
+         AND line_total >= 0
+         AND line_total = price * quantity
+         AND discount_amount = (original_price - price) * quantity
+     )'
+)) {
+    error_log('Order-item amount constraint setup failed: ' . $conn->error);
+    throw new RuntimeException('Không thể bảo vệ tính nhất quán tiền chi tiết đơn hàng.');
 }
 
 $chatProductTable = $conn->query(

@@ -864,7 +864,7 @@ function renderCheckoutSummary() {
         sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0));
 }
 
-function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 'COD') {
+function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 'COD', discountAmount = '0.00', subtotal = null) {
     const success = document.getElementById('checkout-success');
     if (!success) return;
 
@@ -894,11 +894,38 @@ function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 
         const quantity = document.createElement('span');
         quantity.textContent = `Số lượng: ${item.quantity}`;
         const price = document.createElement('span');
-        price.textContent = formatPrice((Number(item.price ?? item.unit_price) || 0) * (Number(item.quantity) || 0));
-        row.append(name, quantity, price);
+        price.textContent = formatPrice(Number(item.line_total ?? ((Number(item.price ?? item.unit_price) || 0) * (Number(item.quantity) || 0))));
+        row.append(name, quantity);
+        if (item.product_sku) {
+            const sku = document.createElement('span');
+            sku.textContent = `SKU: ${item.product_sku}`;
+            row.appendChild(sku);
+        }
+        if (item.attributes_snapshot) {
+            const attributes = document.createElement('span');
+            attributes.textContent = item.attributes_snapshot;
+            row.appendChild(attributes);
+        }
+        if (item.category_name_snapshot) {
+            const category = document.createElement('span');
+            category.textContent = `Phân loại: ${item.category_name_snapshot}`;
+            row.appendChild(category);
+        }
+        if (Number(item.discount_amount) > 0) {
+            const discount = document.createElement('span');
+            discount.textContent = `Giảm: ${formatPrice(item.discount_amount)}`;
+            row.appendChild(discount);
+        }
+        row.appendChild(price);
         receiptItems.appendChild(row);
     });
+    const receiptSubtotal = success.querySelector('.checkout-receipt-subtotal');
+    if (receiptSubtotal) {
+        receiptSubtotal.textContent = formatPrice(Number(subtotal ?? total) || 0);
+    }
     success.querySelector('.checkout-receipt-total').textContent = formatPrice(Number(total) || 0);
+    const receiptDiscount = success.querySelector('.checkout-receipt-discount');
+    if (receiptDiscount) receiptDiscount.textContent = `−${formatPrice(Number(discountAmount) || 0)}`;
     const receiptPayment = success.querySelector('.checkout-receipt-payment');
     const successQr = success.querySelector('.checkout-success-qr');
     if (paymentMethod === 'BANK_QR') {
@@ -1721,7 +1748,10 @@ function initCheckoutPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    cart: selectedItems,
+                    cart: selectedItems.map(item => ({
+                        product_id: item.product_id,
+                        quantity: item.quantity
+                    })),
                     customer,
                     address_id: savedAddressId,
                     save_as_new_address: addressPicker ? addressPicker.isEditingSavedAddress() : false,
@@ -1769,9 +1799,11 @@ form.hidden = true;
 renderCheckoutReceipt(
     result.order_id,
     customer,
-    result.items || selectedItems,
+    result.items || [],
     result.total_price,
-    paymentMethod
+    paymentMethod,
+    result.discount_amount,
+    result.subtotal
 );
 
         } catch (error) {

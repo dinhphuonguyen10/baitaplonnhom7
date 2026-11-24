@@ -71,21 +71,62 @@ $featuredSales = [
 $orderCheck = $conn->query("SELECT COUNT(*) as total FROM orders WHERE id > 1");
 if ($orderCheck && $orderCheck->fetch_assoc()['total'] == 0) {
     foreach ($featuredSales as $prodId => $qty) {
-        // Lấy thông tin sản phẩm
-        $pRes = $conn->query("SELECT name, CASE WHEN promotion_ends_at IS NOT NULL AND promotion_ends_at <= NOW() THEN price_original ELSE price_sale END AS effective_price, image FROM products WHERE id = {$prodId}");
-        if (!$pRes || !($prod = $pRes->fetch_assoc())) continue;
+        $pRes = $conn->prepare(
+            "SELECT p.sku, p.name, p.price_original, c.name AS category_name,
+                    CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                         THEN p.price_original ELSE p.price_sale END AS effective_price,
+                    (CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                          THEN p.price_original ELSE p.price_sale END) * ? AS line_total,
+                    (p.price_original - CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                                             THEN p.price_original ELSE p.price_sale END) * ? AS line_discount,
+                    p.image
+             FROM products p
+             INNER JOIN categories c ON c.id = p.category_id
+             WHERE p.id = ?"
+        );
+        $pRes->bind_param('iii', $qty, $qty, $prodId);
+        $pRes->execute();
+        $productResult = $pRes->get_result();
+        if (!($prod = $productResult->fetch_assoc())) {
+            $pRes->close();
+            continue;
+        }
+        $pRes->close();
 
         $randUser = $userIds[array_rand($userIds)];
-        $totalPrice = $prod['effective_price'] * $qty;
+        $totalPrice = (string) $prod['line_total'];
+        $discountAmount = (string) $prod['line_discount'];
         
-        $insOrder = $conn->prepare("INSERT INTO orders (user_id, full_name, phone, email, address, total_price, status, payment_status, payment_method, created_at) VALUES (?, 'Khách hàng VIP', '0912345678', 'order@ecrin.vn', 'Hà Nội', ?, 'Đã giao hàng', 'Đã thanh toán', 'COD', NOW() - INTERVAL FLOOR(RAND() * 30) DAY)");
-        $insOrder->bind_param("id", $randUser, $totalPrice);
+        $insOrder = $conn->prepare("INSERT INTO orders (user_id, full_name, phone, email, address, total_price, discount_amount, status, payment_status, payment_method, created_at) VALUES (?, 'Khách hàng VIP', '0912345678', 'order@ecrin.vn', 'Hà Nội', ?, ?, 'Đã giao hàng', 'Đã thanh toán', 'COD', NOW() - INTERVAL FLOOR(RAND() * 30) DAY)");
+        $insOrder->bind_param("iss", $randUser, $totalPrice, $discountAmount);
         $insOrder->execute();
         $newOrderId = $conn->insert_id;
+        $insOrder->close();
 
-        $insItem = $conn->prepare("INSERT INTO order_items (order_id, product_id, product_name, quantity, price, image) VALUES (?, ?, ?, ?, ?, ?)");
-        $insItem->bind_param("iisids", $newOrderId, $prodId, $prod['name'], $qty, $prod['effective_price'], $prod['image']);
+        $attributesSnapshot = '';
+        $insItem = $conn->prepare(
+            'INSERT INTO order_items
+                (order_id, product_id, product_sku, attributes_snapshot, category_name_snapshot,
+                 product_name, quantity, price, original_price, discount_amount, line_total, image)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $insItem->bind_param(
+            'iissssisssss',
+            $newOrderId,
+            $prodId,
+            $prod['sku'],
+            $attributesSnapshot,
+            $prod['category_name'],
+            $prod['name'],
+            $qty,
+            $prod['effective_price'],
+            $prod['price_original'],
+            $discountAmount,
+            $totalPrice,
+            $prod['image']
+        );
         $insItem->execute();
+        $insItem->close();
     }
     echo "Seed orders completed.\n";
 } else {

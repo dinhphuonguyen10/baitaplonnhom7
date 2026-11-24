@@ -12,6 +12,26 @@ function respondWithError($message, $statusCode = 400)
     exit;
 }
 
+function parseOrderMoneyCents($value): ?int
+{
+    if (!is_string($value) && !is_int($value)) {
+        return null;
+    }
+
+    $value = trim((string) $value);
+    if (!preg_match('/^\d{1,10}(?:\.\d{1,2})?$/D', $value)) {
+        return null;
+    }
+
+    [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+    return (int) $whole * 100 + (int) str_pad($fraction, 2, '0');
+}
+
+function formatOrderMoneyCents(int $cents): string
+{
+    return intdiv($cents, 100) . '.' . str_pad((string) ($cents % 100), 2, '0', STR_PAD_LEFT);
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     respondWithError('Phương thức yêu cầu không hợp lệ.', 405);
 }
@@ -87,7 +107,11 @@ foreach ($cart as $item) {
     }
 
     $quantities[$product_id] = ($quantities[$product_id] ?? 0) + $quantity;
+    if ($quantities[$product_id] > 99) {
+        respondWithError('Số lượng mỗi sản phẩm không được vượt quá 99.');
+    }
 }
+ksort($quantities, SORT_NUMERIC);
 
 try {
     $email_column = $conn->query("SHOW COLUMNS FROM orders LIKE 'email'");
@@ -103,7 +127,7 @@ try {
     $conn->begin_transaction();
 
     $product_stmt = $conn->prepare(
-        "SELECT p.id, p.name,
+        "SELECT p.id, p.sku, p.name, p.price_original, c.name AS category_name,
                 CASE
                     WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
                     THEN p.price_original
@@ -116,9 +140,15 @@ try {
          WHERE p.id = ?
          FOR UPDATE"
     );
+    if (!$product_stmt) {
+        throw new RuntimeException('Không thể kiểm tra giá và tồn kho sản phẩm.');
+    }
     $stock_stmt = $conn->prepare(
         'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?'
     );
+    if (!$stock_stmt) {
+        throw new RuntimeException('Không thể chuẩn bị cập nhật tồn kho.');
+    }
     $user_id = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
     $address_id = null;
 
@@ -264,29 +294,11 @@ try {
         }
     }
 
-    if ($user_id === null) {
-        $order_stmt = $conn->prepare(
-            "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
-             VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?)"
-        );
-    } elseif ($address_id === null) {
-        $order_stmt = $conn->prepare(
-            "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
-             VALUES (?, NULL, ?, ?, ?, ?, ?, ?)"
-        );
-    } else {
-        $order_stmt = $conn->prepare(
-            "INSERT INTO orders (user_id, address_id, full_name, phone, email, address, total_price, payment_method)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-    }
-    $item_stmt = $conn->prepare(
-        'INSERT INTO order_items (order_id, product_id, product_name, quantity, price, image)
-         VALUES (?, ?, ?, ?, ?, ?)'
-    );
-
     $products = [];
-    $total_price = 0;
+    $total_price_cents = 0;
+    $total_discount_cents = 0;
+    $gross_subtotal_cents = 0;
+    $max_order_amount_cents = 999999999999;
     foreach ($quantities as $product_id => $quantity) {
         $product_stmt->bind_param('i', $product_id);
         $product_stmt->execute();
@@ -301,28 +313,106 @@ try {
         if ((int) $product['stock'] < $quantity) {
             throw new DomainException('Sản phẩm "' . $product['name'] . '" không đủ số lượng tồn kho.');
         }
+        if (!is_string($product['sku']) || trim($product['sku']) === '') {
+            throw new RuntimeException('Sản phẩm chưa có mã SKU hợp lệ.');
+        }
+
+        $unit_price_cents = parseOrderMoneyCents($product['effective_price']);
+        $original_price_cents = parseOrderMoneyCents($product['price_original']);
+        if ($unit_price_cents === null || $original_price_cents === null
+            || $unit_price_cents > $original_price_cents) {
+            throw new RuntimeException('Giá sản phẩm trong cơ sở dữ liệu không hợp lệ.');
+        }
+
+        $unit_discount_cents = $original_price_cents - $unit_price_cents;
+        $line_total_cents = $unit_price_cents * $quantity;
+        $line_discount_cents = $unit_discount_cents * $quantity;
+        $line_gross_cents = $original_price_cents * $quantity;
+        if ($line_total_cents > $max_order_amount_cents
+            || $line_discount_cents > $max_order_amount_cents
+            || $line_gross_cents > $max_order_amount_cents
+            || $total_price_cents > $max_order_amount_cents - $line_total_cents
+            || $total_discount_cents > $max_order_amount_cents - $line_discount_cents
+            || $gross_subtotal_cents > $max_order_amount_cents - $line_gross_cents) {
+            throw new DomainException('Tổng giá trị đơn hàng vượt quá giới hạn thanh toán.');
+        }
 
         $product['quantity'] = $quantity;
+        $product['effective_price_decimal'] = formatOrderMoneyCents($unit_price_cents);
+        $product['original_price_decimal'] = formatOrderMoneyCents($original_price_cents);
+        $product['discount_amount_decimal'] = formatOrderMoneyCents($line_discount_cents);
+        $product['line_total_decimal'] = formatOrderMoneyCents($line_total_cents);
+        $product['attributes_snapshot'] = '';
+        $product['category_name_snapshot'] = (string) $product['category_name'];
         $products[] = $product;
-        $total_price += (float) $product['effective_price'] * $quantity;
+        $total_price_cents += $line_total_cents;
+        $total_discount_cents += $line_discount_cents;
+        $gross_subtotal_cents += $line_gross_cents;
     }
 
-    $total_price = round($total_price, 2);
+    if ($gross_subtotal_cents - $total_discount_cents !== $total_price_cents) {
+        throw new RuntimeException('Không thể cân đối tổng tiền và giảm giá đơn hàng.');
+    }
+
+    $total_price = formatOrderMoneyCents($total_price_cents);
+    $total_discount = formatOrderMoneyCents($total_discount_cents);
     if ($user_id === null) {
-        $order_stmt->bind_param('ssssds', $full_name, $phone, $email, $address, $total_price, $payment_method);
+        $order_stmt = $conn->prepare(
+            "INSERT INTO orders
+                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount, payment_method)
+             VALUES (NULL, NULL, ?, ?, ?, ?, ?, 0.00, ?, ?)"
+        );
     } elseif ($address_id === null) {
-        $order_stmt->bind_param('issssds', $user_id, $full_name, $phone, $email, $address, $total_price, $payment_method);
+        $order_stmt = $conn->prepare(
+            "INSERT INTO orders
+                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount, payment_method)
+             VALUES (?, NULL, ?, ?, ?, ?, ?, 0.00, ?, ?)"
+        );
     } else {
-        $order_stmt->bind_param('iissssds', $user_id, $address_id, $full_name, $phone, $email, $address, $total_price, $payment_method);
+        $order_stmt = $conn->prepare(
+            "INSERT INTO orders
+                (user_id, address_id, full_name, phone, email, address, total_price, shipping_fee, discount_amount, payment_method)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0.00, ?, ?)"
+        );
+    }
+    if (!$order_stmt) {
+        throw new RuntimeException('Không thể tạo đơn hàng.');
+    }
+    if ($user_id === null) {
+        $order_stmt->bind_param('sssssss', $full_name, $phone, $email, $address, $total_price, $total_discount, $payment_method);
+    } elseif ($address_id === null) {
+        $order_stmt->bind_param('isssssss', $user_id, $full_name, $phone, $email, $address, $total_price, $total_discount, $payment_method);
+    } else {
+        $order_stmt->bind_param('iisssssss', $user_id, $address_id, $full_name, $phone, $email, $address, $total_price, $total_discount, $payment_method);
     }
     $order_stmt->execute();
+    if ($order_stmt->affected_rows !== 1) {
+        throw new RuntimeException('Không thể lưu đơn hàng.');
+    }
     $order_id = $conn->insert_id;
+    $order_stmt->close();
+
+    $item_stmt = $conn->prepare(
+        'INSERT INTO order_items
+            (order_id, product_id, product_sku, attributes_snapshot, category_name_snapshot,
+             product_name, quantity, price, original_price, discount_amount, line_total, image)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    if (!$item_stmt) {
+        throw new RuntimeException('Không thể lưu snapshot sản phẩm.');
+    }
 
     foreach ($products as $product) {
         $product_id = (int) $product['id'];
         $quantity = (int) $product['quantity'];
-        $price = (float) $product['effective_price'];
+        $sku = (string) $product['sku'];
+        $attributes_snapshot = (string) $product['attributes_snapshot'];
+        $category_name_snapshot = (string) $product['category_name_snapshot'];
         $product_name = $product['name'];
+        $price = $product['effective_price_decimal'];
+        $original_price = $product['original_price_decimal'];
+        $line_discount = $product['discount_amount_decimal'];
+        $line_total = $product['line_total_decimal'];
         $image = $product['image'];
 
         $stock_stmt->bind_param('iii', $quantity, $product_id, $quantity);
@@ -331,8 +421,60 @@ try {
             throw new DomainException('Số lượng tồn kho vừa thay đổi. Vui lòng thử đặt hàng lại.');
         }
 
-        $item_stmt->bind_param('iisids', $order_id, $product_id, $product_name, $quantity, $price, $image);
+        $item_stmt->bind_param(
+            'iissssisssss',
+            $order_id,
+            $product_id,
+            $sku,
+            $attributes_snapshot,
+            $category_name_snapshot,
+            $product_name,
+            $quantity,
+            $price,
+            $original_price,
+            $line_discount,
+            $line_total,
+            $image
+        );
         $item_stmt->execute();
+        if ($item_stmt->affected_rows !== 1) {
+            throw new RuntimeException('Không thể lưu chi tiết sản phẩm của đơn hàng.');
+        }
+    }
+    $item_stmt->close();
+    $product_stmt->close();
+    $stock_stmt->close();
+
+    $orderCheckStmt = $conn->prepare(
+        'SELECT o.total_price, o.discount_amount,
+                COUNT(oi.id) AS item_count,
+                COALESCE(SUM(oi.line_total), 0.00) AS line_total_sum,
+                COALESCE(SUM(oi.price * oi.quantity), 0.00) AS calculated_line_total,
+                COALESCE(SUM(oi.discount_amount), 0.00) AS item_discount_sum,
+                COALESCE(SUM(oi.original_price * oi.quantity), 0.00) AS gross_subtotal,
+                COALESCE(SUM(oi.original_price * oi.quantity - oi.discount_amount), 0.00) AS calculated_payable
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         WHERE o.id = ?
+         GROUP BY o.id'
+    );
+    if (!$orderCheckStmt) {
+        throw new RuntimeException('Không thể kiểm tra tính nhất quán số tiền đơn hàng.');
+    }
+    $orderCheckStmt->bind_param('i', $order_id);
+    $orderCheckStmt->execute();
+    $orderCheck = $orderCheckStmt->get_result()->fetch_assoc();
+    $orderCheckStmt->close();
+    if (!$orderCheck
+        || (int) $orderCheck['item_count'] !== count($products)
+        || parseOrderMoneyCents((string) $orderCheck['total_price']) !== $total_price_cents
+        || parseOrderMoneyCents((string) $orderCheck['discount_amount']) !== $total_discount_cents
+        || parseOrderMoneyCents((string) $orderCheck['line_total_sum']) !== $total_price_cents
+        || parseOrderMoneyCents((string) $orderCheck['calculated_line_total']) !== $total_price_cents
+        || parseOrderMoneyCents((string) $orderCheck['item_discount_sum']) !== $total_discount_cents
+        || parseOrderMoneyCents((string) $orderCheck['gross_subtotal']) !== $gross_subtotal_cents
+        || parseOrderMoneyCents((string) $orderCheck['calculated_payable']) !== $total_price_cents) {
+        throw new RuntimeException('Tổng tiền đơn hàng không khớp với chi tiết sản phẩm.');
     }
 
     $history_stmt = $conn->prepare(
@@ -352,22 +494,34 @@ try {
 
     $conn->commit();
 
-    // Gửi tin cảm ơn tự động cho khách đã đăng nhập
+    // Phản hồi tự động không được làm đơn hàng đã commit bị báo thất bại.
     if ($user_id !== null) {
-        sendAutoReply($conn, $user_id, 'order_thankyou');
+        try {
+            sendAutoReply($conn, $user_id, 'order_thankyou');
+        } catch (Throwable $e) {
+            error_log('Order confirmation auto-reply failed: ' . $e->getMessage());
+        }
     }
     $ordered_items = array_map(static function ($product) {
         return [
             'product_name' => $product['name'],
+            'product_sku' => $product['sku'],
+            'attributes_snapshot' => $product['attributes_snapshot'],
+            'category_name_snapshot' => $product['category_name_snapshot'],
             'quantity' => (int) $product['quantity'],
-            'price' => (float) $product['effective_price']
+            'price' => $product['effective_price_decimal'],
+            'original_price' => $product['original_price_decimal'],
+            'discount_amount' => $product['discount_amount_decimal'],
+            'line_total' => $product['line_total_decimal'],
         ];
     }, $products);
     echo json_encode([
         'status' => 'success',
         'message' => 'Đặt hàng thành công!',
         'order_id' => $order_id,
+        'subtotal' => formatOrderMoneyCents($gross_subtotal_cents),
         'total_price' => $total_price,
+        'discount_amount' => $total_discount,
         'items' => $ordered_items
     ], JSON_UNESCAPED_UNICODE);
 } catch (DomainException $e) {
