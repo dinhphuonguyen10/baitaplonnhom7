@@ -1,8 +1,6 @@
 <?php
 // Tác dụng: Kiểm soát quyền truy cập khu vực quản trị, ngăn chặn người dùng chưa xác thực hoặc không có thẩm quyền
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
+require_once __DIR__ . '/session.php';
 require_once __DIR__ . '/admin_roles.php';
 
 // Tác dụng: Xác minh phiên làm việc quản trị độc lập (admin/manager/staff)

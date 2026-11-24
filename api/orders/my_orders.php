@@ -1,7 +1,7 @@
 <?php
 // api/orders/my_orders.php — Trả về danh sách đơn hàng của user đang đăng nhập
 // Hỗ trợ lọc theo trạng thái qua ?status=...
-session_start();
+require_once __DIR__ . '/../../include/session.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../include/order_payment_helper.php';
 

@@ -1,7 +1,5 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
+require_once __DIR__ . '/session.php';
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
 $appBaseUrl = rtrim($appBaseUrl, '/');
@@ -9,8 +7,12 @@ $bodyClass = isset($bodyClass) && is_string($bodyClass) ? $bodyClass : '';
 $customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
     ? (string) $_SESSION['username']
     : null;
-$accountUsername = $customerUsername;
-$accountRole = $customerUsername !== null ? 'customer' : null;
+$adminUsernameForClient = isset($_SESSION['admin_user_id'], $_SESSION['admin_username'])
+    && in_array($_SESSION['admin_role'] ?? '', ['admin', 'manager', 'staff'], true)
+    ? (string) $_SESSION['admin_username']
+    : null;
+$accountUsername = $customerUsername ?? $adminUsernameForClient;
+$accountRole = $customerUsername !== null ? 'customer' : ($adminUsernameForClient !== null ? 'admin' : null);
 $isCustomerLoggedIn = $customerUsername !== null && $customerUsername !== '';
 
 // Lấy danh mục sản phẩm từ CSDL để đồng nhất với Admin

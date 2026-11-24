@@ -2515,6 +2515,9 @@ function applyUserRole() {
         }
     }
 
+    // Keep the server-rendered admin identity visible on client pages when no customer is signed in.
+    if (window.ACCOUNT_ROLE === 'admin') return;
+
     // Hiển thị nút đăng ký / đăng nhập mặc định cho khách vãng lai
     if (authContainer) {
         authContainer.innerHTML = `

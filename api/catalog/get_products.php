@@ -2,9 +2,7 @@
 // api/catalog/get_products.php
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../../include/session.php';
 require_once __DIR__ . '/../../config/db.php';
 
 // Lấy danh sách sản phẩm yêu thích (wishlist) của khách hàng hiện tại

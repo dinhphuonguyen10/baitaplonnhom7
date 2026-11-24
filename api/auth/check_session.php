@@ -1,6 +1,6 @@
 <?php
 // Tác dụng: Kiểm tra và duy trì phiên đăng nhập riêng cho khách hàng ngoài giao diện bán hàng, đảm bảo không nhầm lẫn với phiên quản trị
-session_start();
+require_once __DIR__ . '/../../include/session.php';
 header('Content-Type: application/json; charset=utf-8');
 
 // Trang công khai chỉ kiểm tra phiên khách hàng, không trả trạng thái quản trị
