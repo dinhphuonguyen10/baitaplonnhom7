@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../include/order_status_workflow.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -58,9 +59,13 @@ try {
         throw new DomainException('Không tìm thấy đơn hàng của bạn.');
     }
 
-    if (!in_array($order['status'], ['Chờ xác nhận', 'Pending'], true)) {
+    if (
+        normalizeOrderWorkflowStatus((string) $order['status']) !== 'Chờ xác nhận'
+        || !in_array('Đã hủy', getAllowedOrderStatusTransitions((string) $order['status']), true)
+    ) {
         throw new DomainException('Chỉ có thể hủy đơn hàng khi đơn đang chờ xác nhận.');
     }
+    $previousStatus = (string) $order['status'];
 
     $itemsStmt = $conn->prepare('SELECT product_id, quantity FROM order_items WHERE order_id = ?');
     $itemsStmt->bind_param('i', $orderId);
@@ -93,10 +98,11 @@ try {
     $updateStmt->close();
 
     $historyStmt = $conn->prepare(
-        "INSERT INTO order_status_history (order_id, status, note, actor_name)
-         VALUES (?, 'Đã hủy', ?, ?)"
+        "INSERT INTO order_status_history
+            (order_id, status, old_status, new_status, note, actor_name)
+         VALUES (?, 'Đã hủy', ?, 'Đã hủy', ?, ?)"
     );
-    $historyStmt->bind_param('iss', $orderId, $reason, $actorName);
+    $historyStmt->bind_param('isss', $orderId, $previousStatus, $reason, $actorName);
     $historyStmt->execute();
     $historyStmt->close();
 

@@ -19,9 +19,10 @@ $userId = (int) $_SESSION['user_id'];
 $statusGroups = [
     'pending' => ['Chờ xác nhận', 'Pending'],
     'confirmed' => ['Đã xác nhận', 'Đang xử lý'],
-    'preparing' => ['Chuẩn bị đơn hàng', 'Đang chuẩn bị'],
-    'shipping' => ['Đang vận chuyển', 'Đang giao'],
-    'delivered' => ['Đã giao hàng', 'Đã giao', 'Hoàn thành'],
+    'preparing' => ['Đang chuẩn bị hàng', 'Chuẩn bị đơn hàng', 'Đang chuẩn bị'],
+    'shipping' => ['Đang giao hàng', 'Đang vận chuyển', 'Đang giao'],
+    'delivered' => ['Đã giao hàng', 'Đã giao'],
+    'completed' => ['Hoàn thành'],
     'cancelled' => ['Đã hủy', 'Canceled', 'cancelled', 'huy'],
 ];
 $statusFilter = isset($_GET['status']) && is_string($_GET['status']) ? trim($_GET['status']) : 'all';
@@ -94,6 +95,7 @@ try {
         'preparing' => 0,
         'shipping' => 0,
         'delivered' => 0,
+        'completed' => 0,
         'cancelled' => 0,
     ];
     $statusToGroup = [];

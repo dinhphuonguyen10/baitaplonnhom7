@@ -817,7 +817,10 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
                 Đang giao hàng <span class="tab-badge" id="badge-shipping">0</span>
             </button>
             <button class="orders-tab" role="tab" data-status="delivered" aria-selected="false">
-                Đã giao hàng / Hoàn thành <span class="tab-badge" id="badge-delivered">0</span>
+                Đã giao hàng <span class="tab-badge" id="badge-delivered">0</span>
+            </button>
+            <button class="orders-tab" role="tab" data-status="completed" aria-selected="false">
+                Hoàn thành <span class="tab-badge" id="badge-completed">0</span>
             </button>
             <button class="orders-tab" role="tab" data-status="cancelled" aria-selected="false">
                 Đã hủy <span class="tab-badge" id="badge-cancelled">0</span>
@@ -858,7 +861,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     function getStatusGroup(status) {
         if (cancelledStatuses.includes(status)) return 'cancelled';
         if (['Đã giao hàng', 'Đã giao', 'Hoàn thành'].includes(status)) return 'delivered';
-        if (['Đang vận chuyển', 'Đang giao'].includes(status)) return 'shipping';
+        if (['Đang giao hàng', 'Đang vận chuyển', 'Đang giao'].includes(status)) return 'shipping';
         return 'processing';
     }
 
@@ -927,6 +930,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
         document.getElementById('badge-preparing').textContent = counts.preparing || 0;
         document.getElementById('badge-shipping').textContent = counts.shipping || 0;
         document.getElementById('badge-delivered').textContent = counts.delivered || 0;
+        document.getElementById('badge-completed').textContent = counts.completed || 0;
         document.getElementById('badge-cancelled').textContent = counts.cancelled || 0;
     }
 
@@ -938,7 +942,8 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
             confirmed: { icon: '✓', title: 'Không có đơn hàng đã xác nhận', desc: 'Đơn hàng đã xác nhận sẽ hiển thị ở đây.' },
             preparing: { icon: '📦', title: 'Không có đơn hàng đang chuẩn bị', desc: 'Đơn hàng đang được chuẩn bị sẽ hiển thị ở đây.' },
             shipping: { icon: '🚚', title: 'Không có đơn hàng đang giao', desc: 'Các đơn hàng đang vận chuyển sẽ hiển thị ở đây.' },
-            delivered: { icon: '✅', title: 'Chưa có đơn hàng đã giao / hoàn thành', desc: 'Đơn hàng đã giao sẽ hiển thị ở đây.' },
+            delivered: { icon: '📬', title: 'Chưa có đơn hàng đã giao', desc: 'Đơn hàng đã giao sẽ hiển thị ở đây.' },
+            completed: { icon: '✅', title: 'Chưa có đơn hàng hoàn thành', desc: 'Đơn hàng đã hoàn tất sẽ hiển thị ở đây.' },
             cancelled: { icon: '🚫', title: 'Không có đơn hàng đã hủy', desc: 'Rất vui vì bạn chưa phải hủy đơn nào!' },
         };
         const m = msgs[currentTab] || msgs.all;
@@ -1216,13 +1221,19 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
             }).join('');
             const history = order.status_history || [];
             const historyHtml = history.length
-                ? history.map(event => `
+                ? history.map(event => {
+                    const newStatus = event.new_status || event.status;
+                    const transition = event.old_status
+                        ? `${event.old_status} → ${newStatus}`
+                        : newStatus;
+                    return `
                     <div class="order-history-event">
-                        <strong>${escHtml(event.status)}</strong>
+                        <strong>${escHtml(transition)}</strong>
                         <span>${formatDate(event.created_at)} · ${escHtml(event.actor_name)}</span>
                         ${event.note ? `<p>${escHtml(event.note)}</p>` : ''}
                     </div>
-                `).join('')
+                `;
+                }).join('')
                 : '<p class="order-history-event">Đơn hàng cũ chưa có dữ liệu lịch sử trạng thái.</p>';
             const cancellationHtml = order.cancellation_reason
                 ? `<div class="full-width"><strong>Lý do hủy</strong>${escHtml(order.cancellation_reason)}${order.cancelled_at ? `<p>${formatDate(order.cancelled_at)}</p>` : ''}</div>`

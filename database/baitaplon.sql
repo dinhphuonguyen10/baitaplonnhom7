@@ -302,6 +302,8 @@ UNLOCK TABLES;
 CREATE TABLE `order_status_history` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `order_id` int(10) unsigned NOT NULL,
+  `old_status` varchar(50) DEFAULT NULL,
+  `new_status` varchar(50) NOT NULL,
   `status` varchar(50) NOT NULL,
   `note` varchar(500) NOT NULL DEFAULT '',
   `actor_name` varchar(100) NOT NULL DEFAULT 'Hệ thống',

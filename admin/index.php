@@ -62,9 +62,9 @@ $stats = [
 ];
 $statStmt = $conn->prepare(
     "SELECT
-        COALESCE(SUM(CASE WHEN status IN ('Đã giao hàng','Đã giao') THEN total_price ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN status IN ('Đã giao hàng','Đã giao','Hoàn thành') THEN total_price ELSE 0 END), 0) AS revenue,
         COUNT(*) AS orders,
-        COALESCE(SUM(status IN ('Đã giao hàng','Đã giao')), 0) AS completed
+        COALESCE(SUM(status IN ('Đã giao hàng','Đã giao','Hoàn thành')), 0) AS completed
      FROM orders
      WHERE created_at >= ? AND created_at < ?"
 );
@@ -103,7 +103,7 @@ $comparisonPeriodLabel = $previousPeriodStart->format('d/m/Y') . ' - ' . $previo
 $previousStats = ['revenue' => 0, 'orders' => 0];
 $previousStatStmt = $conn->prepare(
     "SELECT
-        COALESCE(SUM(CASE WHEN status IN ('Đã giao hàng','Đã giao') THEN total_price ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN status IN ('Đã giao hàng','Đã giao','Hoàn thành') THEN total_price ELSE 0 END), 0) AS revenue,
         COUNT(*) AS orders
      FROM orders
      WHERE created_at >= ? AND created_at < ?"
@@ -141,15 +141,18 @@ $comparisonNotes = [
 $statusCounts = [
     'Chờ xác nhận' => 0,
     'Đã xác nhận' => 0,
-    'Chuẩn bị đơn hàng' => 0,
-    'Đang vận chuyển' => 0,
-    'Đang giao' => 0,
+    'Đang chuẩn bị hàng' => 0,
+    'Đang giao hàng' => 0,
     'Đã giao hàng' => 0,
+    'Hoàn thành' => 0,
     'Đã hủy' => 0,
 ];
 $legacyStatusMap = [
     'Đang xử lý' => 'Đã xác nhận',
-    'Đang chuẩn bị' => 'Chuẩn bị đơn hàng',
+    'Chuẩn bị đơn hàng' => 'Đang chuẩn bị hàng',
+    'Đang chuẩn bị' => 'Đang chuẩn bị hàng',
+    'Đang vận chuyển' => 'Đang giao hàng',
+    'Đang giao' => 'Đang giao hàng',
     'Đã giao' => 'Đã giao hàng',
     'Canceled' => 'Đã hủy',
     'cancelled' => 'Đã hủy',
@@ -223,7 +226,7 @@ $loadDailyRevenue = static function (mysqli $connection, string $start, string $
     $stmt = $connection->prepare(
         "SELECT DATE(created_at) AS sale_date, COALESCE(SUM(total_price),0) AS revenue
          FROM orders
-         WHERE status IN ('Đã giao hàng','Đã giao')
+         WHERE status IN ('Đã giao hàng','Đã giao','Hoàn thành')
            AND created_at >= ? AND created_at < ?
          GROUP BY DATE(created_at)"
     );
@@ -436,7 +439,7 @@ $periodLabel = $periodLabels[$period];
                             <?php foreach ($recentOrders as $order): ?>
                                 <?php
                                 $orderStatus = (string) $order['status'];
-                                $statusClass = in_array($orderStatus, ['Đã giao hàng', 'Đã giao'], true) ? 'is-done' : (in_array($orderStatus, ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true) ? 'is-cancelled' : (in_array($orderStatus, ['Chờ xác nhận', 'Pending'], true) ? 'is-pending' : ''));
+                                $statusClass = in_array($orderStatus, ['Đã giao hàng', 'Đã giao', 'Hoàn thành'], true) ? 'is-done' : (in_array($orderStatus, ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true) ? 'is-cancelled' : (in_array($orderStatus, ['Chờ xác nhận', 'Pending'], true) ? 'is-pending' : ''));
                                 ?>
                                 <article class="recent-order">
                                     <div class="recent-order-main">

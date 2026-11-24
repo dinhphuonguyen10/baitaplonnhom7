@@ -336,8 +336,9 @@ try {
     }
 
     $history_stmt = $conn->prepare(
-        "INSERT INTO order_status_history (order_id, status, note, actor_name)
-         VALUES (?, 'Chờ xác nhận', 'Đơn hàng được tạo.', ?)"
+        "INSERT INTO order_status_history
+            (order_id, status, old_status, new_status, note, actor_name)
+         VALUES (?, 'Chờ xác nhận', NULL, 'Chờ xác nhận', 'Đơn hàng được tạo.', ?)"
     );
     if (!$history_stmt) {
         throw new RuntimeException('Không thể ghi lịch sử đơn hàng.');

@@ -62,7 +62,7 @@ try {
     $itemStmt->close();
 
     $historyStmt = $conn->prepare(
-        'SELECT status, note, actor_name, created_at
+        'SELECT old_status, new_status, status, note, actor_name, created_at
          FROM order_status_history
          WHERE order_id = ?
          ORDER BY created_at ASC, id ASC'

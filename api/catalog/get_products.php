@@ -140,7 +140,7 @@ if (array_key_exists('ids', $_GET)) {
         INNER JOIN orders o ON o.id = oi.order_id
         WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
           AND o.created_at <= NOW()
-          AND o.status IN ('Đã giao hàng', 'Đã giao')
+          AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
           AND o.payment_status = 'Đã thanh toán'
         GROUP BY oi.product_id
     ) home_sales ON home_sales.product_id = p.id";
@@ -192,7 +192,7 @@ if (array_key_exists('ids', $_GET)) {
              INNER JOIN products p ON p.id = oi.product_id
              INNER JOIN categories c ON c.id = p.category_id
              WHERE o.user_id = ?
-               AND o.status IN ('Đã giao hàng', 'Đã giao')
+               AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
                AND o.payment_status = 'Đã thanh toán'
                AND c.status = 'active' AND c.is_deleted = 0
              GROUP BY p.category_id

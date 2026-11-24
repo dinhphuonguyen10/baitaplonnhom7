@@ -79,6 +79,8 @@ if ($ordersTable->num_rows > 0) {
     $orderStatusHistoryTableSql = "CREATE TABLE IF NOT EXISTS order_status_history (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
         order_id int(10) unsigned NOT NULL,
+        old_status varchar(50) DEFAULT NULL,
+        new_status varchar(50) NOT NULL,
         status varchar(50) NOT NULL,
         note varchar(500) NOT NULL DEFAULT '',
         actor_name varchar(100) NOT NULL DEFAULT 'Hệ thống',
@@ -90,6 +92,77 @@ if ($ordersTable->num_rows > 0) {
     if (!$conn->query($orderStatusHistoryTableSql)) {
         error_log('Order status history schema setup failed: ' . $conn->error);
         throw new RuntimeException('Không thể tạo lịch sử trạng thái đơn hàng.');
+    }
+
+    $orderHistoryColumnsResult = $conn->query('SHOW COLUMNS FROM order_status_history');
+    if (!$orderHistoryColumnsResult) {
+        error_log('Order status history inspection failed: ' . $conn->error);
+        throw new RuntimeException('Không thể kiểm tra lịch sử trạng thái đơn hàng.');
+    }
+    $orderHistoryColumns = [];
+    while ($column = $orderHistoryColumnsResult->fetch_assoc()) {
+        $orderHistoryColumns[$column['Field']] = $column;
+    }
+    $orderHistoryDataNeedsMigration = !isset($orderHistoryColumns['new_status'])
+        || $orderHistoryColumns['new_status']['Null'] === 'YES';
+    $orderHistorySchemaChanged = false;
+    foreach ([
+        'old_status' => 'ALTER TABLE order_status_history ADD COLUMN old_status VARCHAR(50) NULL AFTER order_id',
+        'new_status' => 'ALTER TABLE order_status_history ADD COLUMN new_status VARCHAR(50) NULL AFTER old_status',
+    ] as $columnName => $alterSql) {
+        if (!isset($orderHistoryColumns[$columnName])) {
+            if (!$conn->query($alterSql)) {
+                error_log('Order status history column migration failed for ' . $columnName . ': ' . $conn->error);
+                throw new RuntimeException('Không thể cập nhật lịch sử trạng thái đơn hàng.');
+            }
+            $orderHistorySchemaChanged = true;
+        }
+    }
+
+    if ($orderHistoryDataNeedsMigration && !$conn->query(
+        'UPDATE order_status_history SET new_status = status WHERE new_status IS NULL'
+    )) {
+        error_log('Order status history value migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể bảo toàn lịch sử trạng thái cũ.');
+    }
+    if (($orderHistorySchemaChanged || $orderHistoryDataNeedsMigration) && !$conn->query(
+        "UPDATE order_status_history current_event
+         LEFT JOIN order_status_history prior_event
+           ON prior_event.order_id = current_event.order_id
+          AND (
+              prior_event.created_at < current_event.created_at
+              OR (prior_event.created_at = current_event.created_at AND prior_event.id < current_event.id)
+          )
+         LEFT JOIN order_status_history newer_prior
+           ON newer_prior.order_id = prior_event.order_id
+          AND (
+              newer_prior.created_at < current_event.created_at
+              OR (newer_prior.created_at = current_event.created_at AND newer_prior.id < current_event.id)
+          )
+          AND (
+              newer_prior.created_at > prior_event.created_at
+              OR (newer_prior.created_at = prior_event.created_at AND newer_prior.id > prior_event.id)
+          )
+         SET current_event.old_status = prior_event.new_status
+         WHERE current_event.old_status IS NULL
+           AND prior_event.id IS NOT NULL
+           AND newer_prior.id IS NULL"
+    )) {
+        error_log('Order status history transition migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể chuyển đổi lịch sử trạng thái cũ.');
+    }
+
+    $orderHistoryColumnsResult = $conn->query('SHOW COLUMNS FROM order_status_history LIKE "new_status"');
+    $newStatusColumn = $orderHistoryColumnsResult ? $orderHistoryColumnsResult->fetch_assoc() : null;
+    if (!$newStatusColumn) {
+        error_log('Order status history new-status column verification failed: ' . $conn->error);
+        throw new RuntimeException('Không thể xác minh lịch sử trạng thái đơn hàng.');
+    }
+    if ($newStatusColumn['Null'] === 'YES' && !$conn->query(
+        'ALTER TABLE order_status_history MODIFY COLUMN new_status VARCHAR(50) NOT NULL'
+    )) {
+        error_log('Order status history new-status constraint migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể bảo vệ lịch sử trạng thái đơn hàng.');
     }
 }
 

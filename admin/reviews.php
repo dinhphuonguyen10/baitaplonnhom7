@@ -137,7 +137,7 @@ try {
              FROM orders o
              INNER JOIN order_items oi ON oi.order_id = o.id
              WHERE o.user_id = ? AND oi.product_id = ?
-               AND o.status IN ('Đã giao hàng', 'Đã giao')
+               AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
              LIMIT 1"
         );
         $verifiedStmt->bind_param('ii', $userId, $productId);

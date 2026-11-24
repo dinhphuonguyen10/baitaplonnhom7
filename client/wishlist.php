@@ -67,7 +67,7 @@ if ($userId > 0) {
                   INNER JOIN order_items reviewed_item ON reviewed_item.order_id = o.id
                   WHERE o.user_id = r.user_id
                     AND reviewed_item.product_id = r.product_id
-                    AND o.status IN ('Đã giao hàng', 'Đã giao')
+                    AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
               )
             GROUP BY r.product_id
         ) review_stats ON review_stats.product_id = p.id
