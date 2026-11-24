@@ -3,12 +3,22 @@
 // Hỗ trợ lọc theo trạng thái qua ?status=...
 session_start();
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../include/order_payment_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(["status" => "error", "message" => "Vui lòng đăng nhập để xem đơn hàng"]);
+    exit;
+}
+
+try {
+    expireOverdueQrPaymentOrders($conn);
+} catch (Throwable $e) {
+    error_log('Customer order VietQR expiration sweep failed: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Không thể tải đơn hàng lúc này.']);
     exit;
 }
 

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../include/admin_guard.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../include/order_payment_helper.php';
 $appBaseUrl = applicationBaseUrl();
 $escape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 // Tác dụng: Xác thực phiên và cấp quyền xử lý đơn hàng cho quản trị viên
@@ -18,6 +19,12 @@ $legacyStatusMap = [
 $cancelledStatuses = ['Đã hủy', 'Canceled', 'cancelled', 'huy'];
 $orderNotice = '';
 $paymentNotice = null;
+try {
+    expireOverdueQrPaymentOrders($conn);
+} catch (Throwable $e) {
+    error_log('Admin VietQR expiration sweep failed: ' . $e->getMessage());
+    $orderNotice = 'Không thể tự động cập nhật các đơn VietQR hết hạn lúc này.';
+}
 
 /* ── CSRF tokens ── */
 if (empty($_SESSION['orders_csrf'])) {
@@ -47,8 +54,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     }
 }
 
-/* ── POST: xác nhận thu tiền COD ── */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'confirm_cod') {
+/* ── POST: xác nhận COD hoặc đối soát chuyển khoản ── */
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    in_array($_POST['action'] ?? '', ['confirm_cod', 'confirm_bank_qr'], true)
+) {
+    $paymentAction = (string) $_POST['action'];
+    $paymentMethod = $paymentAction === 'confirm_bank_qr' ? 'BANK_QR' : 'COD';
     $submittedToken = $_POST['csrf_token'] ?? '';
     $orderId = filter_var($_POST['order_id'] ?? null, FILTER_VALIDATE_INT);
 
@@ -62,25 +74,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'confi
                 "UPDATE orders
                  SET payment_status = 'Đã thanh toán'
                  WHERE id = ?
-                   AND payment_method = 'COD'
-                   AND payment_status = 'Chưa thanh toán'
+                   AND payment_method = ?
+                   AND payment_status <> 'Đã thanh toán'
                    AND status NOT IN ('Đã hủy', 'Canceled', 'cancelled', 'huy')"
             );
             if (!$updateStmt) {
                 $paymentNotice = ['type' => 'error', 'message' => 'Không thể cập nhật trạng thái thanh toán.'];
             } else {
-                $updateStmt->bind_param('i', $orderId);
+                $updateStmt->bind_param('is', $orderId, $paymentMethod);
                 if (!$updateStmt->execute()) {
                     $paymentNotice = ['type' => 'error', 'message' => 'Không thể cập nhật trạng thái thanh toán.'];
                 } elseif ($updateStmt->affected_rows !== 1) {
-                    $paymentNotice = ['type' => 'error', 'message' => 'Đơn hàng không còn ở trạng thái chờ thu tiền.'];
+                    $paymentNotice = ['type' => 'error', 'message' => 'Đơn hàng không còn ở trạng thái chờ xác nhận thanh toán.'];
                 } else {
-                    $paymentNotice = ['type' => 'success', 'message' => 'Đã xác nhận thu tiền COD.'];
+                    $paymentNotice = [
+                        'type' => 'success',
+                        'message' => $paymentMethod === 'COD'
+                            ? 'Đã xác nhận thu tiền COD.'
+                            : 'Đã xác nhận đã đối soát chuyển khoản VietQR.'
+                    ];
                 }
                 $updateStmt->close();
             }
         } catch (mysqli_sql_exception $e) {
-            error_log('COD payment update failed: ' . $e->getMessage());
+            error_log('Order payment update failed: ' . $e->getMessage());
             $paymentNotice = ['type' => 'error', 'message' => 'Không thể cập nhật trạng thái thanh toán.'];
         }
     }
@@ -739,6 +756,8 @@ $statusClasses = [
                     <select id="om-filter-payment" class="om-filter-select" aria-label="Lọc trạng thái thanh toán">
                         <option value="">Tất cả thanh toán</option>
                         <option value="Chưa thanh toán">Chưa thanh toán</option>
+                        <option value="Chờ xác nhận thanh toán">Chờ xác nhận thanh toán</option>
+                        <option value="Thanh toán thất bại">Thanh toán thất bại</option>
                         <option value="Đã thanh toán">Đã thanh toán</option>
                     </select>
                 </div>
@@ -775,6 +794,7 @@ $statusClasses = [
                             $searchText = strtolower($o['customer'] . ' ' . $o['phone'] . ' ' . $o['id']);
                             $stClass = $statusClasses[$o['status']] ?? 'st-pending';
                             $isCOD = $o['payment_method'] === 'COD';
+                            $isBankQr = $o['payment_method'] === 'BANK_QR';
                             $isPaid = $o['payment_status'] === 'Đã thanh toán';
                             $isCancelled = in_array($normalizedStatus, $cancelledStatuses, true);
                             $payClass = $isPaid ? 'pay-paid' : 'pay-pending';
@@ -811,7 +831,7 @@ $statusClasses = [
                                             </select>
                                             <button type="submit" class="om-btn-save">Lưu</button>
                                         </form>
-                                        <!-- Xác nhận COD -->
+                                        <!-- Xác nhận COD hoặc đối soát VietQR -->
                                         <div class="om-action-row">
                                             <?php if ($isCOD && !$isPaid && !$isCancelled && $o['payment_status'] === 'Chưa thanh toán'): ?>
                                                 <form method="post" onsubmit="return confirm('Xác nhận đã nhận đủ tiền COD cho đơn #<?php echo (int)$o['id']; ?>?');">
@@ -823,6 +843,17 @@ $statusClasses = [
                                             <?php elseif ($isCOD && $isPaid): ?>
                                                 <span class="om-muted">✓ Đã thu tiền</span>
                                             <?php elseif ($isCOD && $isCancelled): ?>
+                                                <span class="om-muted">Đơn đã hủy</span>
+                                            <?php elseif ($isBankQr && !$isPaid && !$isCancelled): ?>
+                                                <form method="post" onsubmit="return confirm('Chỉ xác nhận sau khi đã kiểm tra tiền vào tài khoản cho đơn #<?php echo (int)$o['id']; ?>. Tiếp tục?');">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo $escape($csrfToken); ?>">
+                                                    <input type="hidden" name="action" value="confirm_bank_qr">
+                                                    <input type="hidden" name="order_id" value="<?php echo (int)$o['id']; ?>">
+                                                    <button type="submit" class="om-btn-cod">✓ Xác nhận đã nhận chuyển khoản</button>
+                                                </form>
+                                            <?php elseif ($isBankQr && $isPaid): ?>
+                                                <span class="om-muted">✓ Đã đối soát chuyển khoản</span>
+                                            <?php elseif ($isBankQr && $isCancelled): ?>
                                                 <span class="om-muted">Đơn đã hủy</span>
                                             <?php endif; ?>
                                         </div>

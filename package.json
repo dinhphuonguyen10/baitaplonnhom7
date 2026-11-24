@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Browser-side QR generation for the PHP storefront",
+  "dependencies": {
+    "qrcode-generator": "1.4.4"
+  }
+}

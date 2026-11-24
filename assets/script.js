@@ -837,17 +837,10 @@ function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 
     });
     success.querySelector('.checkout-receipt-total').textContent = formatPrice(Number(total) || 0);
     const receiptPayment = success.querySelector('.checkout-receipt-payment');
-    const successQr = success.querySelector('.checkout-success-qr');
     if (paymentMethod === 'BANK_QR') {
-        receiptPayment.textContent = success.dataset.qrDemo === 'true'
-            ? 'Thanh toán qua mã QR'
-            : 'Thanh toán qua mã QR';
-        if (successQr) {
-            successQr.hidden = false;
-        }
+        receiptPayment.textContent = 'Chuyển khoản qua VietQR — chờ cửa hàng đối soát';
     } else {
         receiptPayment.textContent = 'Thanh toán khi nhận hàng';
-        if (successQr) successQr.hidden = true;
     }
     success.hidden = false;
     document.querySelector('.checkout-page-layout').hidden = true;
@@ -1520,6 +1513,7 @@ function initCheckoutPage() {
         const selected = form.querySelector('input[name="payment_method"]:checked')?.value || 'COD';
         paymentCards.forEach(card => card.classList.toggle('is-selected', card.dataset.paymentCard === selected));
         if (qrPanel) qrPanel.hidden = selected !== 'BANK_QR';
+        submitButton.textContent = selected === 'BANK_QR' ? 'Lấy mã QR' : 'Hoàn tất đặt hàng';
         if (qrAmount) {
             const total = getCheckoutItems().reduce((sum, item) =>
                 sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
@@ -1529,7 +1523,7 @@ function initCheckoutPage() {
     paymentCards.forEach(card => {
         card.addEventListener('click', () => {
             const radio = card.querySelector('input[name="payment_method"]');
-            if (radio) radio.checked = true;
+            if (radio && !radio.disabled) radio.checked = true;
             syncPaymentMethod();
         });
         card.querySelector('input[name="payment_method"]')?.addEventListener('change', syncPaymentMethod);
@@ -1717,7 +1711,7 @@ renderCheckoutReceipt(
             message.classList.remove('is-success');
         } finally {
             submitButton.disabled = false;
-            submitButton.textContent = 'Hoàn tất đặt hàng';
+            syncPaymentMethod();
         }
     });
 }
