@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/../include/session.php';
 require_once __DIR__ . '/../include/admin_roles.php';
 
 // Tác dụng: Kiểm tra nếu quản trị viên đã đăng nhập từ trước thì chuyển hướng ngay về trang tổng quan

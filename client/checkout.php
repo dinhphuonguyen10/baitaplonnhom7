@@ -1,7 +1,7 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
+require_once __DIR__ . '/../include/session.php';
+require_once __DIR__ . '/../include/payment_qr_helper.php';
+$qrPaymentConfig = getVietQrPaymentConfig();
 $customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
     ? (string) $_SESSION['username']
     : null;
@@ -29,10 +29,6 @@ $pageTitle = "Đặt hàng - ÉCRIN JEWELRY";
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
 $appBaseUrl = rtrim($appBaseUrl, '/');
-$checkoutQrImage = 'payment-qr-demo.svg';
-$checkoutQrImagePath = __DIR__ . '/../assets/' . $checkoutQrImage;
-$checkoutQrUrl = $appBaseUrl . '/assets/' . $checkoutQrImage . '?v=' . filemtime($checkoutQrImagePath);
-$checkoutQrAlt = 'Mã QR thanh toán minh họa';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -158,27 +154,26 @@ $checkoutQrAlt = 'Mã QR thanh toán minh họa';
                             </div>
                             <span class="checkout-method-check" aria-hidden="true"></span>
                         </label>
-                        <label class="checkout-method-card" data-payment-card="BANK_QR">
-                            <input type="radio" name="payment_method" value="BANK_QR">
+                        <label class="checkout-method-card<?php echo $qrPaymentConfig === null ? ' is-disabled' : ''; ?>" data-payment-card="BANK_QR">
+                            <input type="radio" name="payment_method" value="BANK_QR" <?php echo $qrPaymentConfig === null ? 'disabled' : ''; ?>>
                             <div class="checkout-method-icon" aria-hidden="true">▣</div>
                             <div class="checkout-method-content">
-                                <strong>Thanh toán qua mã QR</strong>
-                                <p>Mã QR minh họa, không dùng để chuyển tiền</p>
+                                <strong>Chuyển khoản qua VietQR</strong>
+                                <p><?php echo $qrPaymentConfig === null ? 'Phương thức chưa được cấu hình.' : 'Chuyển khoản đến tài khoản ' . htmlspecialchars($qrPaymentConfig['bank_name'], ENT_QUOTES, 'UTF-8'); ?></p>
                             </div>
                             <span class="checkout-method-check" aria-hidden="true"></span>
                         </label>
                     </fieldset>
                     <div class="checkout-qr-panel" id="checkout-qr-panel" hidden>
                         <div>
-                            <span class="checkout-qr-eyebrow">QR Banking</span>
-                            <h3>Mã QR thanh toán</h3>
-                            <p>Mã QR minh họa, không thể dùng để chuyển tiền thật.</p>
+                            <span class="checkout-qr-eyebrow">VietQR · <?php echo htmlspecialchars($qrPaymentConfig['bank_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?></span>
+                            <h3>Lấy mã thanh toán cho đơn hàng</h3>
+                            <p>Nhấn “Lấy mã QR” để tạo đơn hàng và mở mã chuyển khoản. Mã hiển thị đổi sau 1 phút; ngân hàng vẫn có thể nhận chuyển khoản từ mã cũ nên hãy kiểm tra nội dung trước khi xác nhận.</p>
                             <div class="checkout-qr-meta">
                                 <span>Số tiền cần thanh toán</span>
                                 <strong id="checkout-qr-amount">0 đ</strong>
                             </div>
                         </div>
-                        <img src="<?php echo htmlspecialchars($checkoutQrUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($checkoutQrAlt, ENT_QUOTES, 'UTF-8'); ?>" class="checkout-qr-image">
                     </div>
 
                     <button class="checkout-submit-btn" id="submit-checkout" type="submit">Hoàn tất đặt hàng</button>
@@ -196,7 +191,7 @@ $checkoutQrAlt = 'Mã QR thanh toán minh họa';
                 <p class="checkout-shipping-note">Phí giao hàng (nếu có) sẽ được cửa hàng xác nhận khi liên hệ.</p>
             </aside>
         </div>
-        <section class="checkout-success" id="checkout-success" data-qr-demo="true" hidden aria-live="polite">
+        <section class="checkout-success" id="checkout-success" hidden aria-live="polite">
             <div class="checkout-success-icon" aria-hidden="true">✓</div>
             <h2>Đặt hàng thành công</h2>
             <p class="checkout-success-order-id"></p>
@@ -219,11 +214,6 @@ $checkoutQrAlt = 'Mã QR thanh toán minh họa';
                     <strong class="checkout-receipt-total"></strong>
                 </div>
                 <p class="checkout-receipt-payment">Thanh toán khi nhận hàng</p>
-                <div class="checkout-success-qr" id="checkout-success-qr" hidden>
-                    <strong>QR thanh toán — không dùng để chuyển tiền</strong>
-                    <img src="<?php echo htmlspecialchars($checkoutQrUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($checkoutQrAlt, ENT_QUOTES, 'UTF-8'); ?>">
-                    <span>Đây chỉ là hình minh họa, không ghi nhận thanh toán thật.</span>
-                </div>
             </div>
             <div class="checkout-success-actions">
                 <a class="checkout-submit-btn" href="<?php echo htmlspecialchars($appBaseUrl . '/client/tracuudh.php', ENT_QUOTES, 'UTF-8'); ?>">Tra cứu đơn hàng</a>

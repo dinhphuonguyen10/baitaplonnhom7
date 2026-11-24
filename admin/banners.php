@@ -248,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /* ── Logo section ── */
         .logo-section { margin: 22px 0 24px; }
-        .logo-section-title { margin: 0 0 14px; color: var(--navy); font-size: 22px; font-weight: 700; }
+        .logo-section-title { margin: 0 0 14px; color: var(--navy); font-size: 26px !important; line-height: 1.25; font-weight: 700; }
         .logo-card {
             display: grid;
             grid-template-columns: 220px minmax(0, 1fr);

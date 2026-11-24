@@ -1,6 +1,9 @@
 <?php
-session_start();
+// api/orders/my_orders.php — Trả về danh sách đơn hàng của user đang đăng nhập
+// Hỗ trợ lọc theo trạng thái qua ?status=...
+require_once __DIR__ . '/../../include/session.php';
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../include/order_payment_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');

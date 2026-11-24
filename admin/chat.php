@@ -168,6 +168,42 @@ $adminCurrentPage = 'chat.php';
         .ar-btn--save { background:linear-gradient(135deg,#1D3461,#2A5298); color:#fff; }
         .ar-btn--cancel { background:#F1F3F5; color:#374151; }
         .ar-status { font-size:12px; margin-right:auto; padding:6px 0; }
+
+        /* Slightly larger, consistent reading sizes across customer support chat. */
+        .page-content .eyebrow { font-size:11px; }
+        .page-content .page-subtitle { font-size:14px; }
+        .chat-inbox-head h2 { font-size:19px; }
+        .chat-inbox-head p,
+        .chat-inbox-empty,
+        .chat-loading { font-size:14px; }
+        .chat-search { font-size:15px; }
+        .chat-conversation { font-size:15px; }
+        .chat-conversation-name { font-size:14px; }
+        .chat-conversation-time,
+        .chat-customer small,
+        .chat-live { font-size:12px; }
+        .chat-conversation-preview { font-size:13px; }
+        .chat-unread { font-size:12px; }
+        .chat-customer strong { font-size:15px; }
+        .chat-day { font-size:11px; }
+        .chat-bubble { font-size:15px; }
+        .chat-product-info strong,
+        .chat-product-info span,
+        .chat-file-link { font-size:13px; }
+        .chat-bubble-time,
+        .chat-file-icon,
+        .chat-compose-hint,
+        .chat-notice { font-size:11px; }
+        .chat-compose-entry textarea,
+        .ar-field textarea { font-size:15px; }
+        .chat-action-btn,
+        .ar-btn { font-size:14px; }
+        .auto-badge,
+        .ar-field label { font-size:12px; }
+        .ar-modal h2 { font-size:20px; }
+        .ar-modal .ar-subtitle { font-size:14px; }
+        .ar-tip { font-size:12px; }
+        .ar-status { font-size:13px; }
     </style>
 </head>
 <body>

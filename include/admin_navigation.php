@@ -10,7 +10,7 @@ $adminLinks = [
     ['index.php', 'Tổng quan', '/admin/index.php', false],
     ['products.php', 'Quản lý sản phẩm', '/admin/products.php', false],
     ['categories.php', 'Quản lý danh mục', '/admin/categories.php', false],
-    ['users.php', 'Quản lý tài khoản nhân viên', '/admin/users.php', true],
+    ['users.php', 'Quản lý tài khoản', '/admin/users.php', true],
     ['orders.php', 'Đơn hàng & Thanh toán', '/admin/orders.php', false],
     ['chat.php', 'Quản lý chat', '/admin/chat.php', false],
     ['banners.php', 'Quản lý banner', '/admin/banners.php', true],

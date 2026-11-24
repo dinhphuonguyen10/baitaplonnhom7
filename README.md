@@ -35,18 +35,20 @@ Baitaplon/
 │   ├── auth/                              # Đăng ký, đăng nhập, đăng xuất, phiên
 │   ├── catalog/                           # Dữ liệu danh mục/sản phẩm
 │   ├── orders/                            # Đặt, tra cứu và hủy đơn hàng phía khách
+│   ├── payment/                           # Tạo mới mã VietQR cho đơn hàng
 │   └── chat/                              # API chat phía khách hàng
 │
 ├── client/                                # Trang và chức năng phía khách hàng
 │   ├── bong_tai.php, day_chuyen.php, ...  # Các trang danh mục
 │   ├── cart.php                           # Trang giỏ hàng toàn màn hình
-│   ├── checkout.php                       # Trang nhập thông tin và đặt hàng COD
+│   ├── checkout.php                       # Trang nhập thông tin, đặt COD hoặc lấy mã VietQR
 │   ├── diachi.php, tracuudh.php          # Địa chỉ, tra cứu đơn hàng
 ├── assets/                                # CSS, JavaScript và hình ảnh website
 │   ├── style.css                          # CSS cửa hàng
 │   ├── script.js                          # Tương tác giao diện, giỏ hàng và tài khoản
 │   ├── admin.css                          # CSS quản trị
 │   ├── banner/                            # Banner và logo hiện tại
+│   ├── qrcode-generator.js                # Thư viện tạo mã QR cục bộ
 │   ├── bôngtai/                           # Ảnh sản phẩm bông tai
 │   ├── dây chuyền/                        # Ảnh sản phẩm dây chuyền
 │   ├── nhẫn/                              # Ảnh sản phẩm nhẫn
@@ -54,12 +56,15 @@ Baitaplon/
 │   └── vòng tay/                          # Ảnh sản phẩm vòng tay
 │
 ├── config/
-│   └── db.php                             # Tạo kết nối MySQL dùng chung cho PHP
+│   ├── db.php                             # Tạo kết nối MySQL dùng chung cho PHP
+│   ├── payment.example.php                # Mẫu cấu hình tài khoản VietQR
+│   └── payment.local.php                  # Cấu hình riêng, không đưa vào Git
 │
 ├── database/
 │   ├── baitaplon.sql                      # Tạo các bảng và dữ liệu ban đầu
 │
 ├── include/                               # Thành phần PHP dùng chung
+│   ├── payment_qr_helper.php              # Tạo payload VietQR cho đơn hàng
 │   ├── header.php                         # Header/menu cửa hàng
 │   ├── footer.php                         # Footer cửa hàng
 │   ├── auth_modals.php                    # Modal đăng nhập/đăng ký dùng chung
@@ -114,6 +119,23 @@ Quản lý danh mục dùng mã tự sinh, tên đã chuẩn hóa khoảng trắ
 - Dùng `require_once` để tránh nạp lặp cấu hình. Không tự tạo kết nối MySQL thứ hai trong trang hoặc API.
 - Cấu hình local XAMPP có thể khác môi trường triển khai. Không đưa mật khẩu, khóa hoặc thông tin máy chủ production vào repository; nếu đổi cách quản lý cấu hình thì cả nhóm thống nhất trước và cập nhật hướng dẫn chạy web.
 - API tự đặt header và định dạng phản hồi theo chức năng (ví dụ JSON); không thêm logic giao diện vào `config/db.php`.
+
+## Cấu hình thanh toán VietQR
+
+- Sao chép `config/payment.example.php` thành `config/payment.local.php` và điền tên ngân hàng, BIN, số tài khoản và tên chủ tài khoản. File `payment.local.php` được Git bỏ qua; không đưa thông tin tài khoản thật vào commit.
+- Mã VietQR được tạo cục bộ trong trình duyệt theo số tiền và nội dung riêng của đơn hàng; ứng dụng không gửi thông tin chuyển khoản tới dịch vụ tạo QR bên ngoài. Thư viện tạo QR MIT được ghim phiên bản trong `package.json` và đóng gói tại `assets/qrcode-generator.js`.
+- Mã trên màn hình tự đổi sau 60 giây. Ngân hàng không làm mã QR chuyển khoản thông thường hết hiệu lực, nên mã cũ vẫn có thể được quét; cửa hàng cần đối soát giao dịch trước khi xác nhận trạng thái trong trang quản lý đơn hàng.
+- Nút “Thanh toán thành công” chỉ đưa đơn sang trạng thái chờ xác nhận; cửa hàng phải kiểm tra tiền thực nhận trước khi xác nhận. Nút “Thanh toán thất bại” giữ đơn trong 30 phút để khách thanh toán lại hoặc đổi sang COD. Hết hạn, đơn được hủy và tồn kho được hoàn lại.
+- Để tự hủy đơn đúng hạn cả khi website không có người truy cập, tạo tác vụ trong Windows Task Scheduler chạy mỗi phút:
+
+  Ví dụ với dự án hiện tại (thay bằng thư mục XAMPP/dự án trên máy bạn nếu khác):
+
+  ```text
+  Program: D:\xampp\php\php.exe
+  Arguments: D:\xampp\htdocs\baitaplonnhom7\scripts\cleanup_vietqr_orders.php
+  ```
+
+  Khi website đang hoạt động, trang thanh toán, danh sách đơn của khách và trang quản trị cũng tự xử lý các đơn đã hết hạn. Cột thời hạn được bổ sung tự động cho database hiện có; database mới cũng khai báo cột này trong `database/baitaplon.sql`.
 
 ## File dùng chung
 

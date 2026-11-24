@@ -1,5 +1,6 @@
 <?php
-session_start();
+// Xử lý hủy đơn hàng
+require_once __DIR__ . '/../../include/session.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../include/order_status_workflow.php';
 

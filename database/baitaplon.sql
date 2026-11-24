@@ -1,3 +1,6 @@
+CREATE DATABASE IF NOT EXISTS `baitaplon` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `baitaplon`;
+
 
 SET @OLD_CHARACTER_SET_CLIENT = @@CHARACTER_SET_CLIENT;
 SET @OLD_CHARACTER_SET_RESULTS = @@CHARACTER_SET_RESULTS;
@@ -290,6 +293,7 @@ CREATE TABLE `orders` (
   `discount_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` varchar(50) NOT NULL DEFAULT 'Chờ xác nhận',
   `payment_status` varchar(50) NOT NULL DEFAULT 'Chưa thanh toán',
+  `payment_deadline_at` datetime DEFAULT NULL,
   `payment_method` varchar(50) NOT NULL DEFAULT 'COD',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `cancelled_at` datetime DEFAULT NULL,
@@ -304,6 +308,7 @@ CREATE TABLE `orders` (
   KEY `idx_orders_created_at` (`created_at`),
   KEY `idx_orders_user_created` (`user_id`,`created_at`,`id`),
   KEY `idx_orders_inventory_expiry` (`inventory_status`,`status`,`payment_status`,`expires_at`,`id`),
+  KEY `idx_orders_qr_payment_deadline` (`payment_method`,`payment_status`,`payment_deadline_at`),
   CONSTRAINT `chk_orders_amounts` CHECK (`total_price` >= 0 AND `shipping_fee` >= 0 AND `discount_amount` >= 0),
   CONSTRAINT `chk_orders_inventory_status` CHECK (`inventory_status` IN ('legacy','reserved','released','committed')),
   CONSTRAINT `fk_orders_address` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,

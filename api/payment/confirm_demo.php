@@ -1,68 +1,34 @@
-
 <?php
 
-session_start();
-
-require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../include/session.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-function response($status, $message, $paymentStatus = null, $code = 400)
+function respond($status, $message, $code = 400)
 {
     http_response_code($code);
-
     echo json_encode([
         'status' => $status,
-        'message' => $message,
-        'payment_status' => $paymentStatus
+        'message' => $message
     ], JSON_UNESCAPED_UNICODE);
-
     exit;
 }
 
-// 1. Kiểm tra đăng nhập
-if (
-    !isset($_SESSION['user_id']) ||
-    ($_SESSION['role'] ?? '') !== 'customer'
-) {
-    response('error', 'Vui lòng đăng nhập.', null, 401);
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'customer') {
+    respond('error', 'Vui lòng đăng nhập.', 401);
 }
 
-// 2. Chỉ chấp nhận POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    response('error', 'Phương thức không hợp lệ.', null, 405);
+    respond('error', 'Phương thức không hợp lệ.', 405);
 }
 
-// 3. Đọc dữ liệu JSON
 $data = json_decode(file_get_contents('php://input'), true);
-
-if (!is_array($data)) {
-    response('error', 'Dữ liệu không hợp lệ.');
-}
-
-$orderId = filter_var(
-    $data['order_id'] ?? null,
-    FILTER_VALIDATE_INT
-);
-
-$result = $data['result'] ?? '';
-
-if (!$orderId || $orderId < 1) {
-    response('error', 'Mã đơn hàng không hợp lệ.');
-}
-
-if (!in_array($result, ['success', 'failed'], true)) {
-    response('error', 'Kết quả giao dịch không hợp lệ.');
-}
-
-// 4. Kiểm tra CSRF
-$csrfToken = (string) ($data['csrf_token'] ?? '');
-
+$csrfToken = is_array($data) ? (string) ($data['csrf_token'] ?? '') : '';
 if (
     empty($_SESSION['payment_csrf']) ||
     !hash_equals($_SESSION['payment_csrf'], $csrfToken)
 ) {
-    response('error', 'Yêu cầu không hợp lệ. Vui lòng tải lại trang.', null, 403);
+    respond('error', 'Yêu cầu không hợp lệ. Vui lòng tải lại trang.', 403);
 }
 
 $userId = (int) $_SESSION['user_id'];

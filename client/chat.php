@@ -1,7 +1,5 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
+require_once __DIR__ . '/../include/session.php';
 $pageTitle = 'Chat với cửa hàng - ÉCRIN JEWELRY';
 $isCustomerLoggedIn = isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer';
 $chatUsername = $_SESSION['username'] ?? 'Quý khách';

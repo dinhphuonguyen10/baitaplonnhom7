@@ -1,7 +1,7 @@
 <?php
 // api/catalog/wishlist.php
 // Tác dụng: Quản lý danh sách sản phẩm yêu thích (thả tim) của khách hàng
-session_start();
+require_once __DIR__ . '/../../include/session.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../config/db.php';

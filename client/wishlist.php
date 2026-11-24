@@ -2,7 +2,7 @@
 // client/wishlist.php
 // Tác dụng: Trang hiển thị danh sách sản phẩm yêu thích (thả tim) của khách hàng
 require_once __DIR__ . '/../config/db.php';
-session_start();
+require_once __DIR__ . '/../include/session.php';
 
 $pageTitle = "Sản phẩm yêu thích - ÉCRIN JEWELRY";
 include __DIR__ . '/../include/header.php';
