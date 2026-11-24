@@ -101,8 +101,10 @@ function getProductQuantityControlMarkup(stock, name) {
 
 function createSliderItems(container, products) {
     products.forEach(product => {
-        const origVal = parsePrice(product.priceOriginal || product.price_original);
-        const saleVal = parsePrice(product.priceSale || product.price_sale);
+        const rawOrig = product.priceOriginal || product.price_original;
+        const rawSale = product.priceSale || product.price_sale;
+        const origVal = rawOrig ? parsePrice(rawOrig) : 0;
+        const saleVal = rawSale ? parsePrice(rawSale) : 0;
         let calcPercent = 0;
         if (origVal > saleVal && origVal > 0) {
             calcPercent = Math.round(((origVal - saleVal) / origVal) * 100);
@@ -129,8 +131,8 @@ function createSliderItems(container, products) {
                 <div class="product-info">
                     <h3>${product.name}</h3>
                     <div class="product-price">
-                        <span class="price-sale">${product.priceSale}<sup>đ</sup></span>
-                        ${origVal > 0 ? `<span class="price-original">${product.priceOriginal || formatDbPrice(origVal)}<sup>đ</sup></span>${percentTagHTML}` : ''}
+                        <span class="price-sale">${product.priceSale || formatDbPrice(product.price_sale)}<sup>đ</sup></span>
+                        ${origVal > saleVal && origVal > 0 ? `<span class="price-original">${product.priceOriginal || formatDbPrice(product.price_original)}<sup>đ</sup></span>${percentTagHTML}` : ''}
                     </div>
                     ${metaHTML}
                     ${renderProductRating(product)}
@@ -330,7 +332,9 @@ function saveCart() {
 loadCart();
 
 function parsePrice(priceText) {
-    return Number(priceText.replace(/[^\d]/g, '')) || 0;
+    if (priceText === null || priceText === undefined) return 0;
+    if (typeof priceText === 'number') return isNaN(priceText) ? 0 : priceText;
+    return Number(String(priceText).replace(/[^\d]/g, '')) || 0;
 }
 
 function formatPrice(value) {
@@ -1747,8 +1751,10 @@ let _paginationCurrentPage = 1;
 let _paginationAllProducts = []; // Lưu toàn bộ sản phẩm đã fetch (dùng cho phân trang)
 
 function buildProductCardHTML(product) {
-    const origPriceVal = parsePrice(product.price_original);
-    const salePriceVal = parsePrice(product.price_sale);
+    const rawOrig = product.price_original;
+    const rawSale = product.price_sale;
+    const origPriceVal = rawOrig ? parsePrice(rawOrig) : 0;
+    const salePriceVal = rawSale ? parsePrice(rawSale) : 0;
     let calcPercent = 0;
     if (origPriceVal > salePriceVal && origPriceVal > 0) {
         calcPercent = Math.round(((origPriceVal - salePriceVal) / origPriceVal) * 100);
@@ -1760,7 +1766,7 @@ function buildProductCardHTML(product) {
 
     const priceSaleFormatted = formatDbPrice(product.price_sale);
     const percentTagHTML = calcPercent > 0 ? `<span class="price-discount-percent">-${calcPercent}%</span>` : '';
-    const priceOriginalHTML = product.price_original && origPriceVal > 0
+    const priceOriginalHTML = rawOrig && origPriceVal > salePriceVal && origPriceVal > 0
         ? `<span class="price-original" style="text-decoration: line-through; color: #999; margin-left: 10px; font-size: 0.9rem;">${formatDbPrice(product.price_original)}<sup>đ</sup></span>${percentTagHTML}`
         : '';
 
