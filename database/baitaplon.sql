@@ -220,7 +220,7 @@ CREATE TABLE `order_items` (
   KEY `idx_order_items_order` (`order_id`),
   KEY `idx_order_items_product` (`product_id`),
   CONSTRAINT `fk_order_items_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_order_items_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT `fk_order_items_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -292,8 +292,16 @@ CREATE TABLE `products` (
   `is_featured` tinyint(1) NOT NULL DEFAULT 0,
   `is_suggested` tinyint(1) NOT NULL DEFAULT 0,
   `is_new` tinyint(1) NOT NULL DEFAULT 0,
+  `status` varchar(20) NOT NULL DEFAULT 'active',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT 0,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted_by` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_products_category` (`category_id`),
+  KEY `idx_products_status_deleted` (`is_deleted`,`status`),
+  KEY `idx_products_cat_deleted` (`category_id`,`is_deleted`,`status`),
+  CONSTRAINT `chk_products_status` CHECK (`status` in ('active','inactive','hidden')),
+  CONSTRAINT `chk_products_is_deleted` CHECK (`is_deleted` in (0,1)),
   CONSTRAINT `fk_products_category` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=129 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -466,6 +474,10 @@ SET character_set_client = utf8;
   1 AS `is_featured`,
   1 AS `is_suggested`,
   1 AS `is_new`,
+  1 AS `status`,
+  1 AS `is_deleted`,
+  1 AS `deleted_at`,
+  1 AS `deleted_by`,
   1 AS `category`,
   1 AS `category_name`,
   1 AS `sold_count`,
@@ -568,7 +580,7 @@ DROP VIEW IF EXISTS `view_product_details`;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
-/*!50001 VIEW `view_product_details` AS select `p`.`id` AS `id`,`p`.`name` AS `name`,`p`.`price_sale` AS `price_sale`,`p`.`price_original` AS `price_original`,`p`.`discount` AS `discount`,`p`.`gift` AS `gift`,`p`.`image` AS `image`,`p`.`stock` AS `stock`,`p`.`category_id` AS `category_id`,`p`.`description` AS `description`,`p`.`is_featured` AS `is_featured`,`p`.`is_suggested` AS `is_suggested`,`p`.`is_new` AS `is_new`,`c`.`slug` AS `category`,`c`.`name` AS `category_name`,coalesce((select sum(`oi`.`quantity`) from (`order_items` `oi` join `orders` `o` on(`o`.`id` = `oi`.`order_id`)) where `oi`.`product_id` = `p`.`id` and (`o`.`status` is null or `o`.`status` not in ('Đã hủy','huy','cancelled'))),0) AS `sold_count`,coalesce((select count(0) from `wishlists` `w` where `w`.`product_id` = `p`.`id`),0) AS `wishlist_count`,coalesce((select round(avg(`r`.`rating`),1) from `reviews` `r` where `r`.`product_id` = `p`.`id` and `r`.`rating` between 1 and 5),0) AS `average_rating`,coalesce((select count(0) from `reviews` `r` where `r`.`product_id` = `p`.`id` and `r`.`rating` between 1 and 5),0) AS `review_count` from (`products` `p` left join `categories` `c` on(`c`.`id` = `p`.`category_id`)) group by `p`.`id`,`c`.`slug`,`c`.`name` */;
+/*!50001 VIEW `view_product_details` AS select `p`.`id` AS `id`,`p`.`name` AS `name`,`p`.`price_sale` AS `price_sale`,`p`.`price_original` AS `price_original`,`p`.`discount` AS `discount`,`p`.`gift` AS `gift`,`p`.`image` AS `image`,`p`.`stock` AS `stock`,`p`.`category_id` AS `category_id`,`p`.`description` AS `description`,`p`.`is_featured` AS `is_featured`,`p`.`is_suggested` AS `is_suggested`,`p`.`is_new` AS `is_new`,`p`.`status` AS `status`,`p`.`is_deleted` AS `is_deleted`,`p`.`deleted_at` AS `deleted_at`,`p`.`deleted_by` AS `deleted_by`,`c`.`slug` AS `category`,`c`.`name` AS `category_name`,coalesce((select sum(`oi`.`quantity`) from (`order_items` `oi` join `orders` `o` on(`o`.`id` = `oi`.`order_id`)) where `oi`.`product_id` = `p`.`id` and (`o`.`status` is null or `o`.`status` not in ('Đã hủy','huy','cancelled'))),0) AS `sold_count`,coalesce((select count(0) from `wishlists` `w` where `w`.`product_id` = `p`.`id`),0) AS `wishlist_count`,coalesce((select round(avg(`r`.`rating`),1) from `reviews` `r` where `r`.`product_id` = `p`.`id` and `r`.`rating` between 1 and 5),0) AS `average_rating`,coalesce((select count(0) from `reviews` `r` where `r`.`product_id` = `p`.`id` and `r`.`rating` between 1 and 5),0) AS `review_count` from (`products` `p` left join `categories` `c` on(`c`.`id` = `p`.`category_id`)) group by `p`.`id`,`c`.`slug`,`c`.`name` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;

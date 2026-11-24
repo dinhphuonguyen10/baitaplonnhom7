@@ -244,7 +244,72 @@ BEGIN
     END IF;
 END");
 
-// 3. Tự đồng bộ SQL Triggers: Tự động quản lý giá gốc (price_original) và phần trăm giảm (discount)
+// 4. Tự đồng bộ cột Soft Delete và Trạng thái sản phẩm (Status, IsDeleted, DeletedAt, DeletedBy)
+$colStatusCheck = $conn->query("SHOW COLUMNS FROM products LIKE 'status'");
+if ($colStatusCheck && $colStatusCheck->num_rows === 0) {
+    $conn->query("ALTER TABLE products ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active' AFTER is_new");
+    $conn->query("ALTER TABLE products ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
+    $conn->query("ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER is_deleted");
+    $conn->query("ALTER TABLE products ADD COLUMN deleted_by VARCHAR(100) NULL DEFAULT NULL AFTER deleted_at");
+    $conn->query("ALTER TABLE products ADD INDEX idx_products_status_deleted (is_deleted, status)");
+    $conn->query("ALTER TABLE products ADD INDEX idx_products_cat_deleted (category_id, is_deleted, status)");
+    $conn->query("ALTER TABLE products ADD CONSTRAINT chk_products_status CHECK (status IN ('active', 'inactive', 'hidden'))");
+    $conn->query("ALTER TABLE products ADD CONSTRAINT chk_products_is_deleted CHECK (is_deleted IN (0, 1))");
+}
+
+// Đảm bảo VIEW view_product_details luôn có đầy đủ cột status, is_deleted, deleted_at, deleted_by
+$viewColCheck = $conn->query("SHOW COLUMNS FROM view_product_details LIKE 'is_deleted'");
+if ($viewColCheck && $viewColCheck->num_rows === 0) {
+    $conn->query("CREATE OR REPLACE VIEW view_product_details AS
+    SELECT 
+        p.id,
+        p.name,
+        p.price_sale,
+        p.price_original,
+        p.discount,
+        p.gift,
+        p.image,
+        p.stock,
+        p.category_id,
+        p.description,
+        p.is_featured,
+        p.is_suggested,
+        p.is_new,
+        p.status,
+        p.is_deleted,
+        p.deleted_at,
+        p.deleted_by,
+        c.slug AS category,
+        c.name AS category_name,
+        COALESCE((
+            SELECT SUM(oi.quantity)
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            WHERE oi.product_id = p.id
+              AND (o.status IS NULL OR o.status NOT IN ('Đã hủy', 'huy', 'cancelled'))
+        ), 0) AS sold_count,
+        COALESCE((
+            SELECT COUNT(0)
+            FROM wishlists w
+            WHERE w.product_id = p.id
+        ), 0) AS wishlist_count,
+        COALESCE((
+            SELECT ROUND(AVG(r.rating), 1)
+            FROM reviews r
+            WHERE r.product_id = p.id
+              AND r.rating BETWEEN 1 AND 5
+        ), 0) AS average_rating,
+        COALESCE((
+            SELECT COUNT(0)
+            FROM reviews r
+            WHERE r.product_id = p.id
+              AND r.rating BETWEEN 1 AND 5
+        ), 0) AS review_count
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    GROUP BY p.id, c.slug, c.name");
+}
+
 $conn->query("DROP TRIGGER IF EXISTS trg_products_before_insert");
 $conn->query("CREATE TRIGGER trg_products_before_insert BEFORE INSERT ON products FOR EACH ROW
 BEGIN

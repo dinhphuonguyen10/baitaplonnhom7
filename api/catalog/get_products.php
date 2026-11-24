@@ -24,15 +24,15 @@ $sort     = isset($_GET['sort']) ? trim($_GET['sort']) : '';
 
 // 1. TRANG CHỦ - Sản phẩm nổi bật: Top 10 sản phẩm có nhiều lượt bán nhất (bán chạy nhất)
 if ($category === 'featured') {
-    $result = $conn->query("SELECT * FROM view_product_details ORDER BY sold_count DESC, id DESC LIMIT 10");
+    $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' ORDER BY sold_count DESC, id DESC LIMIT 10");
 }
 // 2. TRANG CHỦ - Gợi ý cho bạn: Top 10 sản phẩm có nhiều lượt tim nhất (yêu thích nhất)
 elseif ($category === 'suggest') {
-    $result = $conn->query("SELECT * FROM view_product_details ORDER BY wishlist_count DESC, id DESC LIMIT 10");
+    $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' ORDER BY wishlist_count DESC, id DESC LIMIT 10");
 }
 // 3. TRANG CHỦ - Sản phẩm mới nhất: Top 10 sản phẩm mới được thêm vào gần đây nhất (ID mới nhất)
 elseif ($category === 'new' || $category === 'latest') {
-    $result = $conn->query("SELECT * FROM view_product_details ORDER BY id DESC LIMIT 10");
+    $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' ORDER BY id DESC LIMIT 10");
 }
 // 4. TRANG DANH MỤC CỤ THỂ (Nhẫn, Bông tai, Dây chuyền, Vòng tay, Set quà tặng)
 // Lọc và sắp xếp hoàn toàn bằng SQL theo tiêu chí truyền từ JS:
@@ -56,8 +56,8 @@ elseif ($category !== '') {
     $hasDiscount= isset($_GET['has_discount']) && $_GET['has_discount'] === '1';
     $hasGift    = isset($_GET['has_gift'])     && $_GET['has_gift']     === '1';
 
-    // Xây dựng WHERE động
-    $where  = "(category = ? OR category_name = ? OR CAST(category_id AS CHAR) = ?)";
+    // Xây dựng WHERE động - bắt buộc loại trừ sản phẩm đã xóa mềm hoặc không active
+    $where  = "is_deleted = 0 AND status = 'active' AND (category = ? OR category_name = ? OR CAST(category_id AS CHAR) = ?)";
     $params = [$category, $category, $category];
     $types  = "sss";
 
@@ -86,9 +86,9 @@ elseif ($category !== '') {
     $stmt->execute();
     $result = $stmt->get_result();
 }
-// 5. Mặc định: Lấy tất cả sản phẩm
+// 5. Mặc định: Lấy tất cả sản phẩm đang kinh doanh và chưa bị xóa
 else {
-    $result = $conn->query("SELECT * FROM view_product_details ORDER BY id DESC");
+    $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' ORDER BY id DESC");
 }
 
 $products = [];

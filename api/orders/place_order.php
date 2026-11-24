@@ -103,7 +103,7 @@ try {
     $conn->begin_transaction();
 
     $product_stmt = $conn->prepare(
-        'SELECT id, name, price_sale, image, stock FROM products WHERE id = ? FOR UPDATE'
+        'SELECT id, name, price_sale, image, stock, status, is_deleted FROM products WHERE id = ? FOR UPDATE'
     );
     $stock_stmt = $conn->prepare(
         'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?'
@@ -281,8 +281,14 @@ try {
         $product_stmt->execute();
         $product = $product_stmt->get_result()->fetch_assoc();
 
-        if (!$product) {
-            throw new DomainException('Không tìm thấy sản phẩm trong giỏ hàng.');
+        if (!$product || (int)$product['is_deleted'] === 1) {
+            throw new DomainException('Sản phẩm không tồn tại hoặc đã ngừng cung cấp.');
+        }
+        if (($product['status'] ?? 'active') === 'inactive') {
+            throw new DomainException('Sản phẩm "' . $product['name'] . '" đã ngừng kinh doanh, không thể đặt mua.');
+        }
+        if (($product['status'] ?? 'active') === 'hidden') {
+            throw new DomainException('Sản phẩm "' . $product['name'] . '" hiện không khả dụng.');
         }
         if ((int) $product['stock'] < $quantity) {
             throw new DomainException('Sản phẩm "' . $product['name'] . '" không đủ số lượng tồn kho.');

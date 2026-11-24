@@ -27,7 +27,7 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0777, true);
 }
 
-// Xử lý Form Thêm / Sửa / Xóa
+// Xử lý Form Thêm / Sửa / Xóa / Khôi phục / Xóa vĩnh viễn
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -37,10 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $categoryId  = (int)($_POST['category_id'] ?? 0);
         $price       = (float)($_POST['price'] ?? 0);
         $stock       = max(0, (int)($_POST['stock'] ?? 0));
+        $status      = in_array($_POST['status'] ?? '', ['active', 'inactive', 'hidden'], true) ? $_POST['status'] : 'active';
         $description = trim($_POST['description'] ?? '');
-        if ($description === '') {
-            $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
-        }
         if ($description === '') {
             $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
         }
@@ -73,8 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $isSuggested = isset($_POST['is_suggested']) ? 1 : 0;
             $isNew       = isset($_POST['is_new']) ? 1 : 0;
 
-            $stmt = $conn->prepare("INSERT INTO products (name, category_id, price_sale, stock, image, description, is_featured, is_suggested, is_new) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("sidissiii", $name, $categoryId, $price, $stock, $imagePath, $description, $isFeatured, $isSuggested, $isNew);
+            $stmt = $conn->prepare("INSERT INTO products (name, category_id, price_sale, stock, image, description, is_featured, is_suggested, is_new, status, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
+            $stmt->bind_param("sidissiiis", $name, $categoryId, $price, $stock, $imagePath, $description, $isFeatured, $isSuggested, $isNew, $status);
             if ($stmt->execute()) {
                 $message = "Đã thêm sản phẩm '{$name}' thành công!";
                 $messageType = 'success';
@@ -94,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $price         = (float)($_POST['price'] ?? 0);
         $priceOriginal = isset($_POST['price_original']) ? (float)$_POST['price_original'] : 0.0;
         $stock         = max(0, (int)($_POST['stock'] ?? 0));
+        $status        = in_array($_POST['status'] ?? '', ['active', 'inactive', 'hidden'], true) ? $_POST['status'] : 'active';
         $description   = trim($_POST['description'] ?? '');
         $isFeatured    = isset($_POST['is_featured']) ? 1 : 0;
         $isSuggested   = isset($_POST['is_suggested']) ? 1 : 0;
@@ -125,11 +124,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($hasNewImage) {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, price_original = ?, stock = ?, image = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
-                $stmt->bind_param("siddissiiii", $name, $categoryId, $price, $priceOriginal, $stock, $newImagePath, $description, $isFeatured, $isSuggested, $isNew, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, price_original = ?, stock = ?, image = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ?, status = ? WHERE id = ?");
+                $stmt->bind_param("siddissiiiis", $name, $categoryId, $price, $priceOriginal, $stock, $newImagePath, $description, $isFeatured, $isSuggested, $isNew, $status, $id);
             } else {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, price_original = ?, stock = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
-                $stmt->bind_param("siddsiiiii", $name, $categoryId, $price, $priceOriginal, $stock, $description, $isFeatured, $isSuggested, $isNew, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, price_original = ?, stock = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ?, status = ? WHERE id = ?");
+                $stmt->bind_param("siddsiiiisi", $name, $categoryId, $price, $priceOriginal, $stock, $description, $isFeatured, $isSuggested, $isNew, $status, $id);
             }
 
             if ($stmt->execute()) {
@@ -143,23 +142,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // 3. XÓA SẢN PHẨM
+    // 3. XÓA MỀM SẢN PHẨM (SOFT DELETE)
     elseif ($action === 'delete') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id > 0) {
-            $stmt = $conn->prepare("DELETE FROM products WHERE id = ?");
-            $stmt->bind_param("i", $id);
+            $adminUser = $adminUsername !== '' ? $adminUsername : 'Admin';
+            $stmt = $conn->prepare("UPDATE products SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE id = ?");
+            $stmt->bind_param("si", $adminUser, $id);
             if ($stmt->execute()) {
-                $message = "Đã xóa sản phẩm thành công!";
+                $message = "Đã chuyển sản phẩm vào Thùng rác (xóa mềm)! Dữ liệu vẫn được bảo toàn trong database cho lịch sử đơn hàng và báo cáo.";
                 $messageType = 'success';
             } else {
-                $message = 'Lỗi khi xóa sản phẩm: ' . $conn->error;
+                $message = 'Lỗi khi xóa mềm sản phẩm: ' . $conn->error;
                 $messageType = 'error';
             }
             $stmt->close();
         }
     }
+
+    // 4. KHÔI PHỤC SẢN PHẨM (RESTORE)
+    elseif ($action === 'restore') {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $stmt = $conn->prepare("UPDATE products SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE id = ?");
+            $stmt->bind_param("i", $id);
+            if ($stmt->execute()) {
+                $message = "Đã khôi phục sản phẩm thành công! Sản phẩm đã quay lại danh sách hoạt động.";
+                $messageType = 'success';
+            } else {
+                $message = 'Lỗi khi khôi phục sản phẩm: ' . $conn->error;
+                $messageType = 'error';
+            }
+            $stmt->close();
+        }
+    }
+
+    // 5. XÓA CỨNG VĨNH VIỄN (FORCE DELETE) - CHỈ CHO PHÉP KHI KHÔNG CÓ LỊCH SỬ ĐƠN HÀNG
+    elseif ($action === 'force_delete') {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0) {
+            // Kiểm tra xem sản phẩm đã phát sinh giao dịch đơn hàng chưa
+            $chkOrder = $conn->prepare("SELECT COUNT(*) AS order_count FROM order_items WHERE product_id = ?");
+            $chkOrder->bind_param("i", $id);
+            $chkOrder->execute();
+            $orderCount = (int)($chkOrder->get_result()->fetch_assoc()['order_count'] ?? 0);
+            $chkOrder->close();
+
+            if ($orderCount > 0) {
+                $message = "KHÔNG THỂ XÓA VĨNH VIỄN! Sản phẩm này đã phát sinh {$orderCount} lượt giao dịch trong đơn hàng. Để bảo đảm tính toàn vẹn dữ liệu kế toán và báo cáo, sản phẩm chỉ có thể lưu trong Thùng rác hoặc chuyển sang trạng thái Ngừng kinh doanh.";
+                $messageType = 'error';
+            } else {
+                // Sản phẩm chưa từng có đơn hàng -> Cho phép xóa cứng
+                $conn->begin_transaction();
+                try {
+                    // Dọn dẹp các dữ liệu phụ trợ liên kết
+                    $conn->query("DELETE FROM cart_items WHERE product_id = {$id}");
+                    $conn->query("DELETE FROM wishlists WHERE product_id = {$id}");
+                    $conn->query("DELETE FROM reviews WHERE product_id = {$id}");
+
+                    $delStmt = $conn->prepare("DELETE FROM products WHERE id = ? AND is_deleted = 1");
+                    $delStmt->bind_param("i", $id);
+                    $delStmt->execute();
+                    $delStmt->close();
+
+                    $conn->commit();
+                    $message = "Đã xóa vĩnh viễn sản phẩm khỏi cơ sở dữ liệu!";
+                    $messageType = 'success';
+                } catch (Throwable $e) {
+                    $conn->rollback();
+                    $message = "Lỗi khi xóa vĩnh viễn: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+            }
+        }
+    }
 }
+
+// Chế độ xem: 'active' (đang hoạt động) hoặc 'trash' (thùng rác)
+$currentView = ($_GET['view'] ?? 'active') === 'trash' ? 'trash' : 'active';
+
+// Lấy số lượng cho các tab
+$cntActiveRes = $conn->query("SELECT COUNT(*) AS cnt FROM products WHERE is_deleted = 0");
+$countActive = (int)($cntActiveRes ? $cntActiveRes->fetch_assoc()['cnt'] : 0);
+
+$cntTrashRes = $conn->query("SELECT COUNT(*) AS cnt FROM products WHERE is_deleted = 1");
+$countTrash = (int)($cntTrashRes ? $cntTrashRes->fetch_assoc()['cnt'] : 0);
 
 // Lấy danh sách danh mục (cho dropdown chọn)
 $categories = [];
@@ -170,9 +237,18 @@ if ($catRes) {
     }
 }
 
-// Lấy danh sách sản phẩm từ SQL VIEW (đã tự động tính tên danh mục & lượt bán)
+// Lấy danh sách sản phẩm từ SQL VIEW theo chế độ xem
 $products = [];
-$prodRes = $conn->query("SELECT * FROM view_product_details ORDER BY id DESC");
+if ($currentView === 'trash') {
+    $prodRes = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 1 ORDER BY deleted_at DESC, id DESC");
+} else {
+    $prodRes = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 ORDER BY id DESC");
+}
+if ($prodRes) {
+    while ($row = $prodRes->fetch_assoc()) {
+        $products[] = $row;
+    }
+}
 if ($prodRes) {
     while ($row = $prodRes->fetch_assoc()) {
         $products[] = $row;
@@ -225,6 +301,25 @@ if ($prodRes) {
         .btn-edit:hover { background: #b9e6fe; }
         .btn-delete { background: #fee4e2; color: #b42318; margin-left: 6px; }
         .btn-delete:hover { background: #fecdca; }
+        .btn-restore { background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; }
+        .btn-restore:hover { background: #d1fadf; }
+        .btn-force { background: #7f1d1d; color: #fff; margin-left: 6px; }
+        .btn-force:hover { background: #991b1b; }
+
+        /* Tabs chuyển đổi Active / Trash */
+        .admin-nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+        .admin-nav-tab { padding: 10px 20px; border-radius: 8px 8px 0 0; text-decoration: none; font-weight: 600; font-size: 14px; color: #64748b; background: transparent; transition: all .2s; display: inline-flex; align-items: center; gap: 8px; margin-bottom: -2px; }
+        .admin-nav-tab:hover { color: var(--navy); background: #f8fafc; }
+        .admin-nav-tab.active { color: var(--navy); border-bottom: 3px solid var(--navy); background: #fff; }
+        .tab-count { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #e2e8f0; color: #475467; font-weight: 700; }
+        .admin-nav-tab.active .tab-count { background: var(--navy); color: #fff; }
+
+        /* Badge trạng thái sản phẩm */
+        .status-badge { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
+        .status-active   { background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; }
+        .status-inactive { background: #fffaeb; color: #b54708; border: 1px solid #fedf89; }
+        .status-hidden   { background: #f2f4f7; color: #475467; border: 1px solid #eaecf0; }
+        .status-deleted  { background: #fef3f2; color: #b42318; border: 1px solid #fecdca; }
 
         .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; }
         .alert-success { background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; }
@@ -269,7 +364,7 @@ if ($prodRes) {
             <div class="welcome-row">
                 <div>
                     <h1>Quản lý sản phẩm</h1>
-                    <p class="page-subtitle">Danh sách sản phẩm trang sức ÉCRIN.</p>
+                    <p class="page-subtitle">Hệ thống quản lý sản phẩm thương mại điện tử ÉCRIN Jewelry.</p>
                 </div>
             </div>
 
@@ -277,19 +372,44 @@ if ($prodRes) {
                 <div class="alert alert-<?php echo $messageType; ?>"><?php echo $escape($message); ?></div>
             <?php endif; ?>
 
+            <!-- TABS CHUYỂN ĐỔI: SẢN PHẨM HOẠT ĐỘNG / THÙNG RÁC -->
+            <div class="admin-nav-tabs">
+                <a href="products.php?view=active" class="admin-nav-tab <?php echo $currentView === 'active' ? 'active' : ''; ?>">
+                    <span>🛍️ Sản phẩm đang hoạt động</span>
+                    <span class="tab-count"><?php echo $countActive; ?></span>
+                </a>
+                <a href="products.php?view=trash" class="admin-nav-tab <?php echo $currentView === 'trash' ? 'active' : ''; ?>">
+                    <span>🗑️ Thùng rác (Đã xóa mềm)</span>
+                    <span class="tab-count" style="<?php echo $countTrash > 0 ? 'background: #fee2e2; color: #dc2626;' : ''; ?>"><?php echo $countTrash; ?></span>
+                </a>
+            </div>
+
             <section class="prod-panel">
-                <!-- Thanh công cụ tìm kiếm và lọc danh mục -->
+                <!-- Thanh công cụ tìm kiếm và lọc -->
                 <div class="prod-toolbar">
                     <div class="toolbar-left">
-                        <input type="search" id="search-input" placeholder="Tìm sản phẩm...">
+                        <input type="search" id="search-input" placeholder="<?php echo $currentView === 'trash' ? 'Tìm trong thùng rác...' : 'Tìm sản phẩm...'; ?>">
                         <select id="category-filter">
                             <option value="">Tất cả danh mục</option>
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?php echo (int)$cat['id']; ?>"><?php echo $escape($cat['name']); ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <?php if ($currentView === 'active'): ?>
+                            <select id="status-filter">
+                                <option value="">Tất cả trạng thái</option>
+                                <option value="active">🟢 Đang kinh doanh</option>
+                                <option value="inactive">🟠 Ngừng kinh doanh</option>
+                                <option value="hidden">⚪ Bị ẩn</option>
+                                <option value="out_of_stock">🔴 Hết hàng (Tồn = 0)</option>
+                            </select>
+                        <?php endif; ?>
                     </div>
-                    <button type="button" class="btn-add" onclick="openAddModal()">+ Thêm sản phẩm</button>
+                    <?php if ($currentView === 'active'): ?>
+                        <button type="button" class="btn-add" onclick="openAddModal()">+ Thêm sản phẩm</button>
+                    <?php else: ?>
+                        <span style="font-size: 13px; color: #64748b; font-weight: 500;">💡 Sản phẩm đã xóa mềm vẫn bảo toàn lịch sử đơn hàng &amp; báo cáo.</span>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Bảng danh sách sản phẩm -->
@@ -300,14 +420,19 @@ if ($prodRes) {
                                 <th style="width: 70px;">Ảnh</th>
                                 <th>Tên sản phẩm</th>
                                 <th>Danh mục</th>
-                                <th>Giá</th>
-                                <th>Tồn kho</th>
-                                <th style="width: 160px; text-align: center;">Thao tác</th>
+                                <th>Giá bán</th>
+                                <th>Trạng thái &amp; Kho</th>
+                                <?php if ($currentView === 'trash'): ?>
+                                    <th>Thông tin xóa</th>
+                                <?php endif; ?>
+                                <th style="width: <?php echo $currentView === 'trash' ? '200px' : '160px'; ?>; text-align: center;">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($products)): ?>
-                                <tr id="empty-row"><td colspan="6" style="text-align:center; color: var(--muted); padding: 30px;">Chưa có sản phẩm nào.</td></tr>
+                                <tr id="empty-row"><td colspan="<?php echo $currentView === 'trash' ? '7' : '6'; ?>" style="text-align:center; color: var(--muted); padding: 30px;">
+                                    <?php echo $currentView === 'trash' ? 'Thùng rác hiện đang trống. Chưa có sản phẩm nào bị xóa mềm.' : 'Chưa có sản phẩm nào.'; ?>
+                                </td></tr>
                             <?php else: ?>
                                 <?php foreach ($products as $p): ?>
                                     <?php
@@ -322,13 +447,28 @@ if ($prodRes) {
                                             $stockText = 'Hết hàng (0)';
                                             $stockClass = 'stock-out';
                                         }
+
+                                        $prodStatus = $p['status'] ?? 'active';
+                                        if ($prodStatus === 'inactive') {
+                                            $statusText = 'Ngừng kinh doanh';
+                                            $statusClass = 'status-inactive';
+                                        } elseif ($prodStatus === 'hidden') {
+                                            $statusText = 'Bị ẩn';
+                                            $statusClass = 'status-hidden';
+                                        } else {
+                                            $statusText = 'Đang kinh doanh';
+                                            $statusClass = 'status-active';
+                                        }
+
                                         $imgSrc = (str_starts_with($p['image'], 'http://') || str_starts_with($p['image'], 'https://'))
                                             ? $p['image']
                                             : $appBaseUrl . '/' . ltrim($p['image'], '/');
                                     ?>
                                     <tr class="product-row"
                                         data-name="<?php echo strtolower($escape($p['name'])); ?>"
-                                        data-cat-id="<?php echo (int)$p['category_id']; ?>">
+                                        data-cat-id="<?php echo (int)$p['category_id']; ?>"
+                                        data-status="<?php echo $escape($prodStatus); ?>"
+                                        data-stock="<?php echo $stockNum; ?>">
                                         <td>
                                             <img src="<?php echo $escape($imgSrc); ?>" alt="" class="thumb-img" onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'">
                                         </td>
@@ -362,27 +502,57 @@ if ($prodRes) {
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <span class="stock-tag <?php echo $stockClass; ?>"><?php echo $escape($stockText); ?></span>
+                                            <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                                                <?php if ((int)$p['is_deleted'] === 1): ?>
+                                                    <span class="status-badge status-deleted">Đã xóa mềm</span>
+                                                <?php else: ?>
+                                                    <span class="status-badge <?php echo $statusClass; ?>"><?php echo $escape($statusText); ?></span>
+                                                <?php endif; ?>
+                                                <span class="stock-tag <?php echo $stockClass; ?>"><?php echo $escape($stockText); ?></span>
+                                            </div>
                                             <?php if ((int)($p['sold_count'] ?? 0) > 0): ?>
                                                 <div style="font-size: 0.8rem; color: #e67e22; font-weight: 500; margin-top: 4px;">Đã bán: <?php echo (int)$p['sold_count']; ?></div>
                                             <?php endif; ?>
                                         </td>
+                                        <?php if ($currentView === 'trash'): ?>
+                                            <td>
+                                                <div style="font-size: 12px; color: #64748b;">
+                                                    <div><strong>Ngày xóa:</strong> <?php echo !empty($p['deleted_at']) ? date('d/m/Y H:i', strtotime($p['deleted_at'])) : 'N/A'; ?></div>
+                                                    <div><strong>Bởi:</strong> <?php echo $escape($p['deleted_by'] ?? 'Admin'); ?></div>
+                                                </div>
+                                            </td>
+                                        <?php endif; ?>
                                         <td style="text-align: center;">
-                                            <button type="button" class="btn-sm btn-edit"
-                                                onclick='openEditModal(<?php echo json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>, "<?php echo $escape($imgSrc); ?>")'>
-                                                Sửa
-                                            </button>
-                                            <form method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc chắn muốn xóa sản phẩm \'<?php echo $escape($p['name']); ?>\' không?');">
-                                                <input type="hidden" name="action" value="delete">
-                                                <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
-                                                <button type="submit" class="btn-sm btn-delete">Xóa</button>
-                                            </form>
+                                            <?php if ($currentView === 'trash'): ?>
+                                                <!-- THAO TÁC TRONG THÙNG RÁC: KHÔI PHỤC HOẶC XÓA VĨNH VIỄN -->
+                                                <form method="post" style="display:inline;" onsubmit="return confirm('Khôi phục sản phẩm \'<?php echo $escape($p['name']); ?>\' về danh sách hoạt động?');">
+                                                    <input type="hidden" name="action" value="restore">
+                                                    <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
+                                                    <button type="submit" class="btn-sm btn-restore" title="Khôi phục sản phẩm">↺ Khôi phục</button>
+                                                </form>
+                                                <form method="post" style="display:inline;" onsubmit="return confirm('CẢNH BÁO NGUY HIỂM!\n\nBạn có chắc chắn muốn XÓA VĨNH VIỄN sản phẩm \'<?php echo $escape($p['name']); ?>\' khỏi hệ thống không?\n\nLưu ý: Chỉ cho phép xóa khi sản phẩm chưa từng phát sinh đơn hàng.');">
+                                                    <input type="hidden" name="action" value="force_delete">
+                                                    <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
+                                                    <button type="submit" class="btn-sm btn-force" title="Xóa cứng vĩnh viễn (chỉ khi chưa có đơn hàng)">✕ Xóa vĩnh viễn</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <!-- THAO TÁC ĐANG HOẠT ĐỘNG: SỬA HOẶC XÓA MỀM -->
+                                                <button type="button" class="btn-sm btn-edit"
+                                                    onclick='openEditModal(<?php echo json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>, "<?php echo $escape($imgSrc); ?>")'>
+                                                    Sửa
+                                                </button>
+                                                <form method="post" style="display:inline;" onsubmit="return confirm('Chuyển sản phẩm \'<?php echo $escape($p['name']); ?>\' vào Thùng rác (xóa mềm)?\n\nSản phẩm sẽ ẩn khỏi Client nhưng vẫn bảo toàn lịch sử đơn hàng và báo cáo.');">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
+                                                    <button type="submit" class="btn-sm btn-delete" title="Xóa mềm vào thùng rác">Xóa</button>
+                                                </form>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                             <tr id="no-search-results" style="display: none;">
-                                <td colspan="6" style="text-align:center; color: var(--muted); padding: 30px;">Không tìm thấy sản phẩm phù hợp.</td>
+                                <td colspan="<?php echo $currentView === 'trash' ? '7' : '6'; ?>" style="text-align:center; color: var(--muted); padding: 30px;">Không tìm thấy sản phẩm phù hợp.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -438,6 +608,15 @@ if ($prodRes) {
                 <div class="form-field">
                     <label>Số lượng tồn kho ban đầu (*):</label>
                     <input type="number" name="stock" value="10" min="0" required>
+                </div>
+
+                <div class="form-field">
+                    <label>Trạng thái kinh doanh (*):</label>
+                    <select name="status" id="add-status" required>
+                        <option value="active" selected>🟢 Đang kinh doanh (Hiển thị và cho phép đặt mua)</option>
+                        <option value="inactive">🟠 Ngừng kinh doanh (Không cho đặt mua, giữ lịch sử)</option>
+                        <option value="hidden">⚪ Bị ẩn (Ẩn khỏi toàn bộ giao diện Client)</option>
+                    </select>
                 </div>
 
                 <div class="form-field">
@@ -550,6 +729,15 @@ if ($prodRes) {
                 </div>
 
                 <div class="form-field">
+                    <label>Trạng thái kinh doanh (*):</label>
+                    <select name="status" id="edit-status" required>
+                        <option value="active">🟢 Đang kinh doanh (Hiển thị và cho phép đặt mua)</option>
+                        <option value="inactive">🟠 Ngừng kinh doanh (Không cho đặt mua, giữ lịch sử)</option>
+                        <option value="hidden">⚪ Bị ẩn (Ẩn khỏi toàn bộ giao diện Client)</option>
+                    </select>
+                </div>
+
+                <div class="form-field">
                     <label>Phân loại hiển thị trang chủ:</label>
                     <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 4px;">
                         <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
@@ -637,6 +825,7 @@ function openEditModal(prod, imgSrc) {
     document.getElementById('edit-category').value    = prod.category_id;
     document.getElementById('edit-price').value       = prod.price_sale;
     document.getElementById('edit-stock').value       = prod.stock;
+    document.getElementById('edit-status').value      = prod.status || 'active';
     document.getElementById('edit-description').value = prod.description || descTemplates[prod.category_id] || '';
     document.getElementById('edit-is-featured').checked  = parseInt(prod.is_featured, 10) === 1;
     document.getElementById('edit-is-suggested').checked = parseInt(prod.is_suggested, 10) === 1;
@@ -730,25 +919,36 @@ window.addEventListener('click', function(e) {
     }
 });
 
-// TÍNH NĂNG TÌM KIẾM & LỌC DANH MỤC REALTIME (Ảnh 3)
+// TÍNH NĂNG TÌM KIẾM & LỌC DANH MỤC / TRẠNG THÁI REALTIME
 const searchInput = document.getElementById('search-input');
 const categoryFilter = document.getElementById('category-filter');
+const statusFilter = document.getElementById('status-filter');
 const rows = document.querySelectorAll('.product-row');
 const noResults = document.getElementById('no-search-results');
 
 function filterProducts() {
-    const query = searchInput.value.trim().toLowerCase();
-    const selectedCat = categoryFilter.value;
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const selectedCat = categoryFilter ? categoryFilter.value : '';
+    const selectedStatus = statusFilter ? statusFilter.value : '';
     let visibleCount = 0;
 
     rows.forEach(row => {
-        const name = row.getAttribute('data-name');
-        const catId = row.getAttribute('data-cat-id');
+        const name = row.getAttribute('data-name') || '';
+        const catId = row.getAttribute('data-cat-id') || '';
+        const status = row.getAttribute('data-status') || '';
+        const stock = parseInt(row.getAttribute('data-stock'), 10) || 0;
 
         const matchName = query === '' || name.includes(query);
         const matchCat = selectedCat === '' || catId === selectedCat;
 
-        if (matchName && matchCat) {
+        let matchStatus = true;
+        if (selectedStatus === 'out_of_stock') {
+            matchStatus = stock <= 0;
+        } else if (selectedStatus !== '') {
+            matchStatus = status === selectedStatus;
+        }
+
+        if (matchName && matchCat && matchStatus) {
             row.style.display = '';
             visibleCount++;
         } else {
@@ -761,8 +961,9 @@ function filterProducts() {
     }
 }
 
-searchInput.addEventListener('input', filterProducts);
-categoryFilter.addEventListener('change', filterProducts);
+if (searchInput) searchInput.addEventListener('input', filterProducts);
+if (categoryFilter) categoryFilter.addEventListener('change', filterProducts);
+if (statusFilter) statusFilter.addEventListener('change', filterProducts);
 </script>
 </body>
 </html>
