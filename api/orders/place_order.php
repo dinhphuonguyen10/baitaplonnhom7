@@ -335,6 +335,20 @@ try {
         $item_stmt->execute();
     }
 
+    $history_stmt = $conn->prepare(
+        "INSERT INTO order_status_history (order_id, status, note, actor_name)
+         VALUES (?, 'Chờ xác nhận', 'Đơn hàng được tạo.', ?)"
+    );
+    if (!$history_stmt) {
+        throw new RuntimeException('Không thể ghi lịch sử đơn hàng.');
+    }
+    $actor_name = $user_id !== null
+        ? mb_substr((string) ($_SESSION['username'] ?? 'Khách hàng'), 0, 100, 'UTF-8')
+        : 'Khách vãng lai';
+    $history_stmt->bind_param('is', $order_id, $actor_name);
+    $history_stmt->execute();
+    $history_stmt->close();
+
     $conn->commit();
 
     // Gửi tin cảm ơn tự động cho khách đã đăng nhập

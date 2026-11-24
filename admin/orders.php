@@ -38,12 +38,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     } elseif ($orderId < 1 || !in_array($newStatus, $orderStatuses, true)) {
         $orderNotice = 'Trạng thái đơn hàng không hợp lệ.';
     } else {
-        $updateStatusStmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $updateStatusStmt->bind_param('si', $newStatus, $orderId);
-        $orderNotice = $updateStatusStmt->execute()
-            ? 'Đã cập nhật trạng thái đơn hàng.'
-            : 'Không thể cập nhật trạng thái đơn hàng.';
-        $updateStatusStmt->close();
+        try {
+            $conn->begin_transaction();
+            $currentStatusStmt = $conn->prepare('SELECT status FROM orders WHERE id = ? FOR UPDATE');
+            $currentStatusStmt->bind_param('i', $orderId);
+            $currentStatusStmt->execute();
+            $currentOrder = $currentStatusStmt->get_result()->fetch_assoc();
+            $currentStatusStmt->close();
+            if (!$currentOrder) {
+                throw new RuntimeException('Không tìm thấy đơn hàng.');
+            }
+
+            if ($currentOrder['status'] === $newStatus) {
+                $conn->commit();
+                $orderNotice = 'Đơn hàng đã ở trạng thái này.';
+            } else {
+                if ($newStatus === 'Đã hủy') {
+                    $updateStatusStmt = $conn->prepare(
+                        "UPDATE orders
+                         SET status = ?, cancelled_at = COALESCE(cancelled_at, NOW()),
+                             cancellation_reason = COALESCE(NULLIF(cancellation_reason, ''), 'Hủy bởi quản trị viên')
+                         WHERE id = ?"
+                    );
+                } else {
+                    $updateStatusStmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+                }
+                $updateStatusStmt->bind_param('si', $newStatus, $orderId);
+                $updateStatusStmt->execute();
+                if ($updateStatusStmt->affected_rows !== 1) {
+                    $updateStatusStmt->close();
+                    throw new RuntimeException('Không thể cập nhật trạng thái đơn hàng.');
+                }
+                $updateStatusStmt->close();
+
+                $actorName = mb_substr((string) ($adminUsername !== '' ? $adminUsername : 'Quản trị viên'), 0, 100, 'UTF-8');
+                $historyStmt = $conn->prepare(
+                    'INSERT INTO order_status_history (order_id, status, note, actor_name)
+                     VALUES (?, ?, ?, ?)'
+                );
+                $historyNote = $newStatus === 'Đã hủy'
+                    ? 'Đơn hàng được hủy bởi quản trị viên.'
+                    : 'Cập nhật trạng thái bởi quản trị viên.';
+                $historyStmt->bind_param('isss', $orderId, $newStatus, $historyNote, $actorName);
+                $historyStmt->execute();
+                $historyStmt->close();
+                $conn->commit();
+                $orderNotice = 'Đã cập nhật trạng thái đơn hàng.';
+            }
+        } catch (Throwable $e) {
+            $conn->rollback();
+            error_log('Admin order status update failed: ' . $e->getMessage());
+            $orderNotice = 'Không thể cập nhật trạng thái đơn hàng.';
+        }
     }
 }
 

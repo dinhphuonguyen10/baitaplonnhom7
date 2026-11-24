@@ -13,6 +13,86 @@ if ($conn->connect_error) {
 
 $conn->set_charset("utf8mb4");
 
+// Keep customer order totals and status history available on existing MySQL databases.
+$ordersTable = $conn->query("SHOW TABLES LIKE 'orders'");
+if (!$ordersTable) {
+    error_log('Order schema inspection failed: ' . $conn->error);
+    throw new RuntimeException('Không thể kiểm tra cấu trúc đơn hàng.');
+}
+if ($ordersTable->num_rows > 0) {
+    $orderColumns = [];
+    $orderColumnsResult = $conn->query('SHOW COLUMNS FROM orders');
+    if (!$orderColumnsResult) {
+        error_log('Order column inspection failed: ' . $conn->error);
+        throw new RuntimeException('Không thể kiểm tra cấu trúc đơn hàng.');
+    }
+    while ($orderColumn = $orderColumnsResult->fetch_assoc()) {
+        $orderColumns[$orderColumn['Field']] = true;
+    }
+
+    $orderColumnMigrations = [
+        'shipping_fee' => 'ALTER TABLE orders ADD COLUMN shipping_fee DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER total_price',
+        'discount_amount' => 'ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER shipping_fee',
+        'cancelled_at' => 'ALTER TABLE orders ADD COLUMN cancelled_at DATETIME NULL DEFAULT NULL AFTER created_at',
+        'cancellation_reason' => 'ALTER TABLE orders ADD COLUMN cancellation_reason VARCHAR(500) NULL DEFAULT NULL AFTER cancelled_at',
+    ];
+    foreach ($orderColumnMigrations as $columnName => $alterSql) {
+        if (!isset($orderColumns[$columnName]) && !$conn->query($alterSql)) {
+            error_log('Order column migration failed for ' . $columnName . ': ' . $conn->error);
+            throw new RuntimeException('Không thể cập nhật cấu trúc đơn hàng.');
+        }
+    }
+
+    $orderIndexResult = $conn->query("SHOW INDEX FROM orders WHERE Key_name = 'idx_orders_user_created'");
+    if (!$orderIndexResult) {
+        error_log('Order index inspection failed: ' . $conn->error);
+        throw new RuntimeException('Không thể kiểm tra chỉ mục đơn hàng.');
+    }
+    if ($orderIndexResult->num_rows === 0 && !$conn->query(
+        'ALTER TABLE orders ADD INDEX idx_orders_user_created (user_id, created_at, id)'
+    )) {
+        error_log('Order list index migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể tối ưu truy vấn đơn hàng.');
+    }
+
+    $orderAmountConstraint = $conn->query(
+        "SELECT CONSTRAINT_NAME
+         FROM information_schema.TABLE_CONSTRAINTS
+         WHERE CONSTRAINT_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'orders'
+           AND CONSTRAINT_NAME = 'chk_orders_amounts'
+           AND CONSTRAINT_TYPE = 'CHECK'"
+    );
+    if (!$orderAmountConstraint) {
+        error_log('Order amount constraint inspection failed: ' . $conn->error);
+        throw new RuntimeException('Không thể kiểm tra ràng buộc giá trị đơn hàng.');
+    }
+    if ($orderAmountConstraint->num_rows === 0 && !$conn->query(
+        'ALTER TABLE orders
+         ADD CONSTRAINT chk_orders_amounts
+         CHECK (total_price >= 0 AND shipping_fee >= 0 AND discount_amount >= 0)'
+    )) {
+        error_log('Order amount constraint migration failed: ' . $conn->error);
+        throw new RuntimeException('Không thể bảo vệ giá trị tiền của đơn hàng.');
+    }
+
+    $orderStatusHistoryTableSql = "CREATE TABLE IF NOT EXISTS order_status_history (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        order_id int(10) unsigned NOT NULL,
+        status varchar(50) NOT NULL,
+        note varchar(500) NOT NULL DEFAULT '',
+        actor_name varchar(100) NOT NULL DEFAULT 'Hệ thống',
+        created_at datetime NOT NULL DEFAULT current_timestamp(),
+        PRIMARY KEY (id),
+        KEY idx_order_status_history_order_created (order_id, created_at, id),
+        CONSTRAINT fk_order_status_history_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE RESTRICT ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    if (!$conn->query($orderStatusHistoryTableSql)) {
+        error_log('Order status history schema setup failed: ' . $conn->error);
+        throw new RuntimeException('Không thể tạo lịch sử trạng thái đơn hàng.');
+    }
+}
+
 // Lưu phản hồi của quản trị viên riêng để không thay đổi nội dung đánh giá của khách hàng.
 $reviewRepliesTableSql = "CREATE TABLE IF NOT EXISTS review_replies (
     review_id int(10) unsigned NOT NULL,

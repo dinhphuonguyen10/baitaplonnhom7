@@ -266,14 +266,20 @@ CREATE TABLE `orders` (
   `email` varchar(254) NOT NULL DEFAULT '',
   `address` varchar(500) NOT NULL,
   `total_price` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `shipping_fee` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `discount_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` varchar(50) NOT NULL DEFAULT 'Chờ xác nhận',
   `payment_status` varchar(50) NOT NULL DEFAULT 'Chưa thanh toán',
   `payment_method` varchar(50) NOT NULL DEFAULT 'COD',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `cancelled_at` datetime DEFAULT NULL,
+  `cancellation_reason` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_orders_user` (`user_id`),
   KEY `idx_orders_address` (`address_id`),
   KEY `idx_orders_created_at` (`created_at`),
+  KEY `idx_orders_user_created` (`user_id`,`created_at`,`id`),
+  CONSTRAINT `chk_orders_amounts` CHECK (`total_price` >= 0 AND `shipping_fee` >= 0 AND `discount_amount` >= 0),
   CONSTRAINT `fk_orders_address` FOREIGN KEY (`address_id`) REFERENCES `addresses` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_orders_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -285,9 +291,25 @@ CREATE TABLE `orders` (
 
 LOCK TABLES `orders` WRITE;
 /*!40000 ALTER TABLE `orders` DISABLE KEYS */;
-INSERT INTO `orders` VALUES (1,1,NULL,'Yến Vũ','0563658095','vuyen5325@gmail.com','ưgwtwgfw, Phường Mường Lay, Tỉnh Điện Biên',1290000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-19 13:53:58'),(2,6,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',27720000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-15 17:13:17'),(3,3,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',18960000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-31 17:13:17'),(4,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',21000000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-25 17:13:17'),(5,6,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',11700000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-12 17:13:17'),(6,2,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',6240000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-26 17:13:17'),(7,8,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',16650000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-13 17:13:17'),(8,4,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',10320000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-01 17:13:17'),(9,2,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',6400000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-04 17:13:17'),(10,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',10320000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-29 17:13:17'),(11,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',2640000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-18 17:13:17'),(12,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',3550000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-16 17:13:17'),(13,5,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',3720000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-09 17:13:17');
+INSERT INTO `orders` (`id`,`user_id`,`address_id`,`full_name`,`phone`,`email`,`address`,`total_price`,`status`,`payment_status`,`payment_method`,`created_at`) VALUES (1,1,NULL,'Yến Vũ','0563658095','vuyen5325@gmail.com','ưgwtwgfw, Phường Mường Lay, Tỉnh Điện Biên',1290000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-19 13:53:58'),(2,6,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',27720000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-15 17:13:17'),(3,3,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',18960000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-31 17:13:17'),(4,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',21000000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-25 17:13:17'),(5,6,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',11700000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-12 17:13:17'),(6,2,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',6240000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-26 17:13:17'),(7,8,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',16650000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-13 17:13:17'),(8,4,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',10320000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-01 17:13:17'),(9,2,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',6400000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-04 17:13:17'),(10,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',10320000.00,'Đã giao hàng','Đã thanh toán','COD','2026-10-29 17:13:17'),(11,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',2640000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-18 17:13:17'),(12,7,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',3550000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-16 17:13:17'),(13,5,NULL,'Khách hàng VIP','0912345678','order@ecrin.vn','Hà Nội',3720000.00,'Đã giao hàng','Đã thanh toán','COD','2026-11-09 17:13:17');
 /*!40000 ALTER TABLE `orders` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `order_status_history`
+--
+
+CREATE TABLE `order_status_history` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `order_id` int(10) unsigned NOT NULL,
+  `status` varchar(50) NOT NULL,
+  `note` varchar(500) NOT NULL DEFAULT '',
+  `actor_name` varchar(100) NOT NULL DEFAULT 'Hệ thống',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_order_status_history_order_created` (`order_id`,`created_at`,`id`),
+  CONSTRAINT `fk_order_status_history_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Table structure for table `products`
