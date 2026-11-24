@@ -101,7 +101,16 @@ function getProductQuantityControlMarkup(stock, name) {
 
 function createSliderItems(container, products) {
     products.forEach(product => {
-        const discountHTML = product.discount ? `<div class="product-discount">${product.discount}</div>` : '';
+        const origVal = parsePrice(product.priceOriginal || product.price_original);
+        const saleVal = parsePrice(product.priceSale || product.price_sale);
+        let calcPercent = 0;
+        if (origVal > saleVal && origVal > 0) {
+            calcPercent = Math.round(((origVal - saleVal) / origVal) * 100);
+        }
+        const discountText = (product.discount && product.discount.trim() !== '')
+            ? product.discount
+            : (calcPercent > 0 ? `-${calcPercent}%` : '');
+        const discountHTML = discountText ? `<div class="product-discount">${discountText}</div>` : '';
         const imagePath = typeof product.image === 'string' ? product.image : '';
         const imageUrl = getProductImageUrl(imagePath);
 
@@ -110,6 +119,7 @@ function createSliderItems(container, products) {
         const wishlistCount = Number(product.wishlistCount) || 0;
 
         const metaHTML = renderProductMeta(soldCount, wishlistCount);
+        const percentTagHTML = calcPercent > 0 ? `<span class="price-discount-percent">-${calcPercent}%</span>` : '';
 
         const itemHTML = `
             <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
@@ -120,7 +130,7 @@ function createSliderItems(container, products) {
                     <h3>${product.name}</h3>
                     <div class="product-price">
                         <span class="price-sale">${product.priceSale}<sup>đ</sup></span>
-                        ${product.priceOriginal && parsePrice(product.priceOriginal) > 0 ? `<span class="price-original">${product.priceOriginal}<sup>đ</sup></span>` : ''}
+                        ${origVal > 0 ? `<span class="price-original">${product.priceOriginal || formatDbPrice(origVal)}<sup>đ</sup></span>${percentTagHTML}` : ''}
                     </div>
                     ${metaHTML}
                     ${renderProductRating(product)}
@@ -1737,11 +1747,21 @@ let _paginationCurrentPage = 1;
 let _paginationAllProducts = []; // Lưu toàn bộ sản phẩm đã fetch (dùng cho phân trang)
 
 function buildProductCardHTML(product) {
-    const badgeHTML = product.discount ? `<div class="product-badge">${product.discount}</div>` : '';
+    const origPriceVal = parsePrice(product.price_original);
+    const salePriceVal = parsePrice(product.price_sale);
+    let calcPercent = 0;
+    if (origPriceVal > salePriceVal && origPriceVal > 0) {
+        calcPercent = Math.round(((origPriceVal - salePriceVal) / origPriceVal) * 100);
+    }
+    const discountText = (product.discount && product.discount.trim() !== '')
+        ? product.discount
+        : (calcPercent > 0 ? `-${calcPercent}%` : '');
+    const badgeHTML = discountText ? `<div class="product-badge">${discountText}</div>` : '';
 
     const priceSaleFormatted = formatDbPrice(product.price_sale);
-    const priceOriginalHTML = product.price_original && parsePrice(product.price_original) > 0
-        ? `<span class="price-original" style="text-decoration: line-through; color: #999; margin-left: 10px; font-size: 0.9rem;">${formatDbPrice(product.price_original)}<sup>đ</sup></span>`
+    const percentTagHTML = calcPercent > 0 ? `<span class="price-discount-percent">-${calcPercent}%</span>` : '';
+    const priceOriginalHTML = product.price_original && origPriceVal > 0
+        ? `<span class="price-original" style="text-decoration: line-through; color: #999; margin-left: 10px; font-size: 0.9rem;">${formatDbPrice(product.price_original)}<sup>đ</sup></span>${percentTagHTML}`
         : '';
 
     const stock = parseInt(product.stock, 10) || 0;

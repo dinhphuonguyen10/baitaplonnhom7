@@ -349,6 +349,7 @@ if ($isDirectReviewRequest) {
 }
 
 // Tải tổng hợp sao, bộ lọc và danh sách đánh giá đã xác minh cho trang chi tiết.
+
 if (empty($product['id']) || !isset($conn) || !($conn instanceof mysqli)) {
     return;
 }
@@ -589,14 +590,18 @@ $paginationStart = max(1, $paginationEnd - 4);
                     ? mb_strtoupper(mb_substr($reviewUsername, 0, 1, 'UTF-8'), 'UTF-8')
                     : 'K';
                 ?>
-                <article class="review-item">
+                <article class="review-item<?php echo ($ownReview !== null && $reviewId === (int) $ownReview['id']) ? ' is-own-review' : ''; ?>">
                     <div class="review-avatar" aria-hidden="true">
                         <?php echo $reviewEscape($reviewAvatarInitial); ?>
                     </div>
                     <div class="review-content">
                         <div class="review-author-line">
                             <strong><?php echo $reviewEscape(maskProductReviewerName($reviewUsername)); ?></strong>
-                            <span class="review-verified">✓ Đã mua hàng</span>
+                            <?php if ($ownReview !== null && $reviewId === (int) $ownReview['id']): ?>
+                                <span class="review-verified" style="background:#e8f4fd;color:#0d6efd;border-color:#b6d4fe;font-weight:700;">Đánh giá của bạn</span>
+                            <?php else: ?>
+                                <span class="review-verified">✓ Đã mua hàng</span>
+                            <?php endif; ?>
                         </div>
                         <div class="review-rating-line">
                             <span class="review-stars" aria-label="<?php echo $reviewStars; ?> trên 5 sao">
@@ -763,3 +768,26 @@ $paginationStart = max(1, $paginationEnd - 4);
     }
     </script>
 <?php endif; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.location.hash === '#product-reviews' || new URLSearchParams(window.location.search).has('rating')) {
+        setTimeout(function () {
+            const ownReviewEl = document.querySelector('.review-item.is-own-review');
+            if (ownReviewEl) {
+                ownReviewEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                ownReviewEl.style.transition = 'box-shadow 0.4s ease, border-color 0.4s ease';
+                ownReviewEl.style.boxShadow = '0 0 0 4px rgba(196, 164, 90, 0.35)';
+                setTimeout(function () {
+                    ownReviewEl.style.boxShadow = '';
+                }, 2500);
+            } else {
+                const reviewSection = document.getElementById('product-reviews');
+                if (reviewSection) {
+                    reviewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        }, 300);
+    }
+});
+</script>

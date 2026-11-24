@@ -66,6 +66,12 @@ $descriptionByCategory = [
             ? $imagePath
             : $appBaseUrl . '/' . ltrim($imagePath, '/') . '?v=' . $imgVersion;
         $stock = (int) $product['stock'];
+        $original = (float)$product['price_original'];
+        $sale = (float)$product['price_sale'];
+        $discountPercentage = 0;
+        if ($original > $sale && $original > 0) {
+            $discountPercentage = round((($original - $sale) / $original) * 100);
+        }
         $rawDescription = trim((string)($product['description'] ?? ''));
         $description = $rawDescription !== ''
             ? $rawDescription
@@ -91,8 +97,8 @@ $descriptionByCategory = [
                     <span class="price-sale"><?php echo number_format((float) $product['price_sale'], 0, ',', '.'); ?><sup>đ</sup></span>
                     <?php if ((float) $product['price_original'] > (float) $product['price_sale']): ?>
                         <span class="price-original"><?php echo number_format((float) $product['price_original'], 0, ',', '.'); ?><sup>đ</sup></span>
-                        <?php if (!empty($product['discount'])): ?>
-                            <span class="product-badge" style="position: static; vertical-align: middle; margin-left: 8px;"><?php echo $escape($product['discount']); ?></span>
+                        <?php if ($discountPercentage > 0): ?>
+                            <span class="price-discount-percent">-<?php echo $discountPercentage; ?>%</span>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>

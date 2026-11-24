@@ -237,8 +237,8 @@ BEGIN
         RETURN order_date >= DATE_SUB(NOW(), INTERVAL 30 DAY);
     ELSEIF filter_time = '6months' THEN
         RETURN order_date >= DATE_SUB(NOW(), INTERVAL 6 MONTH);
-    ELSEIF filter_time = 'this_year' THEN
-        RETURN YEAR(order_date) = YEAR(NOW());
+    ELSEIF filter_time = 'one_year' THEN
+        RETURN order_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR);
     ELSE
         RETURN 1;
     END IF;

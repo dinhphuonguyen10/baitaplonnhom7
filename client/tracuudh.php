@@ -342,10 +342,12 @@ if (!$isCustomerLoggedIn) {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 92px; padding: 8px 12px; border-radius: 9px;
     font-size: .78rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+    transition: all .2s ease;
 }
 .order-review-link { color: #fff; background: #c94f5c; border: 1px solid #c94f5c; }
-.order-review-link:hover { background: #ad3d4a; }
-.order-reviewed-label { color: #3c8c61; background: #edf8f1; border: 1px solid #d8efdf; }
+.order-review-link:hover { background: #ad3d4a; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(201,79,92,.3); }
+.order-reviewed-label { color: #278553; background: #edf8f1; border: 1px solid #bce6cc; cursor: pointer; }
+a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #278553; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(39,133,83,.25); }
 .order-product-review-action { margin-left: auto; }
 @media (max-width: 560px) {
     .order-product-row { flex-wrap: wrap; }
@@ -723,7 +725,7 @@ if (!$isCustomerLoggedIn) {
                 <select id="order-time-select" style="border: 1px solid #ddd; padding: 6px 12px; border-radius: 8px; font-size: 0.88rem; color: var(--navy); font-weight: 600; outline: none; cursor: pointer;">
                     <option value="30days" selected>30 ngày gần nhất</option>
                     <option value="6months">6 tháng gần nhất</option>
-                    <option value="this_year">Trong năm nay</option>
+                    <option value="one_year">1 năm gần nhất</option>
                     <option value="all">Tất cả thời gian</option>
                 </select>
             </div>
@@ -813,8 +815,10 @@ if (!$isCustomerLoggedIn) {
 
     function renderReviewAction(item, isDelivered) {
         if (!isDelivered || !item.product_id) return '';
-        if (Number(item.is_reviewed) === 1) return '<span class="order-reviewed-label order-product-review-action">✓ Đã đánh giá</span>';
         const reviewUrl = `${BASE}/client/product.php?id=${encodeURIComponent(item.product_id)}#product-reviews`;
+        if (Number(item.is_reviewed) === 1) {
+            return `<a class="order-reviewed-label order-product-review-action" href="${reviewUrl}" title="Bấm để xem đánh giá của bạn">✓ Đã đánh giá</a>`;
+        }
         return `<a class="order-review-link order-product-review-action" href="${reviewUrl}">Đánh giá</a>`;
     }
 
