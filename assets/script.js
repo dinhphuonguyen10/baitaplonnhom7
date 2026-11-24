@@ -3065,6 +3065,9 @@ function handleWishlistPageRemoval(productId, favorited) {
     });
 }
 
+// Flag tránh gắn trùng listener nhiều lần
+let isWishlistInitialized = false;
+
 async function initWishlist() {
     // Load wishlist IDs on startup
     if (getCurrentCustomer()) {
@@ -3091,6 +3094,9 @@ async function initWishlist() {
 
     // Highlight all heart buttons already on page
     wishlistIds.forEach(id => updateWishlistBtns(id, true));
+
+    if (isWishlistInitialized) return;
+    isWishlistInitialized = true;
 
     // Event delegation for all .wishlist-btn clicks
     document.addEventListener('click', e => {
@@ -3162,7 +3168,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initScrollToTop();
     initProductDetailsNavigation();
     initAddToCart();
-    void initWishlist();
     initCheckoutPage();
     initSearch();
     initTabs();
