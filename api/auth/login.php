@@ -16,16 +16,7 @@ if (!isset($data->username) || !isset($data->password)) {
 $username = trim($data->username);
 $password = $data->password;
 
-// Tác dụng: Mỗi lần đăng nhập bắt đầu bằng phiên sạch để không giữ vai trò hoặc tên tài khoản của phiên trước
-unset(
-    $_SESSION['user_id'],
-    $_SESSION['username'],
-    $_SESSION['role'],
-    $_SESSION['admin_user_id'],
-    $_SESSION['admin_username'],
-    $_SESSION['admin_role']
-);
-
+// Phiên admin và khách hàng được lưu riêng để đăng nhập một bên không xóa phiên bên kia.
 // ─── Bước 1: Tìm trong bảng users (khách hàng) ───────────────────────────
 $stmt = $conn->prepare("SELECT id, username, password FROM users WHERE username = ? LIMIT 1");
 $stmt->bind_param('s', $username);
@@ -100,7 +91,6 @@ if ($admin) {
         session_regenerate_id(true);
 
         // Phiên quản trị viên
-        unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['role']);
         $_SESSION['admin_user_id']  = $admin['id'];
         $_SESSION['admin_username'] = $admin['username'];
         $_SESSION['admin_role']     = $admin['role'];
