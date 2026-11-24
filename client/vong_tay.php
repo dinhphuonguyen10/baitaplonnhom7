@@ -22,6 +22,18 @@ include __DIR__ . '/../include/header.php';
                 <h2 class="filter-header-title">BỘ LỌC TÌM KIẾM</h2>
             </div>
 
+            <div class="filter-group">
+                <label class="filter-group-title" for="filter-category">DANH MỤC</label>
+                <select id="filter-category" class="filter-category-select">
+                    <?php foreach ($navCategories as $navCategory): ?>
+                        <?php if (in_array($navCategory['slug'], ['combo', 'suggest', 'featured'], true)) continue; ?>
+                        <option value="<?php echo htmlspecialchars($navCategory['slug'], ENT_QUOTES, 'UTF-8'); ?>" <?php echo $navCategory['slug'] === $categoryKey ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($navCategory['name'], ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
             <!-- NHÓM 1: KHOẢNG GIÁ -->
             <div class="filter-group">
                 <h3 class="filter-group-title">KHOẢNG GIÁ</h3>
@@ -65,6 +77,13 @@ include __DIR__ . '/../include/header.php';
                             <span class="check-box-text">Đang giảm giá</span>
                         </label>
                     </li>
+                    <li>
+                        <label class="custom-check-item">
+                            <input type="checkbox" id="filter-has-gift" class="filter-checkbox" value="has_gift">
+                            <span class="check-box-custom"></span>
+                            <span class="check-box-text">Có quà tặng</span>
+                        </label>
+                    </li>
                 </ul>
             </div>
 
@@ -90,6 +109,7 @@ include __DIR__ . '/../include/header.php';
                         <button type="button" class="shopee-sort-btn active" data-sort="best_selling">Bán chạy</button>
                         <button type="button" class="shopee-sort-btn" data-sort="popular">Gợi ý</button>
                         <button type="button" class="shopee-sort-btn" data-sort="newest">Mới nhất</button>
+                        <button type="button" class="shopee-sort-btn" data-sort="name_asc">Tên A-Z</button>
 
                         <div class="shopee-sort-price-dropdown" id="shopee-sort-price-dropdown">
                             <button type="button" class="shopee-sort-btn price-dropdown-toggle" id="price-dropdown-toggle" aria-haspopup="true" aria-expanded="false">

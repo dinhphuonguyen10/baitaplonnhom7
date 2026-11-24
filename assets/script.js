@@ -2054,6 +2054,16 @@ function renderDbProducts(dbProducts, container, page) {
     if (loadMoreContainer) loadMoreContainer.style.display = 'none';
 }
 
+function renderDbProductPage(products, container, totalItems, currentPage, onPageChange) {
+    container.innerHTML = '';
+    products.forEach(product => {
+        container.insertAdjacentHTML('beforeend', buildProductCardHTML(product));
+    });
+    renderPaginationUI(totalItems, currentPage, onPageChange);
+    applyUserRole();
+    wishlistIds.forEach(id => updateWishlistBtns(id, true));
+}
+
 function normalizeSearchText(value) {
     return String(value ?? '')
         .toLocaleLowerCase('vi')
@@ -2782,6 +2792,14 @@ function initCategoryFilters() {
     if (!container) return;
 
     const dbCategory = container.getAttribute('data-db-category');
+    const categorySelect = document.getElementById('filter-category');
+    if (categorySelect) {
+        categorySelect.addEventListener('change', () => {
+            if (categorySelect.value) {
+                window.location.href = `${appUrl('/client/category.php')}?slug=${encodeURIComponent(categorySelect.value)}`;
+            }
+        });
+    }
     if (!dbCategory) return;
 
     // Các phần tử lọc giá
@@ -2804,6 +2822,22 @@ function initCategoryFilters() {
     // Khối rỗng khi không có kết quả
     const emptyState = document.getElementById('filter-empty-state');
     const emptyResetBtn = document.getElementById('btn-empty-reset');
+    let resultsSummary = document.getElementById('category-results-count');
+    if (!resultsSummary) {
+        resultsSummary = document.createElement('p');
+        resultsSummary.id = 'category-results-count';
+        resultsSummary.className = 'category-results-count';
+        container.parentNode.insertBefore(resultsSummary, container);
+    }
+    let filterError = document.getElementById('category-filter-error');
+    if (!filterError) {
+        filterError = document.createElement('p');
+        filterError.id = 'category-filter-error';
+        filterError.className = 'category-filter-error';
+        filterError.hidden = true;
+        container.parentNode.insertBefore(filterError, container);
+    }
+    let requestSequence = 0;
 
     // Thanh sắp xếp Shopee
     const sortBtns = document.querySelectorAll('.shopee-sort-btn[data-sort]');
@@ -2956,7 +2990,8 @@ function initCategoryFilters() {
     }
 
     // ================= HÀM GỌI API VỚI FILTER + SORT (SQL-SIDE) =================
-    async function applyFiltersAndSort() {
+    async function applyFiltersAndSort(page = 1) {
+        const requestId = ++requestSequence;
         const minVal = parseVndNumber(priceFromInput?.value);
         const maxVal = parseVndNumber(priceToInput?.value);
         const reqInStock  = inStockCb  ? inStockCb.checked  : false;
@@ -2966,8 +3001,20 @@ function initCategoryFilters() {
         // Vẽ lại thanh tags tiêu chí đang lọc
         renderActiveFilterBadges(minVal, maxVal, reqInStock, reqDiscount, reqGift);
 
+        if (minVal !== null && maxVal !== null && minVal > maxVal) {
+            filterError.textContent = 'Giá thấp nhất không được lớn hơn giá cao nhất.';
+            filterError.hidden = false;
+            resultsSummary.textContent = '';
+            container.innerHTML = '';
+            if (emptyState) emptyState.style.display = 'none';
+            const paginationEl = document.getElementById('pagination-controls');
+            if (paginationEl) paginationEl.style.display = 'none';
+            return;
+        }
+        filterError.hidden = true;
+
         // Xây dựng query string gửi lên API
-        const params = new URLSearchParams({ category: dbCategory, sort: currentSort });
+        const params = new URLSearchParams({ category: dbCategory, sort: currentSort, page: String(page) });
         if (minVal !== null) params.set('min_price', minVal);
         if (maxVal !== null) params.set('max_price', maxVal);
         if (reqInStock)  params.set('in_stock',     '1');
@@ -2976,20 +3023,46 @@ function initCategoryFilters() {
 
         try {
             const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?${params}`);
-            if (!response.ok) throw new Error('Network response was not ok');
-            const products = await response.json();
+            const data = await response.json();
+            if (!response.ok || !Array.isArray(data.products)) {
+                throw new Error(data.message || 'Không thể tải sản phẩm.');
+            }
+            if (requestId !== requestSequence) return;
 
-            // Ẩn/Hiện khối Empty State
+            const products = data.products;
+            const totalItems = Number(data.total) || 0;
+            const currentPage = Number(data.page) || 1;
+            resultsSummary.textContent = `Tìm thấy ${totalItems.toLocaleString('vi-VN')} sản phẩm`;
             if (emptyState) {
-                emptyState.style.display = (products.length === 0) ? 'block' : 'none';
+                emptyState.style.display = totalItems === 0 ? 'block' : 'none';
             }
 
-            renderDbProducts(products, container, 1);
-            applyUserRole();
-            // Đồng bộ lại nút tim
-            wishlistIds.forEach(id => updateWishlistBtns(id, true));
+            if (totalItems === 0) {
+                container.innerHTML = '';
+                const paginationEl = document.getElementById('pagination-controls');
+                if (paginationEl) paginationEl.style.display = 'none';
+                return;
+            }
+            renderDbProductPage(products, container, totalItems, currentPage, nextPage => {
+                applyFiltersAndSort(nextPage);
+                const categoryMain = document.querySelector('.category-main');
+                if (categoryMain) {
+                    const headerHeight = document.querySelector('.sticky-header-wrapper')?.offsetHeight || 160;
+                    const targetPos = categoryMain.getBoundingClientRect().top + window.pageYOffset - headerHeight - 16;
+                    window.scrollTo({ top: Math.max(0, targetPos), behavior: 'smooth' });
+                }
+            });
         } catch (error) {
             console.error('Lỗi khi tải sản phẩm:', error);
+            if (requestId === requestSequence) {
+                filterError.textContent = error.message || 'Không thể tải sản phẩm. Vui lòng thử lại.';
+                filterError.hidden = false;
+                resultsSummary.textContent = '';
+                container.innerHTML = '';
+                if (emptyState) emptyState.style.display = 'none';
+                const paginationEl = document.getElementById('pagination-controls');
+                if (paginationEl) paginationEl.style.display = 'none';
+            }
         }
     }
 
@@ -3060,6 +3133,8 @@ function initCategoryFilters() {
             loadMoreBtn.textContent = isHidden ? 'Thu gọn' : 'Xem thêm';
         });
     }
+
+    applyFiltersAndSort(1);
 }
 
 // ==================== DYNAMIC CATEGORY PAGES ====================
@@ -3095,24 +3170,8 @@ async function initDynamicCategoryPages() {
     const dbCategory = container.getAttribute('data-db-category');
     if (!dbCategory) return;
 
-    // Load lần đầu: mặc định sort=best_selling, không có filter
-    console.log(`Loading dynamic products for category: ${dbCategory}...`);
-    try {
-        const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?category=${encodeURIComponent(dbCategory)}&sort=best_selling`);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const dbProducts = await response.json();
-
-        if (dbProducts && dbProducts.length > 0) {
-            console.log(`Loaded ${dbProducts.length} products from database. Rendering dynamically...`);
-            renderDbProducts(dbProducts, container);
-            applyUserRole();
-        } else {
-            container.innerHTML = '<p class="empty-category-message">Danh mục hiện chưa có sản phẩm.</p>';
-        }
-    } catch (error) {
-        console.error("Lỗi khi tải sản phẩm động:", error);
-        container.innerHTML = '<p class="empty-cart" style="grid-column: 1/-1; text-align: center;">Không tải được sản phẩm. Vui lòng kiểm tra kết nối cơ sở dữ liệu.</p>';
-    }
+    // Category listings are loaded with backend filters and pagination by initCategoryFilters().
+    if (dbCategory) return;
 }
 
 // ==================== WISHLIST ====================
