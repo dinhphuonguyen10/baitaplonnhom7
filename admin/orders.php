@@ -14,6 +14,34 @@ $orderStatuses = getOrderWorkflowStatuses();
 $cancelledStatuses = ['Đã hủy', 'Canceled', 'cancelled', 'huy'];
 $orderNotice = '';
 $paymentNotice = null;
+
+// ----- BỘ LỌC ĐƠN HÀNG -----
+$search       = $_GET['search'] ?? '';
+$statusFilter = $_GET['status'] ?? '';
+$dateRange    = $_GET['date_range'] ?? '';
+
+// Xây dựng mảng điều kiện và tham số cho prepared statement
+$where   = [];
+$params  = [];
+
+if ($search !== '') {
+    $where[] = "(o.full_name LIKE ? OR o.phone LIKE ? OR o.email LIKE ?)";
+    $like   = '%' . $search . '%';
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+}
+if ($statusFilter !== '') {
+    $where[] = "o.status = ?";
+    $params[] = $statusFilter;
+}
+if ($dateRange === 'last_30_days') {
+    $where[] = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+} elseif ($dateRange === 'last_6_months') {
+    $where[] = "o.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)";
+}
+$whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
 try {
     expireOverdueQrPaymentOrders($conn);
 } catch (Throwable $e) {
