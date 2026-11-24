@@ -165,7 +165,12 @@ function initProductSlider(containerId, prevBtnId, nextBtnId, initialData, moreD
 
     container.innerHTML = '';
     if (initialData.length === 0) {
-        container.innerHTML = '<p class="home-empty-state">Sản phẩm đang được cập nhật. Mời bạn quay lại sau nhé.</p>';
+        const emptyMessages = {
+            'featured-items-container': 'Chưa có sản phẩm bán thành công trong 30 ngày qua.',
+            'suggest-items-container': 'Chưa có đủ dữ liệu mua hoặc yêu thích để gợi ý sản phẩm.',
+            'new-items-container': 'Chưa có sản phẩm mới được ghi nhận thời điểm tạo.',
+        };
+        container.innerHTML = `<p class="home-empty-state">${emptyMessages[container.id] || 'Chưa có sản phẩm phù hợp.'}</p>`;
         if (prevBtn) prevBtn.hidden = true;
         if (nextBtn) nextBtn.hidden = true;
         return;
@@ -208,57 +213,31 @@ function initProductSlider(containerId, prevBtnId, nextBtnId, initialData, moreD
     });
 }
 
-async function fetchProducts(category) {
+async function fetchHomepageSections() {
     try {
-        const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?category=${encodeURIComponent(category)}`);
-        if (!response.ok) throw new Error('Network response was not ok');
+        const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?category=home`);
+        if (!response.ok) throw new Error('Không thể tải dữ liệu nhóm sản phẩm trang chủ.');
         const data = await response.json();
-        // Map database fields to JS field names
-        return data.map(p => ({
-            id: p.id,
-            name: p.name,
-            discount: p.discount,
-            image: p.image,
-            priceSale: p.price_sale,
-            priceOriginal: p.price_original,
-            gift: p.gift,
-            stock: Number(p.stock) || 0,
-            soldCount: Number(p.sold_count) || 0,
-            wishlistCount: Number(p.wishlist_count) || 0,
-            average_rating: Number(p.average_rating) || 0,
-            review_count: Number(p.review_count) || 0,
-            category: p.category,
-            is_favorite: p.is_favorite
-        }));
-    } catch (error) {
-        console.error(`Lỗi khi tải sản phẩm danh mục ${category}:`, error);
-        const containerIds = {
-            featured: 'featured-items-container',
-            suggest: 'suggest-items-container',
-            new: 'new-items-container',
-            latest: 'new-items-container'
-        };
-        const container = document.getElementById(containerIds[category]);
-        if (container) {
-            container.dataset.loadError = 'true';
+        const sectionKeys = ['new', 'featured', 'suggest'];
+        if (!sectionKeys.every(key => Array.isArray(data[key]))) {
+            throw new Error('Dữ liệu nhóm sản phẩm trang chủ không hợp lệ.');
         }
-        return [];
+        return data;
+    } catch (error) {
+        console.error('Lỗi khi tải các nhóm sản phẩm trang chủ:', error);
+        ['featured-items-container', 'suggest-items-container', 'new-items-container'].forEach(containerId => {
+            const container = document.getElementById(containerId);
+            if (container) container.dataset.loadError = 'true';
+        });
+        return { new: [], featured: [], suggest: [] };
     }
 }
 
 async function initComboSlider() {
-    // 1. Tải dữ liệu từ Database theo câu lệnh SQL lọc trực tiếp qua API:
-    // - featured: Sản phẩm nổi bật (Lọc bằng SQL: WHERE is_featured = 1)
-    // - suggest: Gợi ý cho bạn (Lọc bằng SQL: WHERE is_suggested = 1)
-    // - new: Sản phẩm mới nhất (Lọc bằng SQL: WHERE is_new = 1)
-    const featuredData = await fetchProducts('featured');
-    const suggestData = await fetchProducts('suggest');
-    const newData = await fetchProducts('new');
-
-    // Khởi tạo các slider trên trang chủ với dữ liệu từ DB
-    initProductSlider('featured-items-container', 'featured-prev', 'featured-next', featuredData, []);
-    initProductSlider('suggest-items-container', 'suggest-prev', 'suggest-next', suggestData, []);
-    initProductSlider('new-items-container', 'new-prev', 'new-next', newData, []);
+    const sections = await fetchHomepageSections();
+    initProductSlider('featured-items-container', 'featured-prev', 'featured-next', sections.featured, []);
+    initProductSlider('suggest-items-container', 'suggest-prev', 'suggest-next', sections.suggest, []);
+    initProductSlider('new-items-container', 'new-prev', 'new-next', sections.new, []);
 }
 
 // ==================== SCROLL TO TOP ====================

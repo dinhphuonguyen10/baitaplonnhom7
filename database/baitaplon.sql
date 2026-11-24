@@ -747,3 +747,7 @@ GROUP BY p.id, c.slug, c.name, c.status, c.is_deleted;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-11-21 16:08:20
+
+ALTER TABLE `products`
+  ADD COLUMN `created_at` datetime DEFAULT NULL AFTER `deleted_by`,
+  ADD KEY `idx_products_public_created` (`is_deleted`, `status`, `created_at`, `id`);

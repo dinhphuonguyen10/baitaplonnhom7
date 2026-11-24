@@ -45,6 +45,7 @@ if (($suggestInput !== '' && !in_array($suggestInput, ['0', '1'], true))
     exit;
 }
 $paginationMeta = null;
+$homepageSections = null;
 
 if (array_key_exists('ids', $_GET)) {
     $rawIds = $_GET['ids'];
@@ -103,17 +104,152 @@ if (array_key_exists('ids', $_GET)) {
         echo json_encode(['status' => 'error', 'message' => 'Không thể kiểm tra trạng thái sản phẩm.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-// 1. TRANG CHỦ - Sản phẩm nổi bật: Top 10 sản phẩm có nhiều lượt bán nhất (bán chạy nhất)
-} elseif ($category === 'featured') {
-    $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' AND category_is_deleted = 0 AND category_status = 'active' ORDER BY sold_count DESC, id DESC LIMIT 10");
-}
-// 2. TRANG CHỦ - Gợi ý cho bạn: Top 10 sản phẩm có nhiều lượt tim nhất (yêu thích nhất)
-elseif ($category === 'suggest') {
-    $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' AND category_is_deleted = 0 AND category_status = 'active' ORDER BY wishlist_count DESC, id DESC LIMIT 10");
-}
-// 3. TRANG CHỦ - Sản phẩm mới nhất: Top 10 sản phẩm mới được thêm vào gần đây nhất (ID mới nhất)
-elseif ($category === 'new' || $category === 'latest') {
-    $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' AND category_is_deleted = 0 AND category_status = 'active' ORDER BY id DESC LIMIT 10");
+} elseif (in_array($category, ['home', 'featured', 'suggest', 'new', 'latest'], true)) {
+    $sendHomeError = static function (string $message): void {
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => $message], JSON_UNESCAPED_UNICODE);
+        exit;
+    };
+    $fetchHomeRows = static function (string $sql, string $types = '', array $params = []) use ($conn, $sendHomeError): array {
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log('Homepage product query prepare failed: ' . $conn->error);
+            $sendHomeError('Không thể tải sản phẩm trang chủ.');
+        }
+        if ($types !== '' && !$stmt->bind_param($types, ...$params)) {
+            $stmt->close();
+            error_log('Homepage product query binding failed: ' . $conn->error);
+            $sendHomeError('Không thể tải sản phẩm trang chủ.');
+        }
+        if (!$stmt->execute()) {
+            $stmt->close();
+            error_log('Homepage product query failed: ' . $conn->error);
+            $sendHomeError('Không thể tải sản phẩm trang chủ.');
+        }
+        $rows = [];
+        $homeResult = $stmt->get_result();
+        while ($row = $homeResult->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        $stmt->close();
+        return $rows;
+    };
+    $homeSalesJoin = "LEFT JOIN (
+        SELECT oi.product_id, SUM(oi.quantity) AS quantity_30d
+        FROM order_items oi
+        INNER JOIN orders o ON o.id = oi.order_id
+        WHERE o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+          AND o.created_at <= NOW()
+          AND o.status IN ('Đã giao hàng', 'Đã giao')
+          AND o.payment_status = 'Đã thanh toán'
+        GROUP BY oi.product_id
+    ) home_sales ON home_sales.product_id = p.id";
+    $eligibleProducts = "p.is_deleted = 0 AND p.status = 'active'
+        AND v.is_deleted = 0 AND v.status = 'active'
+        AND v.category_is_deleted = 0 AND v.category_status = 'active'";
+    $makeExclusion = static function (array $ids): array {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
+        $clause = $ids === []
+            ? ''
+            : ' AND p.id NOT IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
+        return [$clause, $ids];
+    };
+    $rowsToIds = static fn(array $rows): array => array_map(static fn(array $row): int => (int)$row['id'], $rows);
+
+    $newestRows = $fetchHomeRows(
+        "SELECT v.*, p.created_at AS product_created_at,
+                COALESCE(home_sales.quantity_30d, 0) AS home_sold_count
+         FROM view_product_details v
+         INNER JOIN products p ON p.id = v.id
+         {$homeSalesJoin}
+         WHERE {$eligibleProducts}
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT 10"
+    );
+
+    [$excludeNewestSql, $newestIds] = $makeExclusion($rowsToIds($newestRows));
+    $bestSellingRows = $fetchHomeRows(
+        "SELECT v.*, COALESCE(home_sales.quantity_30d, 0) AS home_sold_count
+         FROM view_product_details v
+         INNER JOIN products p ON p.id = v.id
+         {$homeSalesJoin}
+         WHERE {$eligibleProducts}
+           AND home_sales.quantity_30d > 0
+           {$excludeNewestSql}
+         ORDER BY home_sales.quantity_30d DESC, p.id DESC
+         LIMIT 10",
+        str_repeat('i', count($newestIds)),
+        $newestIds
+    );
+
+    $preferredCategoryId = null;
+    if (!empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
+        $customerId = (int)$_SESSION['user_id'];
+        $purchaseCategories = $fetchHomeRows(
+            "SELECT p.category_id, SUM(oi.quantity) AS purchased_quantity
+             FROM orders o
+             INNER JOIN order_items oi ON oi.order_id = o.id
+             INNER JOIN products p ON p.id = oi.product_id
+             INNER JOIN categories c ON c.id = p.category_id
+             WHERE o.user_id = ?
+               AND o.status IN ('Đã giao hàng', 'Đã giao')
+               AND o.payment_status = 'Đã thanh toán'
+               AND c.status = 'active' AND c.is_deleted = 0
+             GROUP BY p.category_id
+             ORDER BY purchased_quantity DESC, p.category_id ASC
+             LIMIT 1",
+            'i',
+            [$customerId]
+        );
+        if ($purchaseCategories !== []) {
+            $preferredCategoryId = (int)$purchaseCategories[0]['category_id'];
+        }
+    }
+
+    $loadRecommendationRows = static function (?int $categoryId, array $excludeIds) use (
+        $fetchHomeRows,
+        $homeSalesJoin,
+        $eligibleProducts,
+        $makeExclusion
+    ): array {
+        [$excludeSql, $excludeIds] = $makeExclusion($excludeIds);
+        $categoryClause = $categoryId === null ? '' : ' AND p.category_id = ?';
+        $types = $categoryId === null ? '' : 'i';
+        $params = $categoryId === null ? [] : [$categoryId];
+        if ($excludeIds !== []) {
+            $types .= str_repeat('i', count($excludeIds));
+            array_push($params, ...$excludeIds);
+        }
+        return $fetchHomeRows(
+            "SELECT v.*, COALESCE(home_sales.quantity_30d, 0) AS home_sold_count
+             FROM view_product_details v
+             INNER JOIN products p ON p.id = v.id
+             {$homeSalesJoin}
+             WHERE {$eligibleProducts}
+               {$categoryClause}
+               AND (COALESCE(home_sales.quantity_30d, 0) > 0 OR v.wishlist_count > 0)
+               {$excludeSql}
+             ORDER BY COALESCE(home_sales.quantity_30d, 0) DESC, v.wishlist_count DESC, p.id DESC
+             LIMIT 10",
+            $types,
+            $params
+        );
+    };
+    $excludedForSuggestions = array_merge($newestIds, $rowsToIds($bestSellingRows));
+    $suggestionRows = $loadRecommendationRows($preferredCategoryId, $excludedForSuggestions);
+    if (count($suggestionRows) < 10) {
+        $suggestionRows = array_merge(
+            $suggestionRows,
+            $loadRecommendationRows(null, array_merge($excludedForSuggestions, $rowsToIds($suggestionRows)))
+        );
+        $suggestionRows = array_slice($suggestionRows, 0, 10);
+    }
+
+    $homepageSections = [
+        'new' => $newestRows,
+        'featured' => $bestSellingRows,
+        'suggest' => $suggestionRows,
+    ];
 }
 // 4. Trang danh mục và tìm kiếm: lọc, đếm và phân trang trực tiếp trong MySQL.
 elseif ($category !== '' || $searchQuery !== '') {
@@ -297,28 +433,42 @@ else {
     $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' AND category_is_deleted = 0 AND category_status = 'active' ORDER BY id DESC");
 }
 
+$formatProductRow = static function (array $row) use ($userWishlist): array {
+    $row['average_rating'] = (float)($row['average_rating'] ?? 0);
+    $row['review_count'] = (int)($row['review_count'] ?? 0);
+    $row['stock'] = (int)($row['stock'] ?? 0);
+    $row['sold_count'] = (int)($row['home_sold_count'] ?? $row['sold_count'] ?? 0);
+    unset($row['home_sold_count']);
+    $row['wishlist_count'] = (int)($row['wishlist_count'] ?? 0);
+    $row['is_featured'] = (int)($row['is_featured'] ?? 0);
+    $row['is_suggested'] = (int)($row['is_suggested'] ?? 0);
+    $row['is_new'] = (int)($row['is_new'] ?? 0);
+    $row['price_sale_raw'] = (float)$row['price_sale'];
+    $row['price_original_raw'] = (float)($row['price_original'] ?? 0);
+    $row['price_sale'] = number_format((float)$row['price_sale'], 0, ',', '.');
+    $row['price_original'] = $row['price_original_raw'] > $row['price_sale_raw']
+        ? number_format($row['price_original_raw'], 0, ',', '.')
+        : null;
+    $row['is_favorite'] = isset($userWishlist[(int)$row['id']]);
+    return $row;
+};
+
+if ($homepageSections !== null) {
+    foreach ($homepageSections as $sectionKey => $sectionRows) {
+        $homepageSections[$sectionKey] = array_map($formatProductRow, $sectionRows);
+    }
+    $responseData = $category === 'home'
+        ? $homepageSections
+        : $homepageSections[$category === 'latest' ? 'new' : $category];
+    echo json_encode($responseData, JSON_UNESCAPED_UNICODE);
+    $conn->close();
+    exit;
+}
+
 $products = [];
 if ($result) {
     while ($row = $result->fetch_assoc()) {
-        $row['average_rating']     = (float)($row['average_rating'] ?? 0);
-        $row['review_count']       = (int)($row['review_count'] ?? 0);
-        $row['stock']              = (int)($row['stock'] ?? 0);
-        $row['sold_count']         = (int)($row['sold_count'] ?? 0);
-        $row['wishlist_count']     = (int)($row['wishlist_count'] ?? 0);
-        $row['is_featured']        = (int)($row['is_featured'] ?? 0);
-        $row['is_suggested']       = (int)($row['is_suggested'] ?? 0);
-        $row['is_new']             = (int)($row['is_new'] ?? 0);
-        $row['price_sale_raw']     = (float)$row['price_sale'];
-        $row['price_original_raw'] = (float)($row['price_original'] ?? 0);
-
-        // Định dạng giá hiển thị tiền tệ
-        $row['price_sale']     = number_format((float)$row['price_sale'], 0, ',', '.');
-        $row['price_original'] = $row['price_original_raw'] > $row['price_sale_raw']
-            ? number_format($row['price_original_raw'], 0, ',', '.')
-            : null;
-        $row['is_favorite']    = isset($userWishlist[(int)$row['id']]);
-
-        $products[] = $row;
+        $products[] = $formatProductRow($row);
     }
 }
 

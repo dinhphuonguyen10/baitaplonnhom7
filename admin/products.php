@@ -365,8 +365,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $conn->prepare(
                     'INSERT INTO products (
                         sku, name, category_id, price_sale, price_original, promotion_ends_at,
-                        stock, image, description, is_featured, is_suggested, is_new, status, is_deleted
-                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)'
+                        stock, image, description, is_featured, is_suggested, is_new, status, is_deleted, created_at
+                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())'
                 );
                 if (!$stmt) {
                     throw new RuntimeException('Không thể chuẩn bị thêm sản phẩm: ' . $conn->error);

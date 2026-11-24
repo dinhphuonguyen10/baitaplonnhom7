@@ -285,6 +285,7 @@ $productLifecycleColumns = [
     'is_deleted' => "ALTER TABLE products ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER status",
     'deleted_at' => "ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL AFTER is_deleted",
     'deleted_by' => "ALTER TABLE products ADD COLUMN deleted_by VARCHAR(100) NULL DEFAULT NULL AFTER deleted_at",
+    'created_at' => 'ALTER TABLE products ADD COLUMN created_at DATETIME NULL DEFAULT NULL AFTER deleted_by',
 ];
 foreach ($productLifecycleColumns as $columnName => $alterSql) {
     if (!isset($prodColumns[$columnName])) {
@@ -388,6 +389,7 @@ foreach ([
     'idx_products_status_deleted' => 'ALTER TABLE products ADD INDEX idx_products_status_deleted (is_deleted, status)',
     'idx_products_cat_deleted' => 'ALTER TABLE products ADD INDEX idx_products_cat_deleted (category_id, is_deleted, status)',
     'idx_products_deleted_at' => 'ALTER TABLE products ADD INDEX idx_products_deleted_at (is_deleted, deleted_at)',
+    'idx_products_public_created' => 'ALTER TABLE products ADD INDEX idx_products_public_created (is_deleted, status, created_at, id)',
 ] as $indexName => $alterSql) {
     if (!isset($productIndexes[$indexName]) && !$conn->query($alterSql)) {
         error_log('Product lifecycle index migration failed for ' . $indexName . ': ' . $conn->error);
