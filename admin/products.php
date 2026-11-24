@@ -44,7 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($description === '') {
             $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
         }
-        $imagePath   = 'assets/banner/logo.png'; // Ảnh mặc định
+        $imagePath   = 'assets/banner/logo.png'; // Ảnh mặc định — đồng bộ với logo config nếu có
+        $_lpConf = __DIR__ . '/../storage/banner/logo.json';
+        if (is_file($_lpConf)) {
+            $_lpData = json_decode((string) file_get_contents($_lpConf), true);
+            if (is_array($_lpData) && !empty($_lpData['src'])) $imagePath = (string) $_lpData['src'];
+        }
 
         if ($name === '' || $categoryId <= 0) {
             $message = 'Vui lòng nhập tên sản phẩm và chọn danh mục!';

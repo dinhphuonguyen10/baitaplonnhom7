@@ -6,6 +6,17 @@ $isManager = isManagerRole($_SESSION['admin_role'] ?? $_SESSION['role'] ?? null)
 $roleLabel = $isManager ? 'Quản lý' : 'Nhân viên';
 $adminUsername = $_SESSION['admin_username'] ?? $_SESSION['username'] ?? 'Nhân viên ÉCRIN';
 $adminCurrentPage = 'chat.php';
+
+/* ── Logo fallback đồng bộ với config ── */
+$_chatLogoConf = __DIR__ . '/../storage/banner/logo.json';
+$_chatLogoSrc  = 'assets/banner/logo.png';
+if (is_file($_chatLogoConf)) {
+    $_chatLogoData = json_decode((string) file_get_contents($_chatLogoConf), true);
+    if (is_array($_chatLogoData) && !empty($_chatLogoData['src'])) {
+        $_chatLogoSrc = (string) $_chatLogoData['src'];
+    }
+}
+$chatLogoUrl = $appBaseUrl . '/' . ltrim($_chatLogoSrc, '/');
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -405,7 +416,7 @@ $adminCurrentPage = 'chat.php';
         image.src = /^https?:\/\//i.test(imagePath) ? imagePath : `${base}/${imagePath.replace(/^\/+/, '')}`;
         image.alt = String(message.product_name);
         image.loading = 'lazy';
-        image.onerror = () => { image.src = `${base}/assets/banner/logo.png`; };
+        image.onerror = () => { image.src = `<?php echo $escape($chatLogoUrl); ?>`; };
         const details = document.createElement('span');
         details.className = 'chat-product-info';
         const name = document.createElement('strong');

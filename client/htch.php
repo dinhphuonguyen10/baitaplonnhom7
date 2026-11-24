@@ -62,7 +62,13 @@ include __DIR__ . '/../include/header.php';
             max-height: 500px;
             overflow-y: auto;
             padding-right: 5px;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            scrollbar-color: #b7c3d0 #f1f4f7;
         }
+        .store-list::-webkit-scrollbar { width: 8px; }
+        .store-list::-webkit-scrollbar-track { border-radius: 8px; background: #f1f4f7; }
+        .store-list::-webkit-scrollbar-thumb { border-radius: 8px; background: #b7c3d0; }
 
         .store-item {
             display: block;
@@ -226,7 +232,7 @@ include __DIR__ . '/../include/header.php';
         <section class="store-map-area" aria-label="Bản đồ và thông tin cửa hàng">
             <div class="map-placeholder">
                 <iframe id="google-map" title="Bản đồ vị trí cửa hàng Écrin Jewelry"
-                    src="https://www.google.com/maps?q=123%20Xu%C3%A2n%20Th%E1%BB%A7y%2C%20C%E1%BA%A7u%20Gi%E1%BA%A5y%2C%20H%C3%A0%20N%E1%BB%99i&output=embed"
+                    src="https://www.google.com/maps?q=<?php echo rawurlencode($firstClientStore['address']); ?>&amp;output=embed"
                     loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
             </div>
             <div class="store-detail-card" aria-live="polite">
@@ -256,13 +262,13 @@ include __DIR__ . '/../include/header.php';
         const searchInput = document.getElementById('store-search');
         const emptyMessage = document.getElementById('store-empty');
         const pagination = document.getElementById('store-pagination');
-        const storesPerPage = 4;
+        const storesPerPage = 8;
         let filteredStoreItems = [...storeItems];
         let currentStorePage = 1;
 
         storeItems.forEach(item => {
             item.addEventListener('click', () => {
-                const store = stores.find(location => location.id === Number(item.dataset.id));
+                const store = stores.find(location => Number(location.id) === Number(item.dataset.id));
                 if (!store) return;
 
                 storeItems.forEach(storeItem => storeItem.classList.toggle('active', storeItem === item));
@@ -327,6 +333,7 @@ include __DIR__ . '/../include/header.php';
             const totalPages = Math.max(1, Math.ceil(filteredStoreItems.length / storesPerPage));
             currentStorePage = Math.min(currentStorePage, totalPages);
             const firstIndex = (currentStorePage - 1) * storesPerPage;
+            document.getElementById('store-list').scrollTop = 0;
 
             storeItems.forEach(item => {
                 item.hidden = !filteredStoreItems.includes(item) ||

@@ -84,7 +84,15 @@ $firstStore = $stores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'addr
         .store-sidebar-admin { border-right: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
         .store-sidebar-admin h2 { margin: 0 0 10px; color: var(--navy); font-size: 1.1rem; }
         .store-search-admin input { width: 100%; padding: 9px 12px; border: 1px solid #d5dbe2; border-radius: 8px; font: inherit; }
-        .store-list-admin { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; max-height: 440px; }
+        .store-list-admin { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; max-height: 440px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #b7c3d0 #f1f4f7; }
+        .store-list-admin::-webkit-scrollbar { width: 8px; }
+        .store-list-admin::-webkit-scrollbar-track { border-radius: 8px; background: #f1f4f7; }
+        .store-list-admin::-webkit-scrollbar-thumb { border-radius: 8px; background: #b7c3d0; }
+        .store-preview-pagination { display: flex; justify-content: center; align-items: center; gap: 6px; padding-top: 4px; }
+        .store-preview-pagination[hidden] { display: none; }
+        .store-preview-pagination button { min-width: 32px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--navy); font-weight: 700; cursor: pointer; }
+        .store-preview-pagination button:hover:not(:disabled), .store-preview-pagination button.is-active { border-color: var(--navy); background: var(--navy); color: #fff; }
+        .store-preview-pagination button:disabled { cursor: not-allowed; opacity: .45; }
         .store-btn { display: block; width: 100%; padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; cursor: pointer; text-align: left; font: inherit; transition: .2s; }
         .store-btn:hover, .store-btn.active { border-color: #B09060; background: #FBF8F3; }
         .store-btn h3 { margin: 0 0 4px; color: var(--navy); font-size: 13px; }
@@ -170,6 +178,7 @@ $firstStore = $stores[0] ?? ['id' => 0, 'name' => 'Chưa có cửa hàng', 'addr
                                 <?php endforeach; ?>
                                 <p class="store-empty-msg" id="store-empty">Không tìm thấy cửa hàng phù hợp.</p>
                             </div>
+                            <nav class="store-preview-pagination" id="store-preview-pagination" aria-label="Phân trang cửa hàng"></nav>
                         </aside>
                         <div class="store-map-col">
                             <div class="store-map-frame">
@@ -253,6 +262,11 @@ function switchTab(tab, btn) {
 const storeBtns = document.querySelectorAll('.store-btn');
 const searchInput = document.getElementById('store-search');
 const emptyMsg = document.getElementById('store-empty');
+const storeList = document.getElementById('store-list');
+const storePagination = document.getElementById('store-preview-pagination');
+const storesPerPage = 8;
+let filteredStoreBtns = Array.from(storeBtns);
+let currentStorePage = 1;
 
 storeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -269,14 +283,52 @@ storeBtns.forEach(btn => {
 
 searchInput.addEventListener('input', () => {
     const q = searchInput.value.trim().toLocaleLowerCase('vi');
-    let count = 0;
-    storeBtns.forEach(btn => {
-        const match = btn.textContent.toLocaleLowerCase('vi').includes(q);
-        btn.hidden = !match;
-        if (match) count++;
-    });
-    emptyMsg.style.display = count === 0 ? 'block' : 'none';
+    filteredStoreBtns = Array.from(storeBtns).filter(btn => btn.textContent.toLocaleLowerCase('vi').includes(q));
+    currentStorePage = 1;
+    renderAdminStores();
 });
+
+function renderAdminStores() {
+    const totalPages = Math.ceil(filteredStoreBtns.length / storesPerPage);
+    currentStorePage = Math.min(currentStorePage, Math.max(1, totalPages));
+    const start = (currentStorePage - 1) * storesPerPage;
+    storeBtns.forEach(btn => {
+        const index = filteredStoreBtns.indexOf(btn);
+        btn.hidden = index < start || index >= start + storesPerPage;
+    });
+    emptyMsg.style.display = filteredStoreBtns.length === 0 ? 'block' : 'none';
+    storePagination.innerHTML = '';
+    storePagination.hidden = totalPages <= 1;
+    if (totalPages <= 1) return;
+
+    const addPageButton = (label, page, disabled = false, active = false, ariaLabel = label) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.disabled = disabled;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-label', ariaLabel);
+        if (active) button.setAttribute('aria-current', 'page');
+        button.addEventListener('click', () => {
+            currentStorePage = page;
+            storeList.scrollTop = 0;
+            renderAdminStores();
+        });
+        storePagination.appendChild(button);
+    };
+
+    addPageButton('‹', currentStorePage - 1, currentStorePage === 1, false, 'Trang trước');
+    for (let page = 1; page <= totalPages; page += 1) {
+        addPageButton(String(page), page, false, page === currentStorePage, `Trang ${page}`);
+    }
+    addPageButton('›', currentStorePage + 1, currentStorePage === totalPages, false, 'Trang sau');
+    const count = document.createElement('span');
+    count.textContent = `${currentStorePage}/${totalPages}`;
+    count.style.cssText = 'padding: 0 3px; color: #667085; font-size: 13px; font-weight: 600;';
+    storePagination.appendChild(count);
+}
+
+renderAdminStores();
 
 document.querySelectorAll('.edit-store').forEach(button => {
     button.addEventListener('click', () => {
