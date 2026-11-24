@@ -81,7 +81,9 @@ $headerLogoUrl = $appBaseUrl . '/' . ltrim($_logoSrc, '/');
             </a>
         </div>
         <!-- Ô tìm kiếm -->
-        <input type="search" placeholder="Bạn đang tìm món trang sức nào?" class="search" aria-label="Tìm kiếm sản phẩm">
+        <div class="search-wrapper">
+            <input type="search" placeholder="Bạn đang tìm món trang sức nào?" class="search" aria-label="Tìm kiếm sản phẩm">
+        </div>
 
         <!-- Đăng nhập / đăng ký -->
         <div class="auth-cart-wrapper" style="display: flex; align-items: center; gap: 15px;">

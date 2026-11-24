@@ -40,7 +40,7 @@ try {
 
 // Lấy đơn hàng thuộc tài khoản hiện tại
 $stmt = $conn->prepare(
-    "SELECT id, total_price, payment_method,
+    "SELECT id, full_name, phone, email, address, total_price, payment_method,
             payment_status, status, created_at, payment_deadline_at,
             UNIX_TIMESTAMP(payment_deadline_at) AS payment_deadline
      FROM orders
@@ -53,9 +53,9 @@ $stmt->execute();
 
 $order = $stmt->get_result()->fetch_assoc();
 $stmt->close();
-$conn->close();
 
 if (!$order || $order['payment_method'] !== 'BANK_QR') {
+    $conn->close();
     http_response_code(404);
     exit('Không tìm thấy đơn hàng thanh toán QR.');
 }
@@ -88,7 +88,36 @@ $isFailed = $order['payment_status'] === 'Thanh toán thất bại';
 $isPaymentDeadlineExpired = $isFailed
     && $order['payment_deadline'] !== null
     && (int) $order['payment_deadline'] <= time();
+$isOrderSuccess = !$isCanceled && ($isPaid || $isAwaitingConfirmation);
 $showPaymentQr = !$isPaid && !$isAwaitingConfirmation && !$isCanceled && !$isPaymentDeadlineExpired;
+$orderItems = [];
+if ($isOrderSuccess) {
+    try {
+        $itemsStmt = $conn->prepare(
+            'SELECT product_name, quantity, price
+             FROM order_items
+             WHERE order_id = ?
+             ORDER BY id'
+        );
+        if (!$itemsStmt) {
+            throw new RuntimeException('Không thể chuẩn bị thông tin sản phẩm của đơn hàng.');
+        }
+        $itemsStmt->bind_param('i', $orderId);
+        $itemsStmt->execute();
+        $itemsResult = $itemsStmt->get_result();
+        while ($item = $itemsResult->fetch_assoc()) {
+            $orderItems[] = $item;
+        }
+        $itemsStmt->close();
+    } catch (Throwable $e) {
+        error_log('VietQR success receipt load failed: ' . $e->getMessage());
+        $conn->close();
+        http_response_code(500);
+        exit('Không thể tải thông tin đơn hàng lúc này.');
+    }
+}
+$conn->close();
+
 $qrAttempt = null;
 if ($showPaymentQr) {
     $qrAttempts = $_SESSION['payment_qr_attempts'] ?? [];
@@ -146,6 +175,10 @@ function e($value) {
             font-family: Inter, "Segoe UI", Arial, sans-serif;
         }
 
+        body.payment-order-success-page {
+            background: #f4f3f0;
+        }
+
         .demo-payment {
             max-width: 1120px;
             margin: 40px auto;
@@ -155,6 +188,20 @@ function e($value) {
             color: #102a43;
             box-shadow: 0 28px 80px rgba(16, 42, 67, .14);
             overflow: hidden;
+        }
+
+        .demo-payment-order-success-page {
+            max-width: 860px;
+            padding: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            overflow: visible;
+        }
+
+        .demo-payment-order-success-page .checkout-success {
+            max-width: none;
         }
 
         .demo-header {
@@ -530,6 +577,10 @@ function e($value) {
                 margin: 18px 12px 40px;
             }
 
+            .demo-payment-order-success-page {
+                margin: 18px 12px 40px;
+            }
+
             .demo-header {
                 padding: 18px 20px;
             }
@@ -569,9 +620,52 @@ function e($value) {
     </style>
 </head>
 
-<body>
+<body class="<?php echo $isOrderSuccess ? 'payment-order-success-page' : ''; ?>">
 
-<main class="demo-payment">
+<main class="demo-payment<?php echo $isOrderSuccess ? ' demo-payment-order-success-page' : ''; ?>">
+    <?php if ($isOrderSuccess): ?>
+        <section class="checkout-success" aria-live="polite">
+            <div class="checkout-success-icon" aria-hidden="true">✓</div>
+            <h2>Đặt hàng thành công</h2>
+            <p class="checkout-success-order-id">Mã đơn hàng: #<?= e((string) $order['id']) ?></p>
+            <p class="checkout-success-guide">Để tra cứu tình trạng đơn hàng, mở trang Tra cứu đơn hàng và nhập mã đơn hoặc số điện thoại đã đặt.</p>
+            <div class="checkout-receipt">
+                <h3>Thông tin đơn hàng</h3>
+                <div class="checkout-receipt-customer">
+                    <p><strong>Người nhận:</strong> <?= e($order['full_name']) ?></p>
+                    <p><strong>Số điện thoại:</strong> <?= e($order['phone']) ?></p>
+                    <p><strong>Email:</strong> <?= e($order['email']) ?></p>
+                    <p><strong>Địa chỉ giao hàng:</strong> <?= e($order['address']) ?></p>
+                </div>
+                <h3>Sản phẩm đã đặt</h3>
+                <div class="checkout-receipt-items">
+                    <?php foreach ($orderItems as $item): ?>
+                        <?php $itemTotal = (float) $item['price'] * (int) $item['quantity']; ?>
+                        <div class="checkout-receipt-item">
+                            <strong><?= e($item['product_name']) ?></strong>
+                            <span>Số lượng: <?= e((string) $item['quantity']) ?></span>
+                            <span><?= e(number_format($itemTotal, 0, ',', '.')) ?> đ</span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="checkout-order-total">
+                    <span>Tổng tiền hàng</span>
+                    <strong><?= e($amount) ?> đ</strong>
+                </div>
+                <p class="checkout-receipt-payment">
+                    <?php if ($isPaid): ?>
+                        Chuyển khoản qua VietQR — cửa hàng đã xác nhận thanh toán
+                    <?php else: ?>
+                        Chuyển khoản qua VietQR — chờ cửa hàng đối soát
+                    <?php endif; ?>
+                </p>
+            </div>
+            <div class="checkout-success-actions">
+                <a class="checkout-submit-btn" href="<?= e($appBaseUrl) ?>/client/tracuudh.php">Tra cứu đơn hàng</a>
+                <a class="checkout-success-home" href="<?= e($appBaseUrl) ?>/index.php">Tiếp tục mua sắm</a>
+            </div>
+        </section>
+    <?php else: ?>
     <header class="demo-header">
         <div>
             <p class="demo-brand">ÉCRIN JEWELRY</p>
@@ -630,18 +724,6 @@ function e($value) {
                     Đơn hàng này đã được chuyển sang xử lý. Vui lòng liên hệ cửa hàng để được hỗ trợ.
                     <a class="demo-back" href="<?= e($appBaseUrl) ?>/client/tracuudh.php">Tra cứu đơn hàng</a>
                 </div>
-            <?php elseif ($isPaid): ?>
-                <div class="demo-payment-status">
-                    <strong>Đã xác nhận thanh toán</strong>
-                    Cửa hàng đã đối soát khoản chuyển cho đơn hàng này.
-                </div>
-            <?php elseif ($isAwaitingConfirmation): ?>
-                <section class="demo-awaiting-confirmation" id="payment-awaiting-confirmation" role="status" aria-live="polite">
-                    <span class="demo-awaiting-icon" aria-hidden="true">✓</span>
-                    <h2>Đặt hàng thành công</h2>
-                    <p>Đơn hàng <strong>#<?= e((string) $order['id']) ?></strong> đã đặt thành công và đang chờ cửa hàng xác nhận thanh toán sau khi đối soát giao dịch.</p>
-                    <p><strong>Tổng thanh toán:</strong> <?= e($amount) ?>đ</p>
-                </section>
             <?php else: ?>
                 <?php if ($isFailed): ?>
                 <section class="demo-payment-failed-state" id="payment-failed-state" role="status" aria-live="polite">
@@ -714,6 +796,7 @@ function e($value) {
             </div>
         </section>
     </div>
+    <?php endif; ?>
 </main>
 
 <?php if ($showPaymentQr): ?>
