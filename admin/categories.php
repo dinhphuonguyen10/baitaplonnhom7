@@ -246,8 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'success';
         } elseif ($action === 'delete') {
             $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
-            $targetId = filter_var($_POST['target_category_id'] ?? 0, FILTER_VALIDATE_INT);
-            if ($id === false || $id < 1 || $targetId === false || $targetId < 0) {
+            if ($id === false || $id < 1) {
                 throw new InvalidArgumentException('Mã danh mục không hợp lệ.');
             }
             $conn->begin_transaction();
@@ -278,41 +277,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $productCount = (int)($productCountStmt->get_result()->fetch_assoc()['total'] ?? 0);
             $productCountStmt->close();
-
             if ($productCount > 0) {
-                if ($targetId < 1 || $targetId === (int)$id) {
-                    throw new DomainException(
-                        "Danh mục đang có {$productCount} sản phẩm. Hãy chọn danh mục đang hoạt động để chuyển sản phẩm trước khi xóa."
-                    );
-                }
-                $target = $conn->prepare(
-                    "SELECT id FROM categories
-                     WHERE id = ? AND id <> ? AND status = 'active' AND is_deleted = 0
-                     FOR UPDATE"
+                throw new DomainException(
+                    "Danh mục đang có {$productCount} sản phẩm. Hãy chuyển sản phẩm sang danh mục khác trong Quản lý sản phẩm trước khi xóa."
                 );
-                if (!$target) {
-                    throw new RuntimeException('Không thể kiểm tra danh mục đích: ' . $conn->error);
-                }
-                $target->bind_param('ii', $targetId, $id);
-                if (!$target->execute()) {
-                    $target->close();
-                    throw new RuntimeException('Không thể kiểm tra danh mục đích: ' . $conn->error);
-                }
-                $validTarget = $target->get_result()->num_rows === 1;
-                $target->close();
-                if (!$validTarget) {
-                    throw new DomainException('Danh mục đích không tồn tại hoặc không hoạt động.');
-                }
-                $move = $conn->prepare('UPDATE products SET category_id = ? WHERE category_id = ?');
-                if (!$move) {
-                    throw new RuntimeException('Không thể chuẩn bị chuyển sản phẩm: ' . $conn->error);
-                }
-                $move->bind_param('ii', $targetId, $id);
-                if (!$move->execute()) {
-                    $move->close();
-                    throw new RuntimeException('Không thể chuyển sản phẩm sang danh mục đích: ' . $conn->error);
-                }
-                $move->close();
             }
 
             $deletedBy = (string)($_SESSION['admin_username'] ?? $_SESSION['username'] ?? 'admin');
@@ -332,9 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
             $conn->commit();
             $transactionStarted = false;
-            $message = $productCount > 0
-                ? "Đã chuyển {$productCount} sản phẩm và xóa mềm danh mục."
-                : 'Đã xóa mềm danh mục.';
+            $message = 'Đã xóa mềm danh mục.';
             $messageType = 'success';
         } elseif ($action === 'restore') {
             $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
@@ -442,7 +408,6 @@ if ($res) {
         .cat-status-inactive, .cat-status-deleted { background: #f2f4f7; color: #475467; }
         .cat-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; background: #f2f4f7; }
         .cat-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 220px; }
-        .cat-transfer { max-width: 190px; padding: 6px; border: 1px solid #cbd4df; border-radius: 6px; }
         .cat-warning { color: #b54708; font-size: 12px; margin-top: 5px; }
         .btn-primary { padding: 10px 20px; border: 0; border-radius: 8px; background: var(--navy); color: #fff; font: 600 14px inherit; cursor: pointer; transition: .2s; }
         .btn-primary:hover { background: #1a3c68; }
@@ -596,25 +561,18 @@ if ($res) {
                                                 data-image="<?php echo $escape($cat['image']); ?>"
                                                 data-status="<?php echo $escape($cat['status']); ?>"
                                                 onclick="openEditModal(this)">Sửa</button>
-                                            <form method="post" onsubmit="return confirm('Xóa mềm danh mục này? Nếu đang có sản phẩm, chúng sẽ được chuyển sang danh mục đích đã chọn.');">
-                                                <input type="hidden" name="action" value="delete">
-                                                <input type="hidden" name="id" value="<?php echo (int)$cat['id']; ?>">
-                                                <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
-                                                <?php if ((int)$cat['product_count'] > 0): ?>
-                                                    <select class="cat-transfer" name="target_category_id" required aria-label="Danh mục đích để chuyển sản phẩm">
-                                                        <option value="">Chọn danh mục đích</option>
-                                                        <?php foreach ($categories as $targetCategory): ?>
-                                                            <?php if ((int)$targetCategory['id'] !== (int)$cat['id']
-                                                                && (int)$targetCategory['is_deleted'] === 0
-                                                                && $targetCategory['status'] === 'active'): ?>
-                                                                <option value="<?php echo (int)$targetCategory['id']; ?>"><?php echo $escape($targetCategory['name']); ?></option>
-                                                            <?php endif; ?>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                    <div class="cat-warning">Sẽ chuyển <?php echo (int)$cat['product_count']; ?> sản phẩm trước khi xóa.</div>
-                                                <?php endif; ?>
-                                                <button type="submit" class="btn-sm btn-delete">Xóa mềm</button>
-                                            </form>
+                                            <?php if ((int)$cat['product_count'] > 0): ?>
+                                                <div class="cat-warning">
+                                                    Còn <?php echo (int)$cat['product_count']; ?> sản phẩm. Hãy chuyển chúng sang danh mục khác trước.
+                                                </div>
+                                            <?php else: ?>
+                                                <form method="post" onsubmit="return confirm('Xóa mềm danh mục này?');">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="id" value="<?php echo (int)$cat['id']; ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
+                                                    <button type="submit" class="btn-sm btn-delete">Xóa mềm</button>
+                                                </form>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                         </div>
                                     </td>

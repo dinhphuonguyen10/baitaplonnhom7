@@ -332,7 +332,7 @@ $recordPriceHistory = static function (
     $stmt->close();
 };
 
-// Xử lý Form Thêm / Sửa / Xóa / Khôi phục / Xóa vĩnh viễn
+// Xử lý Form Thêm / Sửa / Xóa mềm / Khôi phục
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -640,141 +640,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $stmt->close();
         }
-    }
-
-    elseif ($action === 'force_delete') {
-        // 5. XÓA CỨNG: chỉ khi đã xác nhận và không còn dữ liệu liên quan
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id <= 0 || ($_POST['confirm_force_delete'] ?? '') !== '1') {
-            $message = 'Yêu cầu xóa vĩnh viễn không hợp lệ hoặc chưa được xác nhận.';
-            $messageType = 'error';
-        } else {
-            $conn->begin_transaction();
-            try {
-                $lockStmt = $conn->prepare('SELECT id, name FROM products WHERE id = ? AND is_deleted = 1 FOR UPDATE');
-                if (!$lockStmt) {
-                    throw new RuntimeException('Không thể khóa sản phẩm để xóa.');
-                }
-                $lockStmt->bind_param('i', $id);
-                if (!$lockStmt->execute()) {
-                    throw new RuntimeException('Không thể kiểm tra sản phẩm cần xóa.');
-                }
-                $lockedProduct = $lockStmt->get_result()->fetch_assoc();
-                $lockStmt->close();
-                if (!$lockedProduct) {
-                    throw new DomainException('Chỉ có thể xóa vĩnh viễn sản phẩm đang nằm trong thùng rác.');
-                }
-
-                $references = [
-                    'cart_items' => 'giỏ hàng',
-                    'wishlists' => 'danh sách yêu thích',
-                    'reviews' => 'đánh giá',
-                    'chat_messages' => 'lịch sử chat',
-                    'product_price_history' => 'lịch sử thay đổi giá',
-                ];
-                $orderReferenceStmt = $conn->prepare(
-                    "SELECT COUNT(*) AS total
-                     FROM order_items
-                     WHERE product_id = ?
-                        OR (product_id IS NULL AND (
-                            product_name = ? OR LOCATE(CONCAT(?, ' - Màu:'), product_name) = 1
-                        ))"
-                );
-                if (!$orderReferenceStmt) {
-                    throw new RuntimeException('Không thể kiểm tra lịch sử đơn hàng.');
-                }
-                $lockedProductName = (string)$lockedProduct['name'];
-                $orderReferenceStmt->bind_param('iss', $id, $lockedProductName, $lockedProductName);
-                if (!$orderReferenceStmt->execute()) {
-                    throw new RuntimeException('Không thể đếm giao dịch của sản phẩm.');
-                }
-                $orderReferenceCount = (int)($orderReferenceStmt->get_result()->fetch_assoc()['total'] ?? 0);
-                $orderReferenceStmt->close();
-                $blockingReferences = $orderReferenceCount > 0
-                    ? ["{$orderReferenceCount} đơn hàng"]
-                    : [];
-                foreach ($references as $table => $label) {
-                    $tableCheck = $conn->prepare(
-                        'SELECT 1 FROM information_schema.TABLES
-                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1'
-                    );
-                    if (!$tableCheck) {
-                        throw new RuntimeException("Không thể kiểm tra bảng {$table}.");
-                    }
-                    $tableCheck->bind_param('s', $table);
-                    if (!$tableCheck->execute()) {
-                        throw new RuntimeException("Không thể kiểm tra bảng {$table}.");
-                    }
-                    $tableExists = $tableCheck->get_result()->num_rows > 0;
-                    $tableCheck->close();
-                    if (!$tableExists) {
-                        continue;
-                    }
-
-                    $columnCheck = $conn->prepare(
-                        'SELECT 1 FROM information_schema.COLUMNS
-                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1'
-                    );
-                    if (!$columnCheck) {
-                        throw new RuntimeException("Không thể kiểm tra cột product_id trong {$table}.");
-                    }
-                    $productIdColumn = 'product_id';
-                    $columnCheck->bind_param('ss', $table, $productIdColumn);
-                    if (!$columnCheck->execute()) {
-                        throw new RuntimeException("Không thể kiểm tra cột product_id trong {$table}.");
-                    }
-                    $columnExists = $columnCheck->get_result()->num_rows > 0;
-                    $columnCheck->close();
-                    if (!$columnExists) {
-                        continue;
-                    }
-
-                    $referenceStmt = $conn->prepare("SELECT COUNT(*) AS total FROM `{$table}` WHERE product_id = ?");
-                    if (!$referenceStmt) {
-                        throw new RuntimeException("Không thể kiểm tra dữ liệu liên quan trong {$table}.");
-                    }
-                    $referenceStmt->bind_param('i', $id);
-                    if (!$referenceStmt->execute()) {
-                        throw new RuntimeException("Không thể đếm dữ liệu liên quan trong {$table}.");
-                    }
-                    $referenceCount = (int)($referenceStmt->get_result()->fetch_assoc()['total'] ?? 0);
-                    $referenceStmt->close();
-                    if ($referenceCount > 0) {
-                        $blockingReferences[] = "{$referenceCount} {$label}";
-                    }
-                }
-
-                if ($blockingReferences) {
-                    throw new DomainException(
-                        'Không thể xóa vĩnh viễn vì sản phẩm còn dữ liệu liên quan: '
-                        . implode(', ', $blockingReferences)
-                        . '. Hãy giữ sản phẩm trong thùng rác để bảo toàn lịch sử.'
-                    );
-                }
-
-                $delStmt = $conn->prepare('DELETE FROM products WHERE id = ? AND is_deleted = 1');
-                if (!$delStmt) {
-                    throw new RuntimeException('Không thể chuẩn bị thao tác xóa sản phẩm.');
-                }
-                $delStmt->bind_param('i', $id);
-                if (!$delStmt->execute() || $delStmt->affected_rows !== 1) {
-                    throw new RuntimeException('Sản phẩm đã thay đổi hoặc không thể xóa.');
-                }
-                $delStmt->close();
-                $conn->commit();
-                $message = 'Đã xóa vĩnh viễn sản phẩm không còn dữ liệu liên quan.';
-                $messageType = 'success';
-            } catch (DomainException $e) {
-                $conn->rollback();
-                $message = $e->getMessage();
-                $messageType = 'error';
-            } catch (Throwable $e) {
-                $conn->rollback();
-                error_log('Permanent product deletion failed: ' . $e->getMessage());
-                $message = 'Không thể xóa vĩnh viễn sản phẩm do lỗi hệ thống.';
-                $messageType = 'error';
-            }
-        }
+    } else {
+        $message = 'Thao tác không hợp lệ. Sản phẩm chỉ có thể được xóa mềm và khôi phục.';
+        $messageType = 'error';
     }
 }
 
@@ -867,8 +735,6 @@ if (!$prodRes) {
         .btn-delete:hover { background: #fecdca; }
         .btn-restore { background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; }
         .btn-restore:hover { background: #d1fadf; }
-        .btn-force { background: #7f1d1d; color: #fff; margin-left: 6px; }
-        .btn-force:hover { background: #991b1b; }
 
         /* Tabs chuyển đổi Active / Trash */
         .admin-nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
@@ -1090,19 +956,12 @@ if (!$prodRes) {
                                         <?php endif; ?>
                                         <td style="text-align: center;">
                                             <?php if ($currentView === 'trash'): ?>
-                                                <!-- THAO TÁC TRONG THÙNG RÁC: KHÔI PHỤC HOẶC XÓA VĨNH VIỄN -->
+                                                <!-- THAO TÁC TRONG THÙNG RÁC: KHÔI PHỤC -->
                                                 <form method="post" style="display:inline;" onsubmit="return confirm('Khôi phục sản phẩm này về danh sách hoạt động?');">
                                                     <input type="hidden" name="csrf_token" value="<?php echo $escape($productsCsrfToken); ?>">
                                                     <input type="hidden" name="action" value="restore">
                                                     <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
                                                     <button type="submit" class="btn-sm btn-restore" title="Khôi phục sản phẩm">↺ Khôi phục</button>
-                                                </form>
-                                                <form method="post" style="display:inline;" onsubmit="return confirm('CẢNH BÁO: Xóa vĩnh viễn sản phẩm này? Chỉ thực hiện được nếu sản phẩm không còn dữ liệu liên quan.');">
-                                                    <input type="hidden" name="csrf_token" value="<?php echo $escape($productsCsrfToken); ?>">
-                                                    <input type="hidden" name="action" value="force_delete">
-                                                    <input type="hidden" name="confirm_force_delete" value="1">
-                                                    <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
-                                                    <button type="submit" class="btn-sm btn-force" title="Chỉ xóa khi không còn dữ liệu liên quan">✕ Xóa vĩnh viễn</button>
                                                 </form>
                                             <?php else: ?>
                                                 <!-- THAO TÁC ĐANG HOẠT ĐỘNG: SỬA HOẶC XÓA MỀM -->
