@@ -137,9 +137,7 @@ if (is_file($bannerConfigFile)) {
                     <!-- Sản phẩm sẽ được render từ JavaScript (script.js) -->
                 </div>
 
-                <button class="slider-btn next" id="featured-next"
-                    style="width: auto; padding: 0 16px; border-radius: 20px; font-size: 1rem; font-weight: 600; white-space: nowrap;">Xem
-                    thêm ❯</button>
+                <button class="slider-btn next" id="featured-next" aria-label="Xem thêm sản phẩm">❯</button>
             </div>
         </div>
     </section>
@@ -158,9 +156,7 @@ if (is_file($bannerConfigFile)) {
                     <!-- Sản phẩm sẽ được render từ JavaScript (script.js) -->
                 </div>
 
-                <button class="slider-btn next" id="suggest-next"
-                    style="width: auto; padding: 0 16px; border-radius: 20px; font-size: 1rem; font-weight: 600; white-space: nowrap;">Xem
-                    thêm ❯</button>
+                <button class="slider-btn next" id="suggest-next" aria-label="Xem thêm sản phẩm">❯</button>
             </div>
         </div>
     </section>
@@ -179,9 +175,7 @@ if (is_file($bannerConfigFile)) {
                     <!-- Sản phẩm sẽ được render từ JavaScript (script.js) -->
                 </div>
 
-                <button class="slider-btn next" id="new-next"
-                    style="width: auto; padding: 0 16px; border-radius: 20px; font-size: 1rem; font-weight: 600; white-space: nowrap;">Xem
-                    thêm ❯</button>
+                <button class="slider-btn next" id="new-next" aria-label="Xem thêm sản phẩm">❯</button>
             </div>
         </div>
     </section>

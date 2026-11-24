@@ -20,7 +20,7 @@ $sideMenu = [
     ['icon' => '◇', 'label' => 'Quản lý sản phẩm',             'href' => '/admin/products.php',  'file' => 'products.php'],
     ['icon' => '☆', 'label' => 'Quản lý đánh giá',             'href' => '/admin/reviews.php',   'file' => 'reviews.php'],
     ['icon' => '▧', 'label' => 'Quản lý danh mục',             'href' => '/admin/categories.php','file' => 'categories.php'],
-    ['icon' => '♙', 'label' => 'Quản lý tài khoản nhân viên', 'href' => '/admin/users.php',     'file' => 'users.php', 'manager_only' => true],
+    ['icon' => '♙', 'label' => 'Quản lý tài khoản', 'href' => '/admin/users.php',     'file' => 'users.php', 'manager_only' => true],
     ['icon' => '▤', 'label' => 'Đơn hàng & Thanh toán',         'href' => '/admin/orders.php',    'file' => 'orders.php'],
     ['icon' => '☏', 'label' => 'Quản lý chat',                 'href' => '/admin/chat.php',      'file' => 'chat.php'],
     ['icon' => '▣', 'label' => 'Quản lý banner',               'href' => '/admin/banners.php',   'file' => 'banners.php', 'manager_only' => true],

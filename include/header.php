@@ -3,6 +3,8 @@ require_once __DIR__ . '/session.php';
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
 $appBaseUrl = preg_replace('~/(?:client|admin|api)(?:/.*)?$~', '', $scriptDirectory);
 $appBaseUrl = rtrim($appBaseUrl, '/');
+$navCurrentPage = basename(parse_url($_SERVER['SCRIPT_NAME'] ?? '', PHP_URL_PATH) ?: '');
+$navCategoryPages = ['bong_tai.php', 'day_chuyen.php', 'nhan.php', 'vong_tay.php', 'category.php', 'product.php'];
 $bodyClass = isset($bodyClass) && is_string($bodyClass) ? $bodyClass : '';
 $customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
     ? (string) $_SESSION['username']
@@ -119,9 +121,9 @@ $headerLogoUrl = $appBaseUrl . '/' . ltrim($_logoSrc, '/');
 
     <!-- MENU -->
     <nav class="menu" aria-label="Điều hướng chính">
-        <a href="<?php echo htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>" style="font-weight: bold; color:#0d1b2a">Trang chủ</a>
+        <a href="<?php echo htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>"<?php echo $navCurrentPage === 'index.php' ? ' class="is-active" aria-current="page"' : ''; ?>>Trang chủ</a>
         <div class="dropdown">
-            <a href="javascript:void(0)" class="dropdown-toggle">Danh mục sản phẩm ▾</a>
+            <a href="javascript:void(0)" class="dropdown-toggle<?php echo in_array($navCurrentPage, $navCategoryPages, true) ? ' is-active' : ''; ?>"<?php echo in_array($navCurrentPage, $navCategoryPages, true) ? ' aria-current="page"' : ''; ?>>Danh mục sản phẩm ▾</a>
             <div class="dropdown-menu">
                 <?php if (!empty($navCategories)): ?>
                     <?php 
@@ -163,10 +165,10 @@ $headerLogoUrl = $appBaseUrl . '/' . ltrim($_logoSrc, '/');
         </div>
 
         <?php if ($isCustomerLoggedIn): ?>
-            <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/tracuudh.php', ENT_QUOTES, 'UTF-8'); ?>" class="nav-my-orders-link">Đơn hàng của tôi</a>
+            <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/tracuudh.php', ENT_QUOTES, 'UTF-8'); ?>" class="nav-my-orders-link<?php echo $navCurrentPage === 'tracuudh.php' ? ' is-active' : ''; ?>"<?php echo $navCurrentPage === 'tracuudh.php' ? ' aria-current="page"' : ''; ?>>Đơn hàng của tôi</a>
         <?php endif; ?>
-        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/htch.php', ENT_QUOTES, 'UTF-8'); ?>">Hệ thống cửa hàng</a>
-        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/chat.php', ENT_QUOTES, 'UTF-8'); ?>" class="nav-chat-link">
+        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/htch.php', ENT_QUOTES, 'UTF-8'); ?>"<?php echo $navCurrentPage === 'htch.php' ? ' class="is-active" aria-current="page"' : ''; ?>>Hệ thống cửa hàng</a>
+        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/chat.php', ENT_QUOTES, 'UTF-8'); ?>" class="nav-chat-link<?php echo $navCurrentPage === 'chat.php' ? ' is-active' : ''; ?>"<?php echo $navCurrentPage === 'chat.php' ? ' aria-current="page"' : ''; ?>>
             <svg class="nav-chat-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 5px;">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"></path>
             </svg>Chat với cửa hàng

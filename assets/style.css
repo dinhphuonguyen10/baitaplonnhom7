@@ -483,14 +483,18 @@ section, main {
 .menu a {
     text-decoration: none;
     color: var(--text-dark);
-    font-weight: 500;
-    font-size: 0.88rem;
+    font-weight: 700;
+    font-size: 0.98rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     transition: color 0.2s;
 }
 
 .menu a:hover {
+    color: var(--gold);
+}
+
+.menu a.is-active {
     color: var(--gold);
 }
 
@@ -738,6 +742,7 @@ section, main {
 
 .home-page .home-categories .item {
     flex: 0 1 auto;
+    font-size: 1rem;
 }
 
 @media (max-width: 680px) {
@@ -1529,6 +1534,7 @@ section, main {
     gap: 20px;
     overflow-x: auto;
     flex: 1;
+    min-width: 0;
     scroll-behavior: smooth;
     padding: 12px 2px;
     -ms-overflow-style: none;

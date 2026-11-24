@@ -125,7 +125,7 @@ $adminCurrentPage = 'users.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Quản lý tài khoản nhân viên - ÉCRIN Jewelry</title>
+    <title>Quản lý tài khoản - ÉCRIN Jewelry</title>
     <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/style.css'); ?>">
     <style>
         .prototype-panel { margin: 20px 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
@@ -260,7 +260,8 @@ $adminCurrentPage = 'users.php';
         .page-content > h1 {
             margin-bottom: 28px;
             color: #0f2747;
-            font-size: clamp(1.8rem, 3vw, 2.25rem);
+            font-size: 26px !important;
+            line-height: 1.25;
             letter-spacing: -0.04em;
         }
         .prototype-panel {
@@ -340,14 +341,14 @@ $adminCurrentPage = 'users.php';
     <?php include __DIR__ . '/../include/admin_sidebar.php'; ?>
     <main class="main-content">
         <header class="topbar">
-            <div class="breadcrumb">Trang chủ <span>/</span> <strong>Quản lý tài khoản nhân viên</strong></div>
+            <div class="breadcrumb">Trang chủ <span>/</span> <strong>Quản lý tài khoản</strong></div>
             <div class="admin-profile">
                 <div class="avatar"><?php echo $isManager ? 'QL' : 'NV'; ?></div>
                 <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small><?php echo $escape($roleLabel); ?></small></div>
             </div>
         </header>
         <section class="page-content">
-        <h1>Quản lý tài khoản quản trị & nhân viên</h1>
+        <h1>Quản lý tài khoản</h1>
         <?php if ($error !== ''): ?><p class="notice error" role="alert"><?php echo $escape($error); ?></p><?php endif; ?>
         <?php if ($success !== ''): ?><p class="notice success" role="status"><?php echo $escape($success); ?></p><?php endif; ?>
 
@@ -522,7 +523,7 @@ SESSION['username'] ?? ''); ?></strong><small><?php echo $escape($roleLabel); ?>
         </header>
         <section class="page-content">
     <main>
-        <h1>Quản lý tài khoản quản trị & nhân viên</h1>
+        <h1>Quản lý tài khoản</h1>
         <?php if ($error !== ''): ?><p class="notice error" role="alert"><?php echo $escape($error); ?></p><?php endif; ?>
         <?php if ($success !== ''): ?><p class="notice success" role="status"><?php echo $escape($success); ?></p><?php endif; ?>
 
