@@ -104,7 +104,60 @@ if (is_file($bannerConfigFile)) {
         <div class="category-header">
             <h1 class="page-title-left">KẾT QUẢ TÌM KIẾM</h1>
         </div>
+        <div class="search-filter-bar" id="search-filter-bar" aria-label="Bộ lọc kết quả tìm kiếm">
+            <label>
+                Danh mục
+                <select id="search-filter-category">
+                    <option value="">Tất cả danh mục</option>
+                    <?php foreach ($navCategories as $navCategory): ?>
+                        <?php if (in_array($navCategory['slug'], ['combo', 'suggest', 'featured'], true)) continue; ?>
+                        <option value="<?php echo htmlspecialchars($navCategory['slug'], ENT_QUOTES, 'UTF-8'); ?>">
+                            <?php echo htmlspecialchars($navCategory['name'], ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                Giá từ
+                <input type="number" id="search-filter-min-price" min="0" inputmode="numeric">
+            </label>
+            <label>
+                Giá đến
+                <input type="number" id="search-filter-max-price" min="0" inputmode="numeric">
+            </label>
+            <label class="search-filter-check">
+                <input type="checkbox" id="search-filter-in-stock">
+                Còn hàng
+            </label>
+            <label class="search-filter-check">
+                <input type="checkbox" id="search-filter-discount">
+                Đang giảm giá
+            </label>
+            <label class="search-filter-check">
+                <input type="checkbox" id="search-filter-gift">
+                Có quà tặng
+            </label>
+            <label>
+                Sắp xếp
+                <select id="search-filter-sort">
+                    <option value="relevance">Liên quan nhất</option>
+                    <option value="best_selling">Bán chạy</option>
+                    <option value="newest">Mới nhất</option>
+                    <option value="price_asc">Giá tăng dần</option>
+                    <option value="price_desc">Giá giảm dần</option>
+                    <option value="name_asc">Tên A-Z</option>
+                </select>
+            </label>
+            <button type="button" class="btn-apply-filter" id="search-filter-apply">ÁP DỤNG</button>
+            <button type="button" class="btn-reset-all-filters" id="search-filter-reset">XÓA BỘ LỌC</button>
+        </div>
+        <p id="search-results-count" class="category-results-count"></p>
+        <p id="search-results-error" class="category-filter-error" hidden></p>
         <div class="product-grid category-grid" id="category-products-container" data-db-category=""></div>
+        <div class="filter-empty-state" id="search-empty-state" hidden>
+            <p>Không tìm thấy sản phẩm phù hợp với từ khóa hoặc bộ lọc đã chọn.</p>
+            <button type="button" class="btn-empty-reset" id="search-empty-reset">Xóa bộ lọc</button>
+        </div>
     </section>
 
     <!-- 1. MỤC ĐẦU TIÊN: SẢN PHẨM NỔI BẬT (LỌC BẰNG SQL: is_featured = 1) -->

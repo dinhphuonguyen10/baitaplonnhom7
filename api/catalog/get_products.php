@@ -21,13 +21,29 @@ if (!empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'customer') {
 
 $categoryInput = $_GET['category'] ?? '';
 $sortInput = $_GET['sort'] ?? '';
-if (!is_string($categoryInput) || !is_string($sortInput)) {
+$searchInput = $_GET['search'] ?? '';
+$suggestInput = $_GET['suggest'] ?? '';
+if (!is_string($categoryInput) || !is_string($sortInput) || !is_string($searchInput) || !is_string($suggestInput)) {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Bộ lọc danh mục không hợp lệ.'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['status' => 'error', 'message' => 'Tham số tìm kiếm không hợp lệ.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 $category = trim($categoryInput);
 $sort = trim($sortInput);
+$searchQuery = preg_replace('/\s+/u', ' ', trim($searchInput));
+$searchRequested = array_key_exists('search', $_GET);
+if ($searchQuery === null || ($searchRequested && ($searchQuery === '' || strlen($searchQuery) > 300))) {
+    http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => 'Từ khóa tìm kiếm không hợp lệ.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+$suggestionMode = $suggestInput === '1';
+if (($suggestInput !== '' && !in_array($suggestInput, ['0', '1'], true))
+    || ($suggestionMode && !$searchRequested)) {
+    http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => 'Yêu cầu gợi ý tìm kiếm không hợp lệ.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $paginationMeta = null;
 
 if (array_key_exists('ids', $_GET)) {
@@ -99,8 +115,8 @@ elseif ($category === 'suggest') {
 elseif ($category === 'new' || $category === 'latest') {
     $result = $conn->query("SELECT * FROM view_product_details WHERE is_deleted = 0 AND status = 'active' AND category_is_deleted = 0 AND category_status = 'active' ORDER BY id DESC LIMIT 10");
 }
-// 4. Trang danh mục: lọc, đếm và phân trang trực tiếp trong MySQL.
-elseif ($category !== '') {
+// 4. Trang danh mục và tìm kiếm: lọc, đếm và phân trang trực tiếp trong MySQL.
+elseif ($category !== '' || $searchQuery !== '') {
     $sortOptions = [
         'best_selling' => 'sold_count DESC, id DESC',
         'popular' => 'wishlist_count DESC, id DESC',
@@ -110,72 +126,94 @@ elseif ($category !== '') {
         'price_desc' => 'price_sale DESC, id DESC',
         'name_asc' => 'name ASC, id ASC',
     ];
-    if (!isset($sortOptions[$sort])) {
-        $sort = 'best_selling';
+    if ($sort === '') {
+        $sort = $searchQuery !== '' ? 'relevance' : 'best_selling';
+    }
+    if (!isset($sortOptions[$sort]) && !($searchQuery !== '' && $sort === 'relevance')) {
+        $sort = $searchQuery !== '' ? 'relevance' : 'best_selling';
     }
 
-    $sendCategoryError = static function (int $statusCode, string $message): void {
+    $sendListingError = static function (int $statusCode, string $message): void {
         http_response_code($statusCode);
         echo json_encode(['status' => 'error', 'message' => $message], JSON_UNESCAPED_UNICODE);
         exit;
     };
-    $readOptionalPrice = static function (string $key) use ($sendCategoryError): ?int {
+    $readOptionalPrice = static function (string $key) use ($sendListingError): ?int {
         if (!array_key_exists($key, $_GET) || $_GET[$key] === '') {
             return null;
         }
         if (!is_string($_GET[$key])) {
-            $sendCategoryError(400, 'Khoảng giá không hợp lệ.');
+            $sendListingError(400, 'Khoảng giá không hợp lệ.');
         }
         $value = filter_var($_GET[$key], FILTER_VALIDATE_INT);
         if ($value === false || $value < 0) {
-            $sendCategoryError(400, 'Giá phải là số nguyên không âm.');
+            $sendListingError(400, 'Giá phải là số nguyên không âm.');
         }
         return $value;
     };
     $minPrice = $readOptionalPrice('min_price');
     $maxPrice = $readOptionalPrice('max_price');
     if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
-        $sendCategoryError(400, 'Giá thấp nhất không được lớn hơn giá cao nhất.');
+        $sendListingError(400, 'Giá thấp nhất không được lớn hơn giá cao nhất.');
     }
 
     foreach (['in_stock', 'has_discount', 'has_gift'] as $filterKey) {
         if (isset($_GET[$filterKey])
             && (!is_string($_GET[$filterKey]) || !in_array($_GET[$filterKey], ['0', '1'], true))) {
-            $sendCategoryError(400, 'Giá trị bộ lọc không hợp lệ.');
+            $sendListingError(400, 'Giá trị bộ lọc không hợp lệ.');
         }
     }
     $inStock = ($_GET['in_stock'] ?? '') === '1';
     $hasDiscount = ($_GET['has_discount'] ?? '') === '1';
     $hasGift = ($_GET['has_gift'] ?? '') === '1';
 
-    $requestedPage = filter_var($_GET['page'] ?? '1', FILTER_VALIDATE_INT);
-    if ($requestedPage === false || $requestedPage < 1) {
-        $sendCategoryError(400, 'Số trang không hợp lệ.');
+    $requestedPage = 1;
+    if (!$suggestionMode) {
+        $requestedPage = filter_var($_GET['page'] ?? '1', FILTER_VALIDATE_INT);
+        if ($requestedPage === false || $requestedPage < 1) {
+            $sendListingError(400, 'Số trang không hợp lệ.');
+        }
     }
-
-    $categoryStmt = $conn->prepare(
-        "SELECT id
-         FROM categories
-         WHERE status = 'active' AND is_deleted = 0
-           AND (slug = ? OR name = ? OR CAST(id AS CHAR) = ?)
-         LIMIT 1"
-    );
-    if (!$categoryStmt) {
-        $sendCategoryError(500, 'Không thể kiểm tra danh mục.');
-    }
-    $categoryStmt->bind_param('sss', $category, $category, $category);
-    if (!$categoryStmt->execute()) {
-        $categoryStmt->close();
-        $sendCategoryError(500, 'Không thể kiểm tra danh mục.');
-    }
-    $categoryRow = $categoryStmt->get_result()->fetch_assoc();
-    $categoryStmt->close();
 
     $where = "is_deleted = 0 AND status = 'active'
-              AND category_is_deleted = 0 AND category_status = 'active'
-              AND category_id = ?";
-    $params = [(int)($categoryRow['id'] ?? 0)];
-    $types = 'i';
+              AND category_is_deleted = 0 AND category_status = 'active'";
+    $params = [];
+    $types = '';
+    if ($category !== '') {
+        $categoryStmt = $conn->prepare(
+            "SELECT id
+             FROM categories
+             WHERE status = 'active' AND is_deleted = 0
+               AND (slug = ? OR name = ? OR CAST(id AS CHAR) = ?)
+             LIMIT 1"
+        );
+        if (!$categoryStmt) {
+            $sendListingError(500, 'Không thể kiểm tra danh mục.');
+        }
+        $categoryStmt->bind_param('sss', $category, $category, $category);
+        if (!$categoryStmt->execute()) {
+            $categoryStmt->close();
+            $sendListingError(500, 'Không thể kiểm tra danh mục.');
+        }
+        $categoryRow = $categoryStmt->get_result()->fetch_assoc();
+        $categoryStmt->close();
+        $where .= ' AND category_id = ?';
+        $params[] = (int)($categoryRow['id'] ?? 0);
+        $types .= 'i';
+    }
+    $searchPattern = '';
+    if ($searchQuery !== '') {
+        $escapedSearch = strtr($searchQuery, ['!' => '!!', '%' => '!%', '_' => '!_']);
+        $searchPattern = '%' . $escapedSearch . '%';
+        $where .= " AND (
+            name LIKE ? ESCAPE '!'
+            OR sku LIKE ? ESCAPE '!'
+            OR category_name LIKE ? ESCAPE '!'
+            OR description LIKE ? ESCAPE '!'
+        )";
+        array_push($params, $searchPattern, $searchPattern, $searchPattern, $searchPattern);
+        $types .= 'ssss';
+    }
     if ($minPrice !== null) {
         $where .= ' AND price_sale >= ?';
         $params[] = $minPrice;
@@ -196,44 +234,63 @@ elseif ($category !== '') {
         $where .= " AND gift IS NOT NULL AND gift <> ''";
     }
 
-    $countStmt = $conn->prepare("SELECT COUNT(*) AS total FROM view_product_details WHERE {$where}");
-    if (!$countStmt) {
-        $sendCategoryError(500, 'Không thể đếm sản phẩm phù hợp.');
-    }
-    $countStmt->bind_param($types, ...$params);
-    if (!$countStmt->execute()) {
+    $totalItems = 0;
+    if (!$suggestionMode) {
+        $countStmt = $conn->prepare("SELECT COUNT(*) AS total FROM view_product_details WHERE {$where}");
+        if (!$countStmt) {
+            $sendListingError(500, 'Không thể đếm sản phẩm phù hợp.');
+        }
+        $countStmt->bind_param($types, ...$params);
+        if (!$countStmt->execute()) {
+            $countStmt->close();
+            $sendListingError(500, 'Không thể đếm sản phẩm phù hợp.');
+        }
+        $totalItems = (int)($countStmt->get_result()->fetch_assoc()['total'] ?? 0);
         $countStmt->close();
-        $sendCategoryError(500, 'Không thể đếm sản phẩm phù hợp.');
     }
-    $totalItems = (int)($countStmt->get_result()->fetch_assoc()['total'] ?? 0);
-    $countStmt->close();
 
-    $perPage = 15;
+    $perPage = $suggestionMode ? 8 : 15;
     $totalPages = max(1, (int)ceil($totalItems / $perPage));
-    $currentPage = min($requestedPage, $totalPages);
+    $currentPage = $suggestionMode ? 1 : min($requestedPage, $totalPages);
     $offset = ($currentPage - 1) * $perPage;
-    $pageParams = array_merge($params, [$perPage, $offset]);
+    $orderParams = [];
+    if ($sort === 'relevance' && $searchQuery !== '') {
+        $orderBy = "CASE
+            WHEN name LIKE ? ESCAPE '!' THEN 0
+            WHEN sku LIKE ? ESCAPE '!' THEN 1
+            WHEN category_name LIKE ? ESCAPE '!' THEN 2
+            ELSE 3
+        END, sold_count DESC, id DESC";
+        $orderParams = [$searchPattern, $searchPattern, $searchPattern];
+        $orderTypes = 'sss';
+    } else {
+        $orderBy = $sortOptions[$sort];
+        $orderTypes = '';
+    }
+    $pageParams = array_merge($params, $orderParams, [$perPage, $offset]);
     $stmt = $conn->prepare(
         "SELECT * FROM view_product_details
          WHERE {$where}
-         ORDER BY {$sortOptions[$sort]}
+         ORDER BY {$orderBy}
          LIMIT ? OFFSET ?"
     );
     if (!$stmt) {
-        $sendCategoryError(500, 'Không thể tải sản phẩm.');
+        $sendListingError(500, 'Không thể tải sản phẩm.');
     }
-    $stmt->bind_param($types . 'ii', ...$pageParams);
+    $stmt->bind_param($types . $orderTypes . 'ii', ...$pageParams);
     if (!$stmt->execute()) {
         $stmt->close();
-        $sendCategoryError(500, 'Không thể tải sản phẩm.');
+        $sendListingError(500, 'Không thể tải sản phẩm.');
     }
     $result = $stmt->get_result();
-    $paginationMeta = [
-        'total' => $totalItems,
-        'page' => $currentPage,
-        'per_page' => $perPage,
-        'total_pages' => $totalPages,
-    ];
+    if (!$suggestionMode) {
+        $paginationMeta = [
+            'total' => $totalItems,
+            'page' => $currentPage,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+        ];
+    }
 }
 // 5. Mặc định: Lấy tất cả sản phẩm đang kinh doanh và chưa bị xóa
 else {
@@ -265,12 +322,10 @@ if ($result) {
     }
 }
 
-echo json_encode(
-    $paginationMeta === null
-        ? $products
-        : ['products' => $products] + $paginationMeta,
-    JSON_UNESCAPED_UNICODE
-);
+$responseData = $suggestionMode
+    ? ['products' => $products]
+    : ($paginationMeta === null ? $products : ['products' => $products] + $paginationMeta);
+echo json_encode($responseData, JSON_UNESCAPED_UNICODE);
 if (isset($stmt)) {
     $stmt->close();
 }
