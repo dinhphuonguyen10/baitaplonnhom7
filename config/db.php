@@ -216,3 +216,50 @@ if ($addressTable && $addressTable->num_rows > 0) {
         }
     }
 }
+
+// Tự đồng bộ Triggers tự động tính giảm giá và giá gốc cho products
+$conn->query("DROP TRIGGER IF EXISTS trg_products_before_insert");
+$conn->query("CREATE TRIGGER trg_products_before_insert BEFORE INSERT ON products FOR EACH ROW
+BEGIN
+    IF NEW.price_original > 0 AND NEW.price_sale < NEW.price_original THEN
+        SET NEW.discount = CONCAT('-', ROUND((1 - (NEW.price_sale / NEW.price_original)) * 100), '%');
+    ELSE
+        SET NEW.price_original = 0.00;
+        SET NEW.discount = NULL;
+    END IF;
+END");
+
+$conn->query("DROP TRIGGER IF EXISTS trg_products_before_update");
+$conn->query("CREATE TRIGGER trg_products_before_update BEFORE UPDATE ON products FOR EACH ROW
+BEGIN
+    -- Nếu admin chủ động bỏ giảm giá (truyền price_original = 0 hoặc âm)
+    IF NEW.price_original IS NOT NULL AND NEW.price_original <= 0 AND (OLD.price_original > 0 OR OLD.discount IS NOT NULL) THEN
+        SET NEW.price_original = 0.00;
+        SET NEW.discount = NULL;
+    -- Nếu admin chủ động truyền giá gốc mới hợp lệ (> 0)
+    ELSEIF NEW.price_original IS NOT NULL AND NEW.price_original > 0 THEN
+        IF NEW.price_sale < NEW.price_original THEN
+            SET NEW.discount = CONCAT('-', ROUND((1 - (NEW.price_sale / NEW.price_original)) * 100), '%');
+        ELSE
+            SET NEW.price_original = 0.00;
+            SET NEW.discount = NULL;
+        END IF;
+    -- Nếu giá bán giảm so với giá bán cũ
+    ELSEIF NEW.price_sale < OLD.price_sale THEN
+        SET NEW.price_original = OLD.price_sale;
+        SET NEW.discount = CONCAT('-', ROUND((1 - (NEW.price_sale / OLD.price_sale)) * 100), '%');
+    -- Nếu giá bán tăng so với giá bán cũ (không hiện giá cũ, xóa giảm giá)
+    ELSEIF NEW.price_sale > OLD.price_sale THEN
+        SET NEW.price_original = 0.00;
+        SET NEW.discount = NULL;
+    -- Giá không đổi: giữ nguyên giảm giá cũ nếu còn hợp lệ
+    ELSE
+        IF OLD.price_original > 0 AND NEW.price_sale < OLD.price_original THEN
+            SET NEW.price_original = OLD.price_original;
+            SET NEW.discount = OLD.discount;
+        ELSE
+            SET NEW.price_original = 0.00;
+            SET NEW.discount = NULL;
+        END IF;
+    END IF;
+END");

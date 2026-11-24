@@ -65,13 +65,6 @@ include __DIR__ . '/../include/header.php';
                             <span class="check-box-text">Đang giảm giá</span>
                         </label>
                     </li>
-                    <li>
-                        <label class="custom-check-item">
-                            <input type="checkbox" id="filter-has-gift" class="filter-checkbox" value="has_gift">
-                            <span class="check-box-custom"></span>
-                            <span class="check-box-text">Có quà tặng kèm</span>
-                        </label>
-                    </li>
                 </ul>
             </div>
 

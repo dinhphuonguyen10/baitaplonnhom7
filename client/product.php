@@ -89,8 +89,11 @@ $descriptionByCategory = [
                 <h1 id="product-name"><?php echo $escape($product['name']); ?></h1>
                 <div class="product-detail-price product-price">
                     <span class="price-sale"><?php echo number_format((float) $product['price_sale'], 0, ',', '.'); ?><sup>đ</sup></span>
-                    <?php if ((float) $product['price_original'] > 0): ?>
+                    <?php if ((float) $product['price_original'] > (float) $product['price_sale']): ?>
                         <span class="price-original"><?php echo number_format((float) $product['price_original'], 0, ',', '.'); ?><sup>đ</sup></span>
+                        <?php if (!empty($product['discount'])): ?>
+                            <span class="product-badge" style="position: static; vertical-align: middle; margin-left: 8px;"><?php echo $escape($product['discount']); ?></span>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
 
@@ -118,10 +121,6 @@ $descriptionByCategory = [
                         </div>
                     <?php endif; ?>
                 </dl>
-
-                <?php if (!empty($product['gift'])): ?>
-                    <p class="product-detail-gift">🎁 <?php echo $escape($product['gift']); ?></p>
-                <?php endif; ?>
 
                 <!-- CẶP NÚT MUA HÀNG & CHAT TƯ VẤN SANG TRỌNG -->
                 <?php $maxQuantity = min($stock, 99); ?>

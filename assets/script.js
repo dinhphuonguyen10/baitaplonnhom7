@@ -1732,7 +1732,7 @@ function normalizeVietnamese(str) {
 }
 
 // ==================== PAGINATION SYSTEM ====================
-const PRODUCTS_PER_PAGE = 12; // 3 cột × 4 dòng = 12 sản phẩm (vừa vặn, chuẩn cho cả desktop 3 cột và mobile 2 cột)
+const PRODUCTS_PER_PAGE = 15; // 3 cột × 5 dòng = 15 sản phẩm (chuẩn 5 dòng theo yêu cầu)
 let _paginationCurrentPage = 1;
 let _paginationAllProducts = []; // Lưu toàn bộ sản phẩm đã fetch (dùng cho phân trang)
 

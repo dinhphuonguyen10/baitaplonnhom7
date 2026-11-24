@@ -83,15 +83,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 2. SỬA SẢN PHẨM
     elseif ($action === 'edit') {
-        $id          = (int)($_POST['id'] ?? 0);
-        $name        = trim($_POST['name'] ?? '');
-        $categoryId  = (int)($_POST['category_id'] ?? 0);
-        $price       = (float)($_POST['price'] ?? 0);
-        $stock       = max(0, (int)($_POST['stock'] ?? 0));
-        $description = trim($_POST['description'] ?? '');
-        $isFeatured  = isset($_POST['is_featured']) ? 1 : 0;
-        $isSuggested = isset($_POST['is_suggested']) ? 1 : 0;
-        $isNew       = isset($_POST['is_new']) ? 1 : 0;
+        $id            = (int)($_POST['id'] ?? 0);
+        $name          = trim($_POST['name'] ?? '');
+        $categoryId    = (int)($_POST['category_id'] ?? 0);
+        $price         = (float)($_POST['price'] ?? 0);
+        $priceOriginal = isset($_POST['price_original']) ? (float)$_POST['price_original'] : 0.0;
+        $stock         = max(0, (int)($_POST['stock'] ?? 0));
+        $description   = trim($_POST['description'] ?? '');
+        $isFeatured    = isset($_POST['is_featured']) ? 1 : 0;
+        $isSuggested   = isset($_POST['is_suggested']) ? 1 : 0;
+        $isNew         = isset($_POST['is_new']) ? 1 : 0;
         if ($description === '') {
             $description = $descTemplatesByCategory[$categoryId] ?? $descTemplatesByCategory[2];
         }
@@ -119,11 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($hasNewImage) {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, image = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
-                $stmt->bind_param("sidissiiii", $name, $categoryId, $price, $stock, $newImagePath, $description, $isFeatured, $isSuggested, $isNew, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, price_original = ?, stock = ?, image = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
+                $stmt->bind_param("siddissiiii", $name, $categoryId, $price, $priceOriginal, $stock, $newImagePath, $description, $isFeatured, $isSuggested, $isNew, $id);
             } else {
-                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, stock = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
-                $stmt->bind_param("sidisiiii", $name, $categoryId, $price, $stock, $description, $isFeatured, $isSuggested, $isNew, $id);
+                $stmt = $conn->prepare("UPDATE products SET name = ?, category_id = ?, price_sale = ?, price_original = ?, stock = ?, description = ?, is_featured = ?, is_suggested = ?, is_new = ? WHERE id = ?");
+                $stmt->bind_param("siddsiiii", $name, $categoryId, $price, $priceOriginal, $stock, $description, $isFeatured, $isSuggested, $isNew, $id);
             }
 
             if ($stmt->execute()) {
@@ -344,7 +345,17 @@ if ($prodRes) {
                                             <?php endif; ?>
                                         </td>
                                         <td><span class="cat-badge"><?php echo $escape($p['category_name']); ?></span></td>
-                                        <td><strong class="price-text"><?php echo number_format((float)$p['price_sale'], 0, ',', '.'); ?>đ</strong></td>
+                                        <td>
+                                            <strong class="price-text"><?php echo number_format((float)$p['price_sale'], 0, ',', '.'); ?>đ</strong>
+                                            <?php if (!empty($p['price_original']) && (float)$p['price_original'] > (float)$p['price_sale']): ?>
+                                                <div style="font-size: 11px; color: #94a3b8; text-decoration: line-through;">
+                                                    <?php echo number_format((float)$p['price_original'], 0, ',', '.'); ?>đ
+                                                </div>
+                                                <span style="display: inline-block; font-size: 11px; padding: 1px 5px; border-radius: 4px; background: #fee2e2; color: #dc2626; font-weight: 700;">
+                                                    <?php echo $escape($p['discount'] ?? ''); ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <span class="stock-tag <?php echo $stockClass; ?>"><?php echo $escape($stockText); ?></span>
                                             <?php if ((int)($p['sold_count'] ?? 0) > 0): ?>
@@ -482,8 +493,24 @@ if ($prodRes) {
                 </div>
 
                 <div class="form-field">
-                    <label>Giá bán (VNĐ) (*):</label>
+                    <label>Giá bán hiện tại (VNĐ) (*):</label>
                     <input type="number" name="price" id="edit-price" min="0" step="1000" required>
+                    <input type="hidden" name="price_original" id="edit-price-original" value="0">
+                    <div style="margin-top: 8px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                            <label style="font-size: 13px; font-weight: 600; color: #334155;">Áp dụng % giảm giá nhanh:</label>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="btn-sm" style="background: #e2e8f0; color: #334155; padding: 2px 8px;" onclick="applyDiscountPercent(5)">5%</button>
+                                <button type="button" class="btn-sm" style="background: #e2e8f0; color: #334155; padding: 2px 8px;" onclick="applyDiscountPercent(10)">10%</button>
+                                <button type="button" class="btn-sm" style="background: #e2e8f0; color: #334155; padding: 2px 8px;" onclick="applyDiscountPercent(15)">15%</button>
+                                <button type="button" class="btn-sm" style="background: #e2e8f0; color: #334155; padding: 2px 8px;" onclick="applyDiscountPercent(20)">20%</button>
+                                <button type="button" class="btn-sm" style="background: #e2e8f0; color: #334155; padding: 2px 8px;" onclick="applyDiscountPercent(30)">30%</button>
+                                <button type="button" class="btn-sm" style="background: #e2e8f0; color: #334155; padding: 2px 8px;" onclick="applyDiscountPercent(50)">50%</button>
+                                <button type="button" class="btn-sm" style="background: #fee2e2; color: #b91c1c; padding: 2px 8px;" onclick="removeDiscount()">Hủy giảm giá</button>
+                            </div>
+                        </div>
+                        <div id="price-calc-hint" style="font-size: 12px; color: #0284c7; margin-top: 6px; font-weight: 500;"></div>
+                    </div>
                 </div>
 
                 <div class="form-field">
@@ -597,6 +624,7 @@ function closeAddModal() {
 
 // Modal Sửa sản phẩm
 let originalStock = 0;
+let basePriceForDiscount = 0;
 
 function openEditModal(prod, imgSrc) {
     document.getElementById('edit-id').value          = prod.id;
@@ -610,6 +638,14 @@ function openEditModal(prod, imgSrc) {
     document.getElementById('edit-is-new').checked       = parseInt(prod.is_new, 10) === 1;
     originalStock = parseInt(prod.stock, 10) || 0;
 
+    // Giá gốc tham chiếu khi tính giảm giá
+    const origPrice = parseFloat(prod.price_original) || 0;
+    const salePrice = parseFloat(prod.price_sale) || 0;
+    basePriceForDiscount = origPrice > salePrice ? origPrice : salePrice;
+
+    document.getElementById('edit-price-original').value = origPrice > salePrice ? origPrice : 0;
+    updatePriceCalcHint();
+
     // Reset ô nhập thêm hàng
     const addStockInput = document.getElementById('add-stock-input');
     addStockInput.value = '';
@@ -619,6 +655,41 @@ function openEditModal(prod, imgSrc) {
     document.getElementById('edit-img-url').value   = '';
     document.getElementById('editModal').classList.add('is-open');
 }
+
+function updatePriceCalcHint() {
+    const hint = document.getElementById('price-calc-hint');
+    const orig = parseFloat(document.getElementById('edit-price-original').value) || 0;
+    const current = parseFloat(document.getElementById('edit-price').value) || 0;
+    if (orig > current && current > 0) {
+        const pct = Math.round((1 - (current / orig)) * 100);
+        hint.innerHTML = '🏷️ Giá gốc: <strong>' + orig.toLocaleString('vi-VN') + 'đ</strong> ➡ Giá sau giảm: <strong>' + current.toLocaleString('vi-VN') + 'đ</strong> (Giảm <strong>-' + pct + '%</strong>)';
+    } else {
+        hint.innerHTML = '💡 Sản phẩm đang bán với giá thường (không giảm giá).';
+    }
+}
+
+function applyDiscountPercent(pct) {
+    if (basePriceForDiscount <= 0) return;
+    const discountedPrice = Math.round(basePriceForDiscount * (1 - pct / 100) / 1000) * 1000;
+    document.getElementById('edit-price').value = discountedPrice;
+    document.getElementById('edit-price-original').value = basePriceForDiscount;
+    updatePriceCalcHint();
+}
+
+function removeDiscount() {
+    document.getElementById('edit-price').value = basePriceForDiscount;
+    document.getElementById('edit-price-original').value = 0;
+    updatePriceCalcHint();
+}
+
+document.getElementById('edit-price')?.addEventListener('input', function() {
+    const current = parseFloat(this.value) || 0;
+    const orig = parseFloat(document.getElementById('edit-price-original').value) || 0;
+    if (current >= orig) {
+        document.getElementById('edit-price-original').value = 0;
+    }
+    updatePriceCalcHint();
+});
 
 function closeEditModal() {
     document.getElementById('editModal').classList.remove('is-open');
