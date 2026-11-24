@@ -91,6 +91,8 @@ Giỏ hàng được lưu theo tài khoản/khách trong trình duyệt. Trang �
 
 Quản lý vòng đời sản phẩm dùng MySQL/MariaDB qua MySQLi (dự án hiện không kết nối SQL Server). `products.status` phân biệt `active`, `inactive` và `hidden`; hết hàng được xác định riêng bằng `stock = 0`. Xóa trong Admin là xóa mềm qua `is_deleted`, `deleted_at` và `deleted_by`. Sản phẩm đã xóa mềm được xem/khôi phục trong Thùng rác; xóa cứng chỉ được phép khi không còn đơn hàng hoặc dữ liệu liên quan. Khóa ngoại của sản phẩm và chi tiết đơn hàng dùng `RESTRICT` để tránh xóa dây chuyền làm mất lịch sử.
 
+Thêm/sửa sản phẩm yêu cầu SKU duy nhất, giá gốc không âm và giá khuyến mãi (nếu có) thấp hơn giá gốc. `promotion_ends_at` xác định thời hạn khuyến mãi; các trang Client và API đặt hàng tự dùng giá gốc sau khi khuyến mãi hết hạn. Mỗi lần thay đổi giá được ghi vào `product_price_history` trong cùng transaction với cập nhật sản phẩm. Giá trong `order_items` được lưu thành snapshot khi tạo đơn, không bị thay đổi khi Admin cập nhật giá.
+
 
 ## Cấu hình PHP và database
 

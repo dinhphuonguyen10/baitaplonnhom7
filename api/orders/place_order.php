@@ -103,7 +103,16 @@ try {
     $conn->begin_transaction();
 
     $product_stmt = $conn->prepare(
-        'SELECT id, name, price_sale, image, stock, status, is_deleted FROM products WHERE id = ? FOR UPDATE'
+        'SELECT id, name,
+                CASE
+                    WHEN promotion_ends_at IS NOT NULL AND promotion_ends_at <= NOW()
+                    THEN price_original
+                    ELSE price_sale
+                END AS effective_price,
+                image, stock, status, is_deleted
+         FROM products
+         WHERE id = ?
+         FOR UPDATE'
     );
     $stock_stmt = $conn->prepare(
         'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?'
@@ -293,7 +302,7 @@ try {
 
         $product['quantity'] = $quantity;
         $products[] = $product;
-        $total_price += (float) $product['price_sale'] * $quantity;
+        $total_price += (float) $product['effective_price'] * $quantity;
     }
 
     $total_price = round($total_price, 2);
@@ -310,7 +319,7 @@ try {
     foreach ($products as $product) {
         $product_id = (int) $product['id'];
         $quantity = (int) $product['quantity'];
-        $price = (float) $product['price_sale'];
+        $price = (float) $product['effective_price'];
         $product_name = $product['name'];
         $image = $product['image'];
 
@@ -334,7 +343,7 @@ try {
         return [
             'product_name' => $product['name'],
             'quantity' => (int) $product['quantity'],
-            'price' => (float) $product['price_sale']
+            'price' => (float) $product['effective_price']
         ];
     }, $products);
     echo json_encode([

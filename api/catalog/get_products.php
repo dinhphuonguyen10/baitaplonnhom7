@@ -162,7 +162,9 @@ if ($result) {
 
         // Định dạng giá hiển thị tiền tệ
         $row['price_sale']     = number_format((float)$row['price_sale'], 0, ',', '.');
-        $row['price_original'] = $row['price_original_raw'] > 0 ? number_format($row['price_original_raw'], 0, ',', '.') : null;
+        $row['price_original'] = $row['price_original_raw'] > $row['price_sale_raw']
+            ? number_format($row['price_original_raw'], 0, ',', '.')
+            : null;
         $row['is_favorite']    = isset($userWishlist[(int)$row['id']]);
 
         $products[] = $row;

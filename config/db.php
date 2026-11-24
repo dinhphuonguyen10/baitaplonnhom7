@@ -145,6 +145,81 @@ foreach ($productLifecycleColumns as $columnName => $alterSql) {
     }
 }
 
+$productPricingColumns = [
+    'sku' => 'ALTER TABLE products ADD COLUMN sku VARCHAR(100) NULL AFTER name',
+    'promotion_ends_at' => 'ALTER TABLE products ADD COLUMN promotion_ends_at DATETIME NULL DEFAULT NULL AFTER price_original',
+];
+foreach ($productPricingColumns as $columnName => $alterSql) {
+    if (!isset($prodColumns[$columnName])) {
+        if (!$conn->query($alterSql)) {
+            error_log('Product pricing column migration failed for ' . $columnName . ': ' . $conn->error);
+            throw new RuntimeException('Không thể cập nhật cấu trúc giá và mã sản phẩm.');
+        }
+        $prodColumns[$columnName] = true;
+        $needUpdateView = true;
+    }
+}
+
+// Remove legacy price triggers before normalizing data; they used to rewrite price_original.
+if (!$conn->query('DROP TRIGGER IF EXISTS trg_products_before_insert')
+    || !$conn->query('DROP TRIGGER IF EXISTS trg_products_before_update')) {
+    error_log('Legacy product price trigger removal failed: ' . $conn->error);
+    throw new RuntimeException('Không thể chuẩn hóa quy tắc giá sản phẩm.');
+}
+if (!$conn->query(
+    "UPDATE products
+     SET sku = CONCAT('LEGACY-', LPAD(id, 10, '0'))
+     WHERE sku IS NULL OR TRIM(sku) = ''"
+)) {
+    error_log('Product SKU backfill failed: ' . $conn->error);
+    throw new RuntimeException('Không thể tạo mã SKU cho sản phẩm hiện có.');
+}
+if (!$conn->query(
+    'UPDATE products
+     SET price_original = price_sale
+     WHERE price_original <= 0 AND price_sale >= 0'
+)) {
+    error_log('Product regular-price normalization failed: ' . $conn->error);
+    throw new RuntimeException('Không thể chuẩn hóa giá sản phẩm hiện có.');
+}
+
+$duplicateSku = $conn->query(
+    "SELECT sku
+     FROM products
+     GROUP BY sku
+     HAVING COUNT(*) > 1
+     LIMIT 1"
+);
+if (!$duplicateSku) {
+    throw new RuntimeException('Không thể kiểm tra mã SKU trùng lặp: ' . $conn->error);
+}
+if ($duplicateSku->num_rows > 0) {
+    throw new RuntimeException('Database đang có SKU trùng nhau. Hãy xử lý SKU trùng trước khi tiếp tục.');
+}
+
+$skuColumnResult = $conn->query("SHOW COLUMNS FROM products LIKE 'sku'");
+if (!$skuColumnResult) {
+    throw new RuntimeException('Không thể kiểm tra cấu trúc mã SKU: ' . $conn->error);
+}
+$skuColumn = $skuColumnResult->fetch_assoc();
+if ($skuColumn && $skuColumn['Null'] === 'YES'
+    && !$conn->query('ALTER TABLE products MODIFY sku VARCHAR(100) NOT NULL')) {
+    error_log('Product SKU nullability migration failed: ' . $conn->error);
+    throw new RuntimeException('Không thể bắt buộc SKU cho sản phẩm.');
+}
+
+$invalidProductPrices = $conn->query(
+    'SELECT COUNT(*) AS total
+     FROM products
+     WHERE price_sale < 0 OR price_original < 0 OR price_sale > price_original'
+);
+if (!$invalidProductPrices) {
+    throw new RuntimeException('Không thể kiểm tra giá sản phẩm: ' . $conn->error);
+}
+if ((int)($invalidProductPrices->fetch_assoc()['total'] ?? 0) > 0) {
+    throw new RuntimeException('Có sản phẩm đang có giá bán không hợp lệ. Hãy kiểm tra dữ liệu giá trước khi tiếp tục.');
+}
+
 $productIndexes = [];
 $productIndexResult = $conn->query('SHOW INDEX FROM products');
 if (!$productIndexResult) {
@@ -152,6 +227,10 @@ if (!$productIndexResult) {
 }
 while ($productIndexRow = $productIndexResult->fetch_assoc()) {
     $productIndexes[$productIndexRow['Key_name']] = true;
+}
+if (!isset($productIndexes['uq_products_sku']) && !$conn->query('ALTER TABLE products ADD UNIQUE INDEX uq_products_sku (sku)')) {
+    error_log('Product SKU unique index migration failed: ' . $conn->error);
+    throw new RuntimeException('Không thể tạo ràng buộc SKU duy nhất.');
 }
 foreach ([
     'idx_products_status_deleted' => 'ALTER TABLE products ADD INDEX idx_products_status_deleted (is_deleted, status)',
@@ -181,11 +260,38 @@ while ($productCheckRow = $productChecksResult->fetch_assoc()) {
 foreach ([
     'chk_products_status' => "ALTER TABLE products ADD CONSTRAINT chk_products_status CHECK (status IN ('active', 'inactive', 'hidden'))",
     'chk_products_is_deleted' => 'ALTER TABLE products ADD CONSTRAINT chk_products_is_deleted CHECK (is_deleted IN (0, 1))',
+    'chk_products_sku_nonempty' => "ALTER TABLE products ADD CONSTRAINT chk_products_sku_nonempty CHECK (CHAR_LENGTH(TRIM(sku)) > 0)",
+    'chk_products_name_nonempty' => "ALTER TABLE products ADD CONSTRAINT chk_products_name_nonempty CHECK (CHAR_LENGTH(TRIM(name)) > 0)",
+    'chk_products_pricing' => 'ALTER TABLE products ADD CONSTRAINT chk_products_pricing CHECK (price_sale >= 0 AND price_original >= 0 AND price_sale <= price_original)',
+    'chk_products_stock_nonnegative' => 'ALTER TABLE products ADD CONSTRAINT chk_products_stock_nonnegative CHECK (stock >= 0)',
+    'chk_products_promotion_end' => 'ALTER TABLE products ADD CONSTRAINT chk_products_promotion_end CHECK (promotion_ends_at IS NULL OR price_sale < price_original)',
 ] as $constraintName => $alterSql) {
     if (!isset($productChecks[$constraintName]) && !$conn->query($alterSql)) {
         error_log('Product lifecycle check migration failed for ' . $constraintName . ': ' . $conn->error);
         throw new RuntimeException('Không thể tạo ràng buộc trạng thái sản phẩm.');
     }
+}
+
+$priceHistoryTableSql = "CREATE TABLE IF NOT EXISTS product_price_history (
+    id bigint unsigned NOT NULL AUTO_INCREMENT,
+    product_id int(10) unsigned NOT NULL,
+    old_price decimal(12,2) DEFAULT NULL,
+    new_price decimal(12,2) NOT NULL,
+    old_regular_price decimal(12,2) DEFAULT NULL,
+    new_regular_price decimal(12,2) NOT NULL,
+    old_promotion_price decimal(12,2) DEFAULT NULL,
+    new_promotion_price decimal(12,2) DEFAULT NULL,
+    old_promotion_ends_at datetime DEFAULT NULL,
+    new_promotion_ends_at datetime DEFAULT NULL,
+    changed_at datetime NOT NULL DEFAULT current_timestamp(),
+    changed_by varchar(100) NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_product_price_history_product_time (product_id, changed_at),
+    CONSTRAINT fk_product_price_history_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+if (!$conn->query($priceHistoryTableSql)) {
+    error_log('Product price history table setup failed: ' . $conn->error);
+    throw new RuntimeException('Không thể khởi tạo lịch sử giá sản phẩm.');
 }
 if (!isset($productChecks['chk_products_deleted_metadata'])) {
     if (!$conn->query(
@@ -244,10 +350,45 @@ if ($needUpdateView || true) {
     $viewUpdate = $conn->query("CREATE OR REPLACE VIEW view_product_details AS
         SELECT 
             p.id,
+            p.sku,
             p.name,
-            p.price_sale,
+            CASE
+                WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                THEN p.price_original
+                ELSE p.price_sale
+            END AS price_sale,
             p.price_original,
-            p.discount,
+            CASE
+                WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                THEN NULL
+                WHEN p.price_sale < p.price_original
+                THEN p.price_sale
+                ELSE NULL
+            END AS promotion_price,
+            p.promotion_ends_at,
+            CASE
+                WHEN (
+                    CASE
+                        WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                        THEN p.price_original
+                        ELSE p.price_sale
+                    END
+                ) < p.price_original AND p.price_original > 0
+                THEN CONCAT(
+                    '-',
+                    ROUND(
+                        (p.price_original - (
+                            CASE
+                                WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                                THEN p.price_original
+                                ELSE p.price_sale
+                            END
+                        )) / p.price_original * 100
+                    ),
+                    '%'
+                )
+                ELSE NULL
+            END AS discount,
             p.gift,
             p.image,
             p.stock,
@@ -522,10 +663,9 @@ END");
 $conn->query("DROP TRIGGER IF EXISTS trg_products_before_insert");
 $conn->query("CREATE TRIGGER trg_products_before_insert BEFORE INSERT ON products FOR EACH ROW
 BEGIN
-    IF NEW.price_original > 0 AND NEW.price_sale < NEW.price_original THEN
+    IF NEW.price_sale < NEW.price_original THEN
         SET NEW.discount = fn_format_discount(NEW.price_sale, NEW.price_original);
     ELSE
-        SET NEW.price_original = 0.00;
         SET NEW.discount = NULL;
     END IF;
 END");
@@ -533,34 +673,9 @@ END");
 $conn->query("DROP TRIGGER IF EXISTS trg_products_before_update");
 $conn->query("CREATE TRIGGER trg_products_before_update BEFORE UPDATE ON products FOR EACH ROW
 BEGIN
-    -- Nếu admin chủ động bỏ giảm giá (truyền price_original = 0 hoặc âm)
-    IF NEW.price_original IS NOT NULL AND NEW.price_original <= 0 AND (OLD.price_original > 0 OR OLD.discount IS NOT NULL) THEN
-        SET NEW.price_original = 0.00;
-        SET NEW.discount = NULL;
-    -- Nếu admin chủ động truyền giá gốc mới hợp lệ (> 0)
-    ELSEIF NEW.price_original IS NOT NULL AND NEW.price_original > 0 THEN
-        IF NEW.price_sale < NEW.price_original THEN
-            SET NEW.discount = fn_format_discount(NEW.price_sale, NEW.price_original);
-        ELSE
-            SET NEW.price_original = 0.00;
-            SET NEW.discount = NULL;
-        END IF;
-    -- Nếu giá bán giảm so với giá bán cũ
-    ELSEIF NEW.price_sale < OLD.price_sale THEN
-        SET NEW.price_original = OLD.price_sale;
-        SET NEW.discount = fn_format_discount(NEW.price_sale, OLD.price_sale);
-    -- Nếu giá bán tăng so với giá bán cũ (không hiện giá cũ, xóa giảm giá)
-    ELSEIF NEW.price_sale > OLD.price_sale THEN
-        SET NEW.price_original = 0.00;
-        SET NEW.discount = NULL;
-    -- Giá không đổi: giữ nguyên giảm giá cũ nếu còn hợp lệ
+    IF NEW.price_sale < NEW.price_original THEN
+        SET NEW.discount = fn_format_discount(NEW.price_sale, NEW.price_original);
     ELSE
-        IF OLD.price_original > 0 AND NEW.price_sale < OLD.price_original THEN
-            SET NEW.price_original = OLD.price_original;
-            SET NEW.discount = OLD.discount;
-        ELSE
-            SET NEW.price_original = 0.00;
-            SET NEW.discount = NULL;
-        END IF;
+        SET NEW.discount = NULL;
     END IF;
 END");

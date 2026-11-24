@@ -72,11 +72,11 @@ $orderCheck = $conn->query("SELECT COUNT(*) as total FROM orders WHERE id > 1");
 if ($orderCheck && $orderCheck->fetch_assoc()['total'] == 0) {
     foreach ($featuredSales as $prodId => $qty) {
         // Lấy thông tin sản phẩm
-        $pRes = $conn->query("SELECT name, price_sale, image FROM products WHERE id = {$prodId}");
+        $pRes = $conn->query("SELECT name, CASE WHEN promotion_ends_at IS NOT NULL AND promotion_ends_at <= NOW() THEN price_original ELSE price_sale END AS effective_price, image FROM products WHERE id = {$prodId}");
         if (!$pRes || !($prod = $pRes->fetch_assoc())) continue;
 
         $randUser = $userIds[array_rand($userIds)];
-        $totalPrice = $prod['price_sale'] * $qty;
+        $totalPrice = $prod['effective_price'] * $qty;
         
         $insOrder = $conn->prepare("INSERT INTO orders (user_id, full_name, phone, email, address, total_price, status, payment_status, payment_method, created_at) VALUES (?, 'Khách hàng VIP', '0912345678', 'order@ecrin.vn', 'Hà Nội', ?, 'Đã giao hàng', 'Đã thanh toán', 'COD', NOW() - INTERVAL FLOOR(RAND() * 30) DAY)");
         $insOrder->bind_param("id", $randUser, $totalPrice);
@@ -84,7 +84,7 @@ if ($orderCheck && $orderCheck->fetch_assoc()['total'] == 0) {
         $newOrderId = $conn->insert_id;
 
         $insItem = $conn->prepare("INSERT INTO order_items (order_id, product_id, product_name, quantity, price, image) VALUES (?, ?, ?, ?, ?, ?)");
-        $insItem->bind_param("iisids", $newOrderId, $prodId, $prod['name'], $qty, $prod['price_sale'], $prod['image']);
+        $insItem->bind_param("iisids", $newOrderId, $prodId, $prod['name'], $qty, $prod['effective_price'], $prod['image']);
         $insItem->execute();
     }
     echo "Seed orders completed.\n";

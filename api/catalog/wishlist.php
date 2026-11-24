@@ -29,7 +29,20 @@ if ($method === 'GET') {
         // Lấy chi tiết sản phẩm trong danh sách yêu thích
         $stmt = $conn->prepare("
             SELECT w.id AS wishlist_id, w.created_at AS favorited_at,
-                   p.id, p.name, p.category_id, p.price_sale, p.price_original, p.stock, p.image, p.description,
+                   p.id, p.name, p.category_id,
+                   CASE
+                       WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                       THEN p.price_original
+                       ELSE p.price_sale
+                   END AS price_sale,
+                   p.price_original,
+                   CASE
+                       WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN NULL
+                       WHEN p.price_sale < p.price_original
+                       THEN CONCAT('-', ROUND((p.price_original - p.price_sale) / p.price_original * 100), '%')
+                       ELSE NULL
+                   END AS discount,
+                   p.stock, p.image, p.description,
                    c.name AS category_name, c.slug AS category,
                    COALESCE(SUM(oi.quantity), 0) AS sold_count
             FROM wishlists w
@@ -53,7 +66,9 @@ if ($method === 'GET') {
             $row['price_sale_raw'] = (float)$row['price_sale'];
             $row['price_original_raw'] = (float)($row['price_original'] ?? 0);
             $row['price_sale'] = number_format((float)$row['price_sale'], 0, ',', '.');
-            $row['price_original'] = $row['price_original_raw'] > 0 ? number_format($row['price_original_raw'], 0, ',', '.') : null;
+            $row['price_original'] = $row['price_original_raw'] > $row['price_sale_raw']
+                ? number_format($row['price_original_raw'], 0, ',', '.')
+                : null;
             $row['is_favorite'] = true;
             $items[] = $row;
             $ids[] = $row['id'];

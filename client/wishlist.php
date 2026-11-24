@@ -33,7 +33,20 @@ if ($userId > 0) {
     // 2. Truy vấn phân trang LIMIT & OFFSET hoàn toàn bằng SQL
     $stmt = $conn->prepare("
         SELECT w.id AS wishlist_id,
-               p.id, p.name, p.category_id, p.price_sale, p.price_original, p.stock, p.image, p.discount, p.gift, p.description,
+               p.id, p.name, p.category_id,
+               CASE
+                   WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                   THEN p.price_original
+                   ELSE p.price_sale
+               END AS price_sale,
+               p.price_original,
+               CASE
+                   WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN NULL
+                   WHEN p.price_sale < p.price_original
+                   THEN CONCAT('-', ROUND((p.price_original - p.price_sale) / p.price_original * 100), '%')
+                   ELSE NULL
+               END AS discount,
+               p.stock, p.image, p.gift, p.description,
                c.name AS category_name, c.slug AS category,
                COALESCE(SUM(oi.quantity), 0) AS sold_count,
                COALESCE(review_stats.average_rating, 0) AS average_rating,
@@ -118,7 +131,7 @@ $totalPages = $totalWishlistItems > 0 ? (int)ceil($totalWishlistItems / $itemsPe
                         <h3><?php echo $escape($name); ?></h3>
                         <div class="product-price">
                             <span class="price-sale"><?php echo number_format($priceSale, 0, ',', '.'); ?><sup>đ</sup></span>
-                            <?php if ($priceOriginal > 0): ?>
+                            <?php if ($priceOriginal > $priceSale): ?>
                                 <span class="price-original"><?php echo number_format($priceOriginal, 0, ',', '.'); ?><sup>đ</sup></span>
                             <?php endif; ?>
                         </div>
@@ -223,7 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const sold = Number(p.sold_count) || 0;
                         const priceSaleFormatted = typeof p.price_sale === 'string' && p.price_sale.includes('.') ? p.price_sale : formatPrice(p.price_sale);
                         const priceOriginalFormatted = p.price_original ? (typeof p.price_original === 'string' && p.price_original.includes('.') ? p.price_original : formatPrice(p.price_original)) : '';
-                        const priceOriginalHTML = p.price_original && parsePrice(p.price_original) > 0 ? `<span class="price-original">${priceOriginalFormatted}<sup>đ</sup></span>` : '';
+                        const priceOriginalHTML = p.price_original && p.price_original_raw > priceSaleRaw ? `<span class="price-original">${priceOriginalFormatted}<sup>đ</sup></span>` : '';
                         const badgeHTML = hasDiscount ? `<span class="product-badge">${p.discount || 'ƯU ĐÃI'}</span>` : '';
                         const metaHTML = renderProductMeta(sold);
 
