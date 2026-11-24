@@ -35,6 +35,17 @@ if ($isCustomerLoggedIn && isset($_SESSION['user_id']) && isset($conn) && $conn 
         $initialWishlistCount = (int)$wlRow['total'];
     }
 }
+
+/* ── Đọc logo tùy chỉnh nếu có, fallback về logo mặc định ── */
+$_logoConfigFile = __DIR__ . '/../storage/banner/logo.json';
+$_logoSrc = 'assets/banner/logo.png';
+if (is_file($_logoConfigFile)) {
+    $_logoData = json_decode((string) file_get_contents($_logoConfigFile), true);
+    if (is_array($_logoData) && !empty($_logoData['src'])) {
+        $_logoSrc = (string) $_logoData['src'];
+    }
+}
+$headerLogoUrl = $appBaseUrl . '/' . ltrim($_logoSrc, '/');
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -61,7 +72,7 @@ if ($isCustomerLoggedIn && isset($_SESSION['user_id']) && isset($conn) && $conn 
         <!-- Logo ảnh -->
         <div class="logo">
             <a href="<?php echo htmlspecialchars($appBaseUrl . '/index.php', ENT_QUOTES, 'UTF-8'); ?>" aria-label="Écrin Jewelry - Trang chủ">
-                <img src="<?php echo htmlspecialchars($appBaseUrl . '/assets/banner/logo.png', ENT_QUOTES, 'UTF-8'); ?>" alt="Écrin Jewelry" class="logo-img">
+                <img src="<?php echo htmlspecialchars($headerLogoUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="Écrin Jewelry" class="logo-img">
                 <span class="logo-wordmark"><strong>ÉCRIN</strong><small>JEWELRY</small></span>
             </a>
         </div>

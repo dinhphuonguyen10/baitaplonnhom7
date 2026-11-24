@@ -320,7 +320,14 @@ if ($totalReviews > 0) {
                                 $reviewId = (int) $review['id'];
                                 $rating = (int) $review['rating'];
                                 $image = (string) ($review['product_image'] ?? '');
-                                $imageUrl = $image !== '' ? $appBaseUrl . '/' . ltrim($image, '/') : $appBaseUrl . '/assets/banner/logo.png';
+                                $imageUrl = $image !== '' ? $appBaseUrl . '/' . ltrim($image, '/') : (function() use ($appBaseUrl) {
+                                    $_rvLogoConf = __DIR__ . '/../storage/banner/logo.json';
+                                    if (is_file($_rvLogoConf)) {
+                                        $_rvData = json_decode((string) file_get_contents($_rvLogoConf), true);
+                                        if (is_array($_rvData) && !empty($_rvData['src'])) return $appBaseUrl . '/' . ltrim((string)$_rvData['src'], '/');
+                                    }
+                                    return $appBaseUrl . '/assets/banner/logo.png';
+                                })();
                                 $date = strtotime((string) $review['created_at']);
                                 ?>
                                 <tr>
