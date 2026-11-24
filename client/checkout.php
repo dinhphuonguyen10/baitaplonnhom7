@@ -187,6 +187,7 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                     <span>Tổng tiền hàng</span>
                     <strong id="checkout-total-price">0 đ</strong>
                 </div>
+                <p class="checkout-shipping-note">Giá và khuyến mãi sẽ được xác nhận lại từ hệ thống khi đặt hàng.</p>
                 <p class="checkout-shipping-note">Phí giao hàng (nếu có) sẽ được cửa hàng xác nhận khi liên hệ.</p>
             </aside>
         </div>
@@ -201,7 +202,15 @@ $appBaseUrl = rtrim($appBaseUrl, '/');
                 <h3>Sản phẩm đã đặt</h3>
                 <div class="checkout-receipt-items"></div>
                 <div class="checkout-order-total">
-                    <span>Tổng tiền hàng</span>
+                    <span>Tạm tính</span>
+                    <strong class="checkout-receipt-subtotal"></strong>
+                </div>
+                <div class="checkout-order-total">
+                    <span>Giảm giá</span>
+                    <strong class="checkout-receipt-discount"></strong>
+                </div>
+                <div class="checkout-order-total">
+                    <span>Tổng thanh toán</span>
                     <strong class="checkout-receipt-total"></strong>
                 </div>
                 <p class="checkout-receipt-payment">Thanh toán khi nhận hàng</p>

@@ -6,7 +6,13 @@ $categoryTitle = "Danh mục sản phẩm";
 $categoryKey = $slug;
 
 if ($slug !== '') {
-    $stmt = $conn->prepare("SELECT id, name, slug FROM categories WHERE slug = ? OR name = ? OR CAST(id AS CHAR) = ? LIMIT 1");
+    $stmt = $conn->prepare(
+        "SELECT id, name, slug
+         FROM categories
+         WHERE status = 'active' AND is_deleted = 0
+           AND (slug = ? OR name = ? OR CAST(id AS CHAR) = ?)
+         LIMIT 1"
+    );
     $stmt->bind_param("sss", $slug, $slug, $slug);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -36,6 +42,18 @@ include __DIR__ . '/../include/header.php';
                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                 </svg>
                 <h2 class="filter-header-title">BỘ LỌC TÌM KIẾM</h2>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-group-title" for="filter-category">DANH MỤC</label>
+                <select id="filter-category" class="filter-category-select">
+                    <?php foreach ($navCategories as $navCategory): ?>
+                        <?php if (in_array($navCategory['slug'], ['combo', 'suggest', 'featured'], true)) continue; ?>
+                        <option value="<?php echo htmlspecialchars($navCategory['slug'], ENT_QUOTES, 'UTF-8'); ?>" <?php echo $navCategory['slug'] === $categoryKey ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($navCategory['name'], ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <!-- NHÓM 1: KHOẢNG GIÁ -->

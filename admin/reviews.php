@@ -137,7 +137,7 @@ try {
              FROM orders o
              INNER JOIN order_items oi ON oi.order_id = o.id
              WHERE o.user_id = ? AND oi.product_id = ?
-               AND o.status IN ('Đã giao hàng', 'Đã giao')
+               AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
              LIMIT 1"
         );
         $verifiedStmt->bind_param('ii', $userId, $productId);
@@ -320,20 +320,15 @@ if ($totalReviews > 0) {
                                 $reviewId = (int) $review['id'];
                                 $rating = (int) $review['rating'];
                                 $image = (string) ($review['product_image'] ?? '');
-                                $imageUrl = $image !== '' ? $appBaseUrl . '/' . ltrim($image, '/') : (function() use ($appBaseUrl) {
-                                    $_rvLogoConf = __DIR__ . '/../storage/banner/logo.json';
-                                    if (is_file($_rvLogoConf)) {
-                                        $_rvData = json_decode((string) file_get_contents($_rvLogoConf), true);
-                                        if (is_array($_rvData) && !empty($_rvData['src'])) return $appBaseUrl . '/' . ltrim((string)$_rvData['src'], '/');
-                                    }
-                                    return $appBaseUrl . '/assets/banner/logo.png';
-                                })();
+                                $imageUrl = preg_match('~^https?://~i', $image)
+                                    ? $image
+                                    : $appBaseUrl . '/' . ltrim($image !== '' ? $image : 'assets/banner/logo.png', '/');
                                 $date = strtotime((string) $review['created_at']);
                                 ?>
                                 <tr>
                                     <td>
                                         <div class="review-product">
-                                            <img class="review-thumb" src="<?php echo $escape($imageUrl); ?>" alt="">
+                                            <img class="review-thumb" src="<?php echo $escape($imageUrl); ?>" alt="" onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'">
                                             <strong><?php echo $escape($review['product_name']); ?></strong>
                                         </div>
                                     </td>

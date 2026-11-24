@@ -370,6 +370,17 @@ section, main {
     margin: 0;
 }
 
+.cart-item-stock {
+    margin: -4px 0 0;
+    color: #536579;
+    font-size: 0.78rem;
+}
+
+.cart-item-stock.unavailable {
+    color: #b42318;
+    font-weight: 600;
+}
+
 .cart-item-price {
     color: var(--gold);
     font-weight: 700;
@@ -404,6 +415,11 @@ section, main {
     background: var(--navy);
     color: var(--white);
     border-color: var(--navy);
+}
+
+.cart-qty-controls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .cart-qty {
@@ -2331,6 +2347,77 @@ section, main {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+.filter-category-select {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid var(--cream-dark);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--navy);
+    font: inherit;
+}
+
+.category-results-count {
+    margin: 0 0 12px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.category-filter-error {
+    margin: 0 0 12px;
+    color: #a4262c;
+    font-size: 0.9rem;
+}
+
+.search-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 12px;
+    margin: 16px 0;
+    padding: 14px;
+    border: 1px solid var(--cream-dark);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.search-filter-bar > label:not(.search-filter-check) {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: var(--navy);
+    font-size: 0.82rem;
+}
+
+.search-filter-bar select,
+.search-filter-bar input[type="number"] {
+    min-height: 38px;
+    max-width: 190px;
+    padding: 7px 9px;
+    border: 1px solid var(--cream-dark);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--navy);
+    font: inherit;
+}
+
+.search-filter-bar .search-filter-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    color: var(--navy);
+    font-size: 0.85rem;
+}
+
+.search-filter-bar .btn-apply-filter,
+.search-filter-bar .btn-reset-all-filters {
+    width: auto;
+    min-height: 38px;
+    margin: 0;
 }
 
 /* 2. NHẬP KHOẢNG GIÁ & CHIPS GỢI Ý */

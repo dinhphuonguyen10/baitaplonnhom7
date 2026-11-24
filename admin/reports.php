@@ -732,7 +732,7 @@ if ($reportView === 'customer') {
     $customerRows = [];
     $customerSql = "SELECT u.id, u.username, u.phone, u.created_at,
                            COUNT(DISTINCT o.id) AS order_count,
-                           COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng','Đã giao') THEN o.total_price ELSE 0 END),0) AS revenue,
+                           COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng','Đã giao','Hoàn thành') THEN o.total_price ELSE 0 END),0) AS revenue,
                            MAX(o.created_at) AS last_order
                     FROM users u
                     LEFT JOIN orders o ON o.user_id = u.id
@@ -1216,7 +1216,7 @@ $summary = [
 $summaryResult = $runReportQuery(
     "SELECT COUNT(*) AS total_orders,
             COALESCE(SUM(o.status NOT IN ('Đã hủy', 'Canceled', 'cancelled', 'huy')), 0) AS active_orders,
-            COALESCE(SUM(o.status IN ('Đã giao hàng', 'Đã giao')), 0) AS completed_orders,
+            COALESCE(SUM(o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')), 0) AS completed_orders,
             COALESCE(SUM(o.status IN ('Đã hủy', 'Canceled', 'cancelled', 'huy')), 0) AS cancelled_orders
      FROM orders o
      WHERE o.created_at >= ? AND o.created_at < ?{$categoryCondition}"
@@ -1232,7 +1232,7 @@ if ($categoryId > 0) {
                    INNER JOIN order_items oi ON oi.order_id = o.id
                    INNER JOIN products p ON p.id = oi.product_id AND p.category_id = " . (int) $categoryId . "
                    WHERE o.created_at >= ? AND o.created_at < ?
-                     AND o.status IN ('Đã giao hàng', 'Đã giao')";
+                     AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')";
 } else {
     $revenueSql = "SELECT COALESCE(SUM(o.total_price), 0) AS revenue,
                           COALESCE(SUM((
@@ -1242,7 +1242,7 @@ if ($categoryId > 0) {
                           )), 0) AS items_sold
                    FROM orders o
                    WHERE o.created_at >= ? AND o.created_at < ?
-                     AND o.status IN ('Đã giao hàng', 'Đã giao')";
+                     AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')";
 }
 $revenueResult = $runReportQuery($revenueSql);
 if ($revenueResult) {
@@ -1260,8 +1260,8 @@ if ($customersResult) {
 if ($categoryId > 0) {
     $trendSql = "SELECT {$bucketExpression} AS report_bucket,
                         COUNT(DISTINCT o.id) AS order_count,
-                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao') AND p.id IS NOT NULL THEN oi.quantity ELSE 0 END), 0) AS items_sold,
-                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao') AND p.id IS NOT NULL THEN oi.quantity * oi.price ELSE 0 END), 0) AS revenue
+                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành') AND p.id IS NOT NULL THEN oi.quantity ELSE 0 END), 0) AS items_sold,
+                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành') AND p.id IS NOT NULL THEN oi.quantity * oi.price ELSE 0 END), 0) AS revenue
                  FROM orders o
                  LEFT JOIN order_items oi ON oi.order_id = o.id
                  LEFT JOIN products p ON p.id = oi.product_id AND p.category_id = " . (int) $categoryId . "
@@ -1271,12 +1271,12 @@ if ($categoryId > 0) {
 } else {
     $trendSql = "SELECT {$bucketExpression} AS report_bucket,
                         COUNT(*) AS order_count,
-                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao') THEN (
+                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành') THEN (
                             SELECT COALESCE(SUM(oi.quantity), 0)
                             FROM order_items oi
                             WHERE oi.order_id = o.id
                         ) ELSE 0 END), 0) AS items_sold,
-                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao') THEN o.total_price ELSE 0 END), 0) AS revenue
+                        COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành') THEN o.total_price ELSE 0 END), 0) AS revenue
                  FROM orders o
                  WHERE o.created_at >= ? AND o.created_at < ?
                  GROUP BY report_bucket
@@ -1329,7 +1329,7 @@ $topProductsSql = "SELECT oi.product_name,
                    INNER JOIN orders o ON o.id = oi.order_id
                    LEFT JOIN products p ON p.id = oi.product_id
                    WHERE o.created_at >= ? AND o.created_at < ?
-                     AND o.status IN ('Đã giao hàng', 'Đã giao')" .
+                     AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')" .
     ($categoryId > 0 ? ' AND p.category_id = ' . (int) $categoryId : '') .
     ' GROUP BY oi.product_id, oi.product_name
       ORDER BY quantity_sold DESC, product_revenue DESC';
@@ -1349,7 +1349,7 @@ $categoryRevenueSql = "SELECT c.name AS category_name,
                        INNER JOIN products p ON p.id = oi.product_id
                        INNER JOIN categories c ON c.id = p.category_id
                        WHERE o.created_at >= ? AND o.created_at < ?
-                         AND o.status IN ('Đã giao hàng', 'Đã giao')" .
+                         AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')" .
     ($categoryId > 0 ? ' AND p.category_id = ' . (int) $categoryId : '') . "
                        GROUP BY c.id, c.name
                        ORDER BY revenue DESC, items_sold DESC";
@@ -1363,16 +1363,17 @@ if ($categoryRevenueResult) {
 $statusCounts = [
     'Chờ xác nhận' => 0,
     'Đã xác nhận' => 0,
-    'Chuẩn bị đơn hàng' => 0,
-    'Đang vận chuyển' => 0,
-    'Đang giao' => 0,
+    'Đang chuẩn bị hàng' => 0,
+    'Đang giao hàng' => 0,
     'Đã giao hàng' => 0,
+    'Hoàn thành' => 0,
     'Đã hủy' => 0,
 ];
 $statusResult = $runReportQuery(
     "SELECT CASE
                 WHEN o.status IN ('Đang xử lý') THEN 'Đã xác nhận'
-                WHEN o.status IN ('Đang chuẩn bị') THEN 'Chuẩn bị đơn hàng'
+                WHEN o.status IN ('Chuẩn bị đơn hàng', 'Đang chuẩn bị') THEN 'Đang chuẩn bị hàng'
+                WHEN o.status IN ('Đang vận chuyển', 'Đang giao') THEN 'Đang giao hàng'
                 WHEN o.status IN ('Đã giao') THEN 'Đã giao hàng'
                 WHEN o.status IN ('Canceled', 'cancelled', 'huy') THEN 'Đã hủy'
                 ELSE o.status

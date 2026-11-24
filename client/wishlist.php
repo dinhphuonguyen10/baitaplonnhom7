@@ -19,7 +19,13 @@ $totalWishlistItems = 0;
 $wishlistItems = [];
 if ($userId > 0) {
     // 1. Đếm tổng số lượng yêu thích bằng SQL
-    $cntStmt = $conn->prepare("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = ?");
+    $cntStmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM wishlists w
+        INNER JOIN products p ON p.id = w.product_id
+        INNER JOIN categories c ON c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0
+        WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
+    ");
     $cntStmt->bind_param('i', $userId);
     $cntStmt->execute();
     $totalWishlistItems = (int)($cntStmt->get_result()->fetch_assoc()['total'] ?? 0);
@@ -28,14 +34,27 @@ if ($userId > 0) {
     // 2. Truy vấn phân trang LIMIT & OFFSET hoàn toàn bằng SQL
     $stmt = $conn->prepare("
         SELECT w.id AS wishlist_id,
-               p.id, p.name, p.category_id, p.price_sale, p.price_original, p.stock, p.image, p.discount, p.gift, p.description,
+               p.id, p.name, p.category_id,
+               CASE
+                   WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                   THEN p.price_original
+                   ELSE p.price_sale
+               END AS price_sale,
+               p.price_original,
+               CASE
+                   WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN NULL
+                   WHEN p.price_sale < p.price_original
+                   THEN CONCAT('-', ROUND((p.price_original - p.price_sale) / p.price_original * 100), '%')
+                   ELSE NULL
+               END AS discount,
+               p.stock, p.image, p.gift, p.description,
                c.name AS category_name, c.slug AS category,
                COALESCE(SUM(oi.quantity), 0) AS sold_count,
                COALESCE(review_stats.average_rating, 0) AS average_rating,
                COALESCE(review_stats.review_count, 0) AS review_count
         FROM wishlists w
         JOIN products p ON w.product_id = p.id
-        JOIN categories c ON p.category_id = c.id
+        JOIN categories c ON p.category_id = c.id AND c.status = 'active' AND c.is_deleted = 0
         LEFT JOIN order_items oi ON p.id = oi.product_id
         LEFT JOIN (
             SELECT r.product_id, ROUND(AVG(r.rating), 1) AS average_rating, COUNT(*) AS review_count
@@ -48,11 +67,11 @@ if ($userId > 0) {
                   INNER JOIN order_items reviewed_item ON reviewed_item.order_id = o.id
                   WHERE o.user_id = r.user_id
                     AND reviewed_item.product_id = r.product_id
-                    AND o.status IN ('Đã giao hàng', 'Đã giao')
+                    AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
               )
             GROUP BY r.product_id
         ) review_stats ON review_stats.product_id = p.id
-        WHERE w.user_id = ?
+        WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
         GROUP BY p.id
         ORDER BY w.id DESC
         LIMIT ? OFFSET ?
@@ -107,13 +126,13 @@ $totalPages = $totalWishlistItems > 0 ? (int)ceil($totalWishlistItems / $itemsPe
                 <div class="product-card" data-db-id="<?php echo $id; ?>" data-stock="<?php echo $stock; ?>" data-detail-url="<?php echo $escape($detailUrl); ?>" role="link" tabindex="0">
                     <div class="product-image-wrap">
                         <button class="wishlist-btn active" data-product-id="<?php echo $id; ?>" title="Bỏ yêu thích">♥</button>
-                        <img src="<?php echo $escape($imgSrc); ?>" alt="<?php echo $escape($name); ?>" class="product-image" onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';">
+                        <img src="<?php echo $escape($imgSrc); ?>" alt="<?php echo $escape($name); ?>" class="product-image" onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';">
                     </div>
                     <div class="product-info">
                         <h3><?php echo $escape($name); ?></h3>
                         <div class="product-price">
                             <span class="price-sale"><?php echo number_format($priceSale, 0, ',', '.'); ?><sup>đ</sup></span>
-                            <?php if ($priceOriginal > 0): ?>
+                            <?php if ($priceOriginal > $priceSale): ?>
                                 <span class="price-original"><?php echo number_format($priceOriginal, 0, ',', '.'); ?><sup>đ</sup></span>
                             <?php endif; ?>
                         </div>
@@ -218,7 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const sold = Number(p.sold_count) || 0;
                         const priceSaleFormatted = typeof p.price_sale === 'string' && p.price_sale.includes('.') ? p.price_sale : formatPrice(p.price_sale);
                         const priceOriginalFormatted = p.price_original ? (typeof p.price_original === 'string' && p.price_original.includes('.') ? p.price_original : formatPrice(p.price_original)) : '';
-                        const priceOriginalHTML = p.price_original && parsePrice(p.price_original) > 0 ? `<span class="price-original">${priceOriginalFormatted}<sup>đ</sup></span>` : '';
+                        const priceOriginalHTML = p.price_original && p.price_original_raw > priceSaleRaw ? `<span class="price-original">${priceOriginalFormatted}<sup>đ</sup></span>` : '';
                         const badgeHTML = hasDiscount ? `<span class="product-badge">${p.discount || 'ƯU ĐÃI'}</span>` : '';
                         const metaHTML = renderProductMeta(sold);
 
@@ -227,7 +246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div class="product-image-wrap">
                                     ${badgeHTML}
                                     <button class="wishlist-btn active" data-product-id="${p.id}" title="Bỏ yêu thích">♥</button>
-                                    <img src="${typeof getProductImageUrl === 'function' ? getProductImageUrl(p.image) : p.image}" alt="${p.name}" class="product-image">
+                                    <img src="${typeof getProductImageUrl === 'function' ? getProductImageUrl(p.image) : p.image}" alt="${p.name}" class="product-image" onerror="this.onerror=null;this.src='${window.APP_BASE_URL || ''}/assets/banner/logo.png'">
                                 </div>
                                 <div class="product-info">
                                     <h3>${p.name}</h3>

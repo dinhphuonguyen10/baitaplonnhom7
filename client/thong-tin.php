@@ -232,8 +232,24 @@ include __DIR__ . '/../include/header.php';
             <?php endif; ?>
 
             <?php if (!empty($topic['actions'])): ?>
+                <?php
+                    $categoryActionSlugs = [
+                        '/client/bong_tai.php' => 'bong-tai',
+                        '/client/day_chuyen.php' => 'day-chuyen',
+                        '/client/nhan.php' => 'nhan',
+                        '/client/vong_tay.php' => 'vong-tay',
+                        '/client/category.php?slug=set-qua-tang' => 'set-qua-tang',
+                    ];
+                    $activeCategorySlugs = array_column($navCategories, 'slug');
+                ?>
                 <nav class="info-actions" aria-label="Liên kết hữu ích">
                     <?php foreach ($topic['actions'] as $action): ?>
+                        <?php
+                            $requiredCategorySlug = $categoryActionSlugs[$action['href']] ?? null;
+                            if ($requiredCategorySlug !== null && !in_array($requiredCategorySlug, $activeCategorySlugs, true)) {
+                                continue;
+                            }
+                        ?>
                         <a class="info-action<?php echo !empty($action['primary']) ? ' info-action-primary' : ''; ?>"
                             href="<?php echo htmlspecialchars(strpos($action['href'], 'tel:') === 0 ? $action['href'] : $appBaseUrl . $action['href'], ENT_QUOTES, 'UTF-8'); ?>">
                             <?php echo htmlspecialchars($action['label'], ENT_QUOTES, 'UTF-8'); ?>

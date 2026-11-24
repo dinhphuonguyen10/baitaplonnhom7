@@ -6,129 +6,178 @@ require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../include/order_payment_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Vui lòng đăng nhập để xem đơn hàng"]);
+$respond = static function (int $code, array $body): void {
+    http_response_code($code);
+    echo json_encode($body, JSON_UNESCAPED_UNICODE);
     exit;
+};
+
+if (($_SESSION['role'] ?? '') !== 'customer' || !isset($_SESSION['user_id'])) {
+    $respond(401, ['status' => 'error', 'message' => 'Vui lòng đăng nhập để xem đơn hàng.']);
 }
+
+$userId = (int) $_SESSION['user_id'];
+$statusGroups = [
+    'processing' => ['Chờ xác nhận', 'Đã xác nhận', 'Đang chuẩn bị hàng', 'Chuẩn bị đơn hàng', 'Đang xử lý', 'Đang chuẩn bị', 'Pending'],
+    'shipping'   => ['Đang giao hàng', 'Đang vận chuyển', 'Đang giao'],
+    'delivered'  => ['Đã giao hàng', 'Đã giao', 'Hoàn thành'],
+    'cancelled'  => ['Đã hủy', 'Canceled', 'cancelled', 'huy'],
+];
+$statusFilter = isset($_GET['status']) && is_string($_GET['status']) ? trim($_GET['status']) : 'all';
+if ($statusFilter !== 'all' && !isset($statusGroups[$statusFilter])) {
+    $respond(400, ['status' => 'error', 'message' => 'Bộ lọc trạng thái không hợp lệ.']);
+}
+
+$search = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
+$search = ltrim($search, '#');
+if ($search !== '' && (!ctype_digit($search) || strlen($search) > 10)) {
+    $respond(400, ['status' => 'error', 'message' => 'Mã đơn hàng chỉ gồm tối đa 10 chữ số.']);
+}
+
+$timeFilter = isset($_GET['time']) && is_string($_GET['time']) ? trim($_GET['time']) : '30days';
+if (!in_array($timeFilter, ['30days', '6months', 'all'], true)) {
+    $timeFilter = 'all';
+}
+
+$page = filter_var($_GET['page'] ?? 1, FILTER_VALIDATE_INT);
+$pageSize = filter_var($_GET['per_page'] ?? 5, FILTER_VALIDATE_INT);
+if ($page === false || $page < 1 || $page > 1000000 || $pageSize === false || $pageSize < 1 || $pageSize > 20) {
+    $respond(400, ['status' => 'error', 'message' => 'Thông tin phân trang không hợp lệ.']);
+}
+
+$baseWhere = ['o.user_id = ?'];
+$baseTypes = 'i';
+$baseParams = [$userId];
+
+if ($timeFilter === '30days') {
+    $baseWhere[] = 'o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+} elseif ($timeFilter === '6months') {
+    $baseWhere[] = 'o.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)';
+}
+
+if ($search !== '') {
+    $baseWhere[] = 'o.id = ?';
+    $baseTypes .= 's';
+    $baseParams[] = $search;
+}
+$baseSql = implode(' AND ', $baseWhere);
+
+$bind = static function (mysqli_stmt $stmt, string $types, array &$params): void {
+    if (!$stmt->bind_param($types, ...$params)) {
+        throw new RuntimeException('Không thể gắn tham số truy vấn đơn hàng.');
+    }
+};
 
 try {
-    expireOverdueQrPaymentOrders($conn);
-} catch (Throwable $e) {
-    error_log('Customer order VietQR expiration sweep failed: ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Không thể tải đơn hàng lúc này.']);
-    exit;
-}
-
-$user_id = (int) $_SESSION['user_id'];
-$statusFilter = isset($_GET['status']) ? trim($_GET['status']) : '';
-$timeFilter   = isset($_GET['time']) ? trim($_GET['time']) : '30days';
-
-// Xây dựng truy vấn orders dùng SQL Function fn_order_time_condition
-$whereClauses = ["user_id = ?", "fn_order_time_condition(created_at, ?) = 1"];
-$types = 'is';
-$params = [$user_id, $timeFilter];
-
-if ($statusFilter !== '' && $statusFilter !== 'all') {
-    // Hỗ trợ nhóm trạng thái
-    $statusGroups = [
-        'processing' => ['Chờ xác nhận', 'Đã xác nhận', 'Chuẩn bị đơn hàng'],
-        'shipping'   => ['Đang vận chuyển', 'Đang giao'],
-        'delivered'  => ['Đã giao hàng', 'Đã giao'],
-        'cancelled'  => ['Đã hủy'],
+    $countStmt = $conn->prepare("SELECT status, COUNT(*) AS total FROM orders o WHERE {$baseSql} GROUP BY status");
+    $bind($countStmt, $baseTypes, $baseParams);
+    $countStmt->execute();
+    $counts = [
+        'all' => 0,
+        'processing' => 0,
+        'shipping' => 0,
+        'delivered' => 0,
+        'cancelled' => 0,
     ];
+    $statusToGroup = [];
+    foreach ($statusGroups as $group => $statuses) {
+        foreach ($statuses as $status) {
+            $statusToGroup[$status] = $group;
+        }
+    }
+    $countResult = $countStmt->get_result();
+    while ($countRow = $countResult->fetch_assoc()) {
+        $statusCount = (int) $countRow['total'];
+        $counts['all'] += $statusCount;
+        $group = $statusToGroup[$countRow['status']] ?? null;
+        if ($group !== null) {
+            $counts[$group] += $statusCount;
+        }
+    }
+    $countStmt->close();
 
-    if (isset($statusGroups[$statusFilter])) {
+    $where = $baseWhere;
+    $types = $baseTypes;
+    $params = $baseParams;
+    if ($statusFilter !== 'all') {
         $statuses = $statusGroups[$statusFilter];
-        $placeholders = implode(',', array_fill(0, count($statuses), '?'));
-        $whereClauses[] = "status IN ($placeholders)";
+        $where[] = 'o.status IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')';
         $types .= str_repeat('s', count($statuses));
-        $params = array_merge($params, $statuses);
-    } else {
-        // Lọc theo 1 trạng thái cụ thể
-        $whereClauses[] = "status = ?";
-        $types .= 's';
-        $params[] = $statusFilter;
+        array_push($params, ...$statuses);
     }
-}
+    $whereSql = implode(' AND ', $where);
 
-$sql = "SELECT * FROM orders WHERE " . implode(' AND ', $whereClauses) . " ORDER BY created_at DESC";
+    $totalStmt = $conn->prepare("SELECT COUNT(*) AS total FROM orders o WHERE {$whereSql}");
+    $bind($totalStmt, $types, $params);
+    $totalStmt->execute();
+    $total = (int) $totalStmt->get_result()->fetch_assoc()['total'];
+    $totalStmt->close();
 
-$stmt = $conn->prepare($sql);
-$stmt->bind_param($types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
-
-$orders = [];
-while ($row = $result->fetch_assoc()) {
-    $order_id = $row['id'];
-
-    // Lấy chi tiết sản phẩm
-    $stmt_items = $conn->prepare(
-        "SELECT oi.*, EXISTS (
-            SELECT 1 FROM reviews r
-            WHERE r.product_id = oi.product_id AND r.user_id = ?
-        ) AS is_reviewed
-         FROM order_items oi
-         WHERE oi.order_id = ?"
+    $totalPages = max(1, (int) ceil($total / $pageSize));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $pageSize;
+    $orderStmt = $conn->prepare(
+        "SELECT o.id, o.full_name, o.phone, o.email, o.address, o.total_price,
+                o.shipping_fee, o.discount_amount, o.status, o.payment_status,
+                o.payment_method, o.created_at, o.cancelled_at, o.cancellation_reason
+         FROM orders o
+         WHERE {$whereSql}
+         ORDER BY o.created_at DESC, o.id DESC
+         LIMIT ? OFFSET ?"
     );
-    $stmt_items->bind_param("ii", $user_id, $order_id);
-    $stmt_items->execute();
-    $result_items = $stmt_items->get_result();
-
-    $items = [];
-    while ($item_row = $result_items->fetch_assoc()) {
-        $items[] = $item_row;
+    $orderParams = $params;
+    $orderParams[] = $pageSize;
+    $orderParams[] = $offset;
+    $bind($orderStmt, $types . 'ii', $orderParams);
+    $orderStmt->execute();
+    $orders = [];
+    $orderIds = [];
+    $orderResult = $orderStmt->get_result();
+    while ($row = $orderResult->fetch_assoc()) {
+        $row['items'] = [];
+        $orders[(int) $row['id']] = $row;
+        $orderIds[] = (int) $row['id'];
     }
-    $stmt_items->close();
+    $orderStmt->close();
 
-    $row['items'] = $items;
-    $orders[] = $row;
+    if ($orderIds !== []) {
+        $itemPlaceholders = implode(',', array_fill(0, count($orderIds), '?'));
+        $itemStmt = $conn->prepare(
+            "SELECT oi.*,
+                    EXISTS (
+                        SELECT 1 FROM reviews r
+                        WHERE r.product_id = oi.product_id AND r.user_id = ?
+                    ) AS is_reviewed
+             FROM order_items oi
+             WHERE oi.order_id IN ({$itemPlaceholders})
+             ORDER BY oi.order_id ASC, oi.id ASC"
+        );
+        $itemTypes = 'i' . str_repeat('i', count($orderIds));
+        $itemParams = array_merge([$userId], $orderIds);
+        $bind($itemStmt, $itemTypes, $itemParams);
+        $itemStmt->execute();
+        $itemResult = $itemStmt->get_result();
+        while ($item = $itemResult->fetch_assoc()) {
+            $orders[(int) $item['order_id']]['items'][] = $item;
+        }
+        $itemStmt->close();
+    }
+
+    $orders = array_values($orders);
+    $respond(200, [
+        'status' => 'success',
+        'orders' => $orders,
+        'counts' => $counts,
+        'pagination' => [
+            'page' => $page,
+            'per_page' => $pageSize,
+            'total' => $total,
+            'total_pages' => $totalPages,
+        ],
+    ]);
+} catch (Throwable $e) {
+    error_log('Customer order list failed: ' . $e->getMessage());
+    $respond(500, ['status' => 'error', 'message' => 'Không thể tải danh sách đơn hàng lúc này.']);
 }
-$stmt->close();
-
-// Đếm số lượng đơn theo từng nhóm trạng thái (đồng bộ theo khoảng thời gian đã chọn qua SQL)
-$counts = [
-    'all' => 0,
-    'processing' => 0,
-    'shipping' => 0,
-    'delivered' => 0,
-    'cancelled' => 0,
-];
-
-$countStmt = $conn->prepare("SELECT status, COUNT(*) as cnt FROM orders WHERE user_id = ? AND fn_order_time_condition(created_at, ?) = 1 GROUP BY status");
-$countStmt->bind_param("is", $user_id, $timeFilter);
-$countStmt->execute();
-$countResult = $countStmt->get_result();
-
-$statusToGroup = [
-    'Chờ xác nhận'      => 'processing',
-    'Đã xác nhận'       => 'processing',
-    'Chuẩn bị đơn hàng' => 'processing',
-    'Đang xử lý'        => 'processing',
-    'Đang chuẩn bị'     => 'processing',
-    'Đang vận chuyển'    => 'shipping',
-    'Đang giao'          => 'shipping',
-    'Đã giao hàng'       => 'delivered',
-    'Đã giao'            => 'delivered',
-    'Đã hủy'             => 'cancelled',
-];
-
-while ($countRow = $countResult->fetch_assoc()) {
-    $cnt = (int) $countRow['cnt'];
-    $counts['all'] += $cnt;
-    $group = $statusToGroup[$countRow['status']] ?? 'processing';
-    $counts[$group] += $cnt;
-}
-$countStmt->close();
-
-echo json_encode([
-    "status" => "success",
-    "orders" => $orders,
-    "counts" => $counts,
-]);
-
-$conn->close();
-?>

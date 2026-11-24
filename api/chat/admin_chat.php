@@ -48,7 +48,7 @@ if ($method === 'GET') {
         if (!$userId || $userId < 1) {
             chatJsonResponse(['status' => 'error', 'message' => 'Cuộc trò chuyện không hợp lệ.'], 400);
         }
-        $stmt = $conn->prepare('SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, p.price_sale AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.user_id = ? ORDER BY cm.id DESC LIMIT 200');
+        $stmt = $conn->prepare('SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN p.price_original ELSE p.price_sale END AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.user_id = ? ORDER BY cm.id DESC LIMIT 200');
         if (!$stmt) {
             chatJsonResponse(['status' => 'error', 'message' => 'Không thể tải tin nhắn.'], 500);
         }
@@ -114,7 +114,7 @@ if ($method === 'POST') {
         $messageId = $stmt->insert_id;
         $stmt->close();
         // Return the inserted message
-        $read = $conn->prepare('SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, p.price_sale AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.id = ? LIMIT 1');
+        $read = $conn->prepare('SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN p.price_original ELSE p.price_sale END AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.id = ? LIMIT 1');
         if ($read) {
             $read->bind_param('i', $messageId);
             $read->execute();
@@ -191,7 +191,7 @@ if ($method === 'POST') {
     $messageId = $stmt->insert_id;
     $stmt->close();
 
-    $read = $conn->prepare('SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, p.price_sale AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.id = ? LIMIT 1');
+    $read = $conn->prepare('SELECT cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN p.price_original ELSE p.price_sale END AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.id = ? LIMIT 1');
     if (!$read) {
         chatJsonResponse(['status' => 'error', 'message' => 'Tin nhắn đã gửi nhưng không thể tải lại nội dung.'], 500);
     }

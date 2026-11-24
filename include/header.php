@@ -22,10 +22,22 @@ $navCategories = [];
 if (file_exists(__DIR__ . '/../config/db.php')) {
     require_once __DIR__ . '/../config/db.php';
     if (isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
-        $navCatRes = $conn->query("SELECT id, name, slug FROM categories ORDER BY id ASC");
+        $navCatRes = $conn->query(
+            "SELECT id, name, slug, image
+             FROM categories
+             WHERE status = 'active' AND is_deleted = 0
+             ORDER BY id ASC"
+        );
         if ($navCatRes) {
             while ($cRow = $navCatRes->fetch_assoc()) {
                 $navCategories[] = $cRow;
+            }
+        }
+        if (isset($categoryKey) && is_string($categoryKey) && $categoryKey !== '') {
+            $activeCategorySlugs = array_column($navCategories, 'slug');
+            if (!in_array($categoryKey, $activeCategorySlugs, true)) {
+                header('Location: ' . $appBaseUrl . '/index.php', true, 302);
+                exit;
             }
         }
     }
@@ -34,7 +46,15 @@ if (file_exists(__DIR__ . '/../config/db.php')) {
 $initialWishlistCount = 0;
 if ($isCustomerLoggedIn && isset($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli && !$conn->connect_error) {
     $wlUid = (int)$_SESSION['user_id'];
-    $wlRes = $conn->query("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = {$wlUid}");
+    $wlRes = $conn->query(
+        "SELECT COUNT(*) AS total
+         FROM wishlists w
+         INNER JOIN products p ON p.id = w.product_id
+         INNER JOIN categories c ON c.id = p.category_id
+         WHERE w.user_id = {$wlUid}
+           AND p.is_deleted = 0 AND p.status = 'active'
+           AND c.is_deleted = 0 AND c.status = 'active'"
+    );
     if ($wlRes && ($wlRow = $wlRes->fetch_assoc())) {
         $initialWishlistCount = (int)$wlRow['total'];
     }
@@ -146,22 +166,6 @@ $headerLogoUrl = $appBaseUrl . '/' . ltrim($_logoSrc, '/');
                             <a href="<?php echo htmlspecialchars($catHref, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($catItem['name'], ENT_QUOTES, 'UTF-8'); ?></a>
                         </div>
                     <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="dropdown-item">
-                        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/bong_tai.php', ENT_QUOTES, 'UTF-8'); ?>">Bông tai</a>
-                    </div>
-                    <div class="dropdown-item">
-                        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/day_chuyen.php', ENT_QUOTES, 'UTF-8'); ?>">Dây chuyền</a>
-                    </div>
-                    <div class="dropdown-item">
-                        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/nhan.php', ENT_QUOTES, 'UTF-8'); ?>">Nhẫn</a>
-                    </div>
-                     <div class="dropdown-item">
-                        <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/vong_tay.php', ENT_QUOTES, 'UTF-8'); ?>">Vòng tay</a>
-                    </div>
-                     <div class="dropdown-item">
-                         <a href="<?php echo htmlspecialchars($appBaseUrl . '/client/category.php?slug=set-qua-tang', ENT_QUOTES, 'UTF-8'); ?>">Set quà tặng</a>
-                     </div>
                 <?php endif; ?>
             </div>
         </div>

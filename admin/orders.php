@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../include/admin_guard.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../include/order_status_workflow.php';
 require_once __DIR__ . '/../include/order_payment_helper.php';
 $appBaseUrl = applicationBaseUrl();
 $escape = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
@@ -9,16 +10,38 @@ $isManager  = isManagerRole($_SESSION['admin_role'] ?? $_SESSION['role'] ?? null
 $roleLabel  = $isManager ? 'Quản lý' : 'Nhân viên';
 $adminUsername = $_SESSION['admin_username'] ?? $_SESSION['username'] ?? '';
 $adminCurrentPage = 'orders.php';
-$orderStatuses = ['Chờ xác nhận', 'Đã xác nhận', 'Chuẩn bị đơn hàng', 'Đang vận chuyển', 'Đang giao', 'Đã giao hàng', 'Đã hủy'];
-$legacyStatusMap = [
-    'Đang xử lý' => 'Đã xác nhận',
-    'Đang chuẩn bị' => 'Chuẩn bị đơn hàng',
-    'Đang giao' => 'Đang giao',
-    'Đã giao' => 'Đã giao hàng',
-];
+$orderStatuses = getOrderWorkflowStatuses();
 $cancelledStatuses = ['Đã hủy', 'Canceled', 'cancelled', 'huy'];
 $orderNotice = '';
 $paymentNotice = null;
+
+// ----- BỘ LỌC ĐƠN HÀNG -----
+$search       = $_GET['search'] ?? '';
+$statusFilter = $_GET['status'] ?? '';
+$dateRange    = $_GET['date_range'] ?? '';
+
+// Xây dựng mảng điều kiện và tham số cho prepared statement
+$where   = [];
+$params  = [];
+
+if ($search !== '') {
+    $where[] = "(o.full_name LIKE ? OR o.phone LIKE ? OR o.email LIKE ?)";
+    $like   = '%' . $search . '%';
+    $params[] = $like;
+    $params[] = $like;
+    $params[] = $like;
+}
+if ($statusFilter !== '') {
+    $where[] = "o.status = ?";
+    $params[] = $statusFilter;
+}
+if ($dateRange === 'last_30_days') {
+    $where[] = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+} elseif ($dateRange === 'last_6_months') {
+    $where[] = "o.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)";
+}
+$whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
 try {
     expireOverdueQrPaymentOrders($conn);
 } catch (Throwable $e) {
@@ -45,12 +68,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     } elseif ($orderId < 1 || !in_array($newStatus, $orderStatuses, true)) {
         $orderNotice = 'Trạng thái đơn hàng không hợp lệ.';
     } else {
-        $updateStatusStmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $updateStatusStmt->bind_param('si', $newStatus, $orderId);
-        $orderNotice = $updateStatusStmt->execute()
-            ? 'Đã cập nhật trạng thái đơn hàng.'
-            : 'Không thể cập nhật trạng thái đơn hàng.';
-        $updateStatusStmt->close();
+        try {
+            $conn->begin_transaction();
+            $currentStatusStmt = $conn->prepare(
+                'SELECT status, inventory_status, payment_method, payment_status,
+                        (expires_at IS NOT NULL AND expires_at <= NOW()) AS is_expired
+                 FROM orders
+                 WHERE id = ?
+                 FOR UPDATE'
+            );
+            $currentStatusStmt->bind_param('i', $orderId);
+            $currentStatusStmt->execute();
+            $currentOrder = $currentStatusStmt->get_result()->fetch_assoc();
+            $currentStatusStmt->close();
+            if (!$currentOrder) {
+                throw new RuntimeException('Không tìm thấy đơn hàng.');
+            }
+
+            $currentStatus = (string) $currentOrder['status'];
+            $normalizedCurrentStatus = normalizeOrderWorkflowStatus($currentStatus);
+            if ($normalizedCurrentStatus === $newStatus) {
+                $conn->commit();
+                $orderNotice = 'Đơn hàng đã ở trạng thái này.';
+            } else {
+                if (
+                    (int) $currentOrder['is_expired'] === 1
+                    && $currentOrder['inventory_status'] === 'reserved'
+                    && $normalizedCurrentStatus === 'Chờ xác nhận'
+                    && $newStatus !== 'Đã hủy'
+                ) {
+                    throw new DomainException('Đơn hàng đã hết thời gian giữ tồn kho; không thể tiếp tục xử lý.');
+                }
+                if (
+                    $currentOrder['payment_method'] === 'BANK_QR'
+                    && $currentOrder['payment_status'] !== 'Đã thanh toán'
+                    && $newStatus !== 'Đã hủy'
+                ) {
+                    throw new DomainException('Chỉ xử lý đơn thanh toán QR sau khi đã xác nhận thanh toán.');
+                }
+                if (!in_array($newStatus, getAllowedOrderStatusTransitions($currentStatus), true)) {
+                    throw new DomainException(
+                        'Không thể chuyển trạng thái từ "' . $normalizedCurrentStatus . '" sang "' . $newStatus . '".'
+                    );
+                }
+
+                if ($newStatus === 'Đã hủy') {
+                    if ($currentOrder['inventory_status'] === 'reserved') {
+                        if (!releaseReservedOrderInventory($conn, $orderId)) {
+                            throw new RuntimeException('Không thể hoàn tồn kho cho đơn hàng.');
+                        }
+                    } elseif ($currentOrder['inventory_status'] !== 'legacy') {
+                        throw new DomainException('Tồn kho của đơn hàng đã được xử lý; không thể hủy trạng thái này.');
+                    }
+                    $updateStatusStmt = $conn->prepare(
+                        "UPDATE orders
+                         SET status = ?, cancelled_at = COALESCE(cancelled_at, NOW()),
+                             cancellation_reason = COALESCE(NULLIF(cancellation_reason, ''), 'Hủy bởi quản trị viên')
+                         WHERE id = ?"
+                    );
+                } elseif ($newStatus === 'Đang giao hàng') {
+                    if ($currentOrder['inventory_status'] === 'released') {
+                        throw new DomainException('Đơn hàng đã hoàn tồn kho và không thể chuyển sang giao hàng.');
+                    }
+                    $updateStatusStmt = $conn->prepare(
+                        "UPDATE orders
+                         SET status = ?,
+                             inventory_status = CASE
+                                 WHEN inventory_status = 'reserved' THEN 'committed'
+                                 ELSE inventory_status
+                             END
+                         WHERE id = ?"
+                    );
+                } else {
+                    $updateStatusStmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+                }
+                $updateStatusStmt->bind_param('si', $newStatus, $orderId);
+                $updateStatusStmt->execute();
+                if ($updateStatusStmt->affected_rows !== 1) {
+                    $updateStatusStmt->close();
+                    throw new RuntimeException('Không thể cập nhật trạng thái đơn hàng.');
+                }
+                $updateStatusStmt->close();
+
+                $actorName = mb_substr((string) ($adminUsername !== '' ? $adminUsername : 'Quản trị viên'), 0, 100, 'UTF-8');
+                $historyStmt = $conn->prepare(
+                    'INSERT INTO order_status_history
+                        (order_id, status, old_status, new_status, note, actor_name)
+                     VALUES (?, ?, ?, ?, ?, ?)'
+                );
+                $historyNote = $newStatus === 'Đã hủy'
+                    ? 'Đơn hàng được hủy bởi quản trị viên.'
+                    : 'Cập nhật trạng thái bởi quản trị viên.';
+                $historyStmt->bind_param('isssss', $orderId, $newStatus, $currentStatus, $newStatus, $historyNote, $actorName);
+                $historyStmt->execute();
+                $historyStmt->close();
+                $conn->commit();
+                $orderNotice = 'Đã cập nhật trạng thái đơn hàng.';
+            }
+        } catch (DomainException $e) {
+            $conn->rollback();
+            $orderNotice = $e->getMessage();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            error_log('Admin order status update failed: ' . $e->getMessage());
+            $orderNotice = 'Không thể cập nhật trạng thái đơn hàng.';
+        }
     }
 }
 
@@ -113,7 +235,9 @@ if (!$emailColumn) {
     $emailField = $emailColumn->num_rows > 0 ? 'o.email' : "'' AS email";
     $sql = "SELECT o.id, o.full_name, o.phone, {$emailField}, o.address, o.total_price,
                    o.status, o.payment_status, o.payment_method, o.created_at,
-                   oi.product_name, oi.quantity, oi.price
+                   oi.product_sku, oi.attributes_snapshot, oi.category_name_snapshot,
+                   oi.product_name, oi.quantity,
+                   oi.price, oi.original_price, oi.discount_amount, oi.line_total
             FROM orders o
             LEFT JOIN order_items oi ON oi.order_id = o.id
             ORDER BY o.created_at DESC, o.id DESC, oi.id ASC";
@@ -141,9 +265,15 @@ if (!$emailColumn) {
             }
             if ($row['product_name'] !== null) {
                 $orders[$orderId]['items'][] = [
+                    'sku' => $row['product_sku'],
+                    'attributes' => $row['attributes_snapshot'],
+                    'category' => $row['category_name_snapshot'],
                     'name' => $row['product_name'],
                     'quantity' => (int) $row['quantity'],
                     'price' => (float) $row['price'],
+                    'original_price' => (float) $row['original_price'],
+                    'discount_amount' => (float) $row['discount_amount'],
+                    'line_total' => (float) $row['line_total'],
                 ];
             }
         }
@@ -158,14 +288,13 @@ $statCounts = [
     'cod_pending' => 0, 'cod_paid' => 0,
 ];
 foreach ($orders as $o) {
-    $st = $legacyStatusMap[$o['status']] ?? $o['status'];
+    $st = normalizeOrderWorkflowStatus((string) $o['status']);
     match ($st) {
         'Chờ xác nhận' => $statCounts['pending']++,
         'Đã xác nhận' => $statCounts['confirmed']++,
-        'Chuẩn bị đơn hàng' => $statCounts['preparing']++,
-        'Đang vận chuyển' => $statCounts['shipping']++,
-        'Đang giao' => $statCounts['delivering']++,
-        'Đã giao hàng' => $statCounts['completed']++,
+        'Đang chuẩn bị hàng' => $statCounts['preparing']++,
+        'Đang giao hàng' => $statCounts['shipping']++,
+        'Đã giao hàng', 'Hoàn thành' => $statCounts['completed']++,
         'Đã hủy' => $statCounts['cancelled']++,
         default => null,
     };
@@ -181,13 +310,10 @@ foreach ($orders as $o) {
 $statusClasses = [
     'Chờ xác nhận' => 'st-pending',
     'Đã xác nhận' => 'st-confirmed',
-    'Chuẩn bị đơn hàng' => 'st-preparing',
-    'Đang vận chuyển' => 'st-shipping',
-    'Đang giao' => 'st-shipping',
+    'Đang chuẩn bị hàng' => 'st-preparing',
+    'Đang giao hàng' => 'st-shipping',
     'Đã giao hàng' => 'st-completed',
-    'Đang xử lý' => 'st-confirmed',
-    'Đang chuẩn bị' => 'st-preparing',
-    'Đã giao' => 'st-completed',
+    'Hoàn thành' => 'st-completed',
     'Đã hủy' => 'st-cancelled',
 ];
 ?>
@@ -704,13 +830,13 @@ $statusClasses = [
                     <div class="om-stat-accent"></div>
                     <div class="om-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h11v10H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M14 14h7"/></svg></div>
                     <div class="om-stat-value"><?php echo $statCounts['shipping'] + $statCounts['delivering']; ?></div>
-                    <div class="om-stat-label">Đang giao</div>
+                    <div class="om-stat-label">Đang giao hàng</div>
                 </div>
                 <div class="om-stat om-stat--done">
                     <div class="om-stat-accent"></div>
                     <div class="om-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/></svg></div>
                     <div class="om-stat-value"><?php echo $statCounts['completed']; ?></div>
-                    <div class="om-stat-label">Đã giao hàng</div>
+                    <div class="om-stat-label">Đã giao / hoàn thành</div>
                 </div>
                 <div class="om-stat om-stat--cancel">
                     <div class="om-stat-accent"></div>
@@ -790,9 +916,10 @@ $statusClasses = [
                         <?php foreach ($orders as $o): ?>
                             <?php
                             $date = strtotime($o['date']);
-                            $normalizedStatus = $legacyStatusMap[$o['status']] ?? $o['status'];
+                            $normalizedStatus = normalizeOrderWorkflowStatus((string) $o['status']);
+                            $allowedStatusTransitions = getAllowedOrderStatusTransitions((string) $o['status']);
                             $searchText = strtolower($o['customer'] . ' ' . $o['phone'] . ' ' . $o['id']);
-                            $stClass = $statusClasses[$o['status']] ?? 'st-pending';
+                            $stClass = $statusClasses[$normalizedStatus] ?? 'st-pending';
                             $isCOD = $o['payment_method'] === 'COD';
                             $isBankQr = $o['payment_method'] === 'BANK_QR';
                             $isPaid = $o['payment_status'] === 'Đã thanh toán';
@@ -824,12 +951,17 @@ $statusClasses = [
                                             <input type="hidden" name="csrf_token" value="<?php echo $escape($_SESSION['orders_csrf']); ?>">
                                             <input type="hidden" name="action" value="update_status">
                                             <input type="hidden" name="order_id" value="<?php echo (int) $o['id']; ?>">
-                                            <select name="status" class="om-status-select" aria-label="Trạng thái đơn #<?php echo (int) $o['id']; ?>">
-                                                <?php foreach ($orderStatuses as $statusOption): ?>
-                                                    <option value="<?php echo $escape($statusOption); ?>" <?php echo $normalizedStatus === $statusOption ? 'selected' : ''; ?>><?php echo $escape($statusOption); ?></option>
+                                            <select name="status" class="om-status-select" aria-label="Trạng thái tiếp theo đơn #<?php echo (int) $o['id']; ?>" <?php echo $allowedStatusTransitions === [] ? 'disabled' : ''; ?>>
+                                                <?php if ($allowedStatusTransitions === []): ?>
+                                                    <option value="" selected>Đơn đã ở trạng thái cuối</option>
+                                                <?php else: ?>
+                                                    <option value="" selected disabled>Chọn bước tiếp theo</option>
+                                                <?php foreach ($allowedStatusTransitions as $statusOption): ?>
+                                                    <option value="<?php echo $escape($statusOption); ?>"><?php echo $escape($statusOption); ?></option>
                                                 <?php endforeach; ?>
+                                                <?php endif; ?>
                                             </select>
-                                            <button type="submit" class="om-btn-save">Lưu</button>
+                                            <button type="submit" class="om-btn-save" <?php echo $allowedStatusTransitions === [] ? 'disabled' : ''; ?>>Lưu</button>
                                         </form>
                                         <!-- Xác nhận COD hoặc đối soát VietQR -->
                                         <div class="om-action-row">
@@ -873,7 +1005,15 @@ $statusClasses = [
                                                     <strong>Sản phẩm:</strong>
                                                     <ul class="om-detail-items">
                                                         <?php foreach ($o['items'] as $item): ?>
-                                                            <li><?php echo $escape($item['name']); ?> × <?php echo $escape($item['quantity']); ?> — <?php echo $escape(number_format($item['price'], 0, ',', '.')); ?>đ / sp</li>
+                                                            <li>
+                                                                <?php echo $escape($item['name']); ?>
+                                                                <?php if ($item['sku'] !== null): ?> · SKU <?php echo $escape($item['sku']); ?><?php endif; ?>
+                                                                <?php if ($item['attributes'] !== ''): ?> · <?php echo $escape($item['attributes']); ?><?php endif; ?>
+                                                                <?php if ($item['category'] !== ''): ?> · <?php echo $escape($item['category']); ?><?php endif; ?>
+                                                                · <?php echo $escape($item['quantity']); ?> × <?php echo $escape(number_format($item['price'], 0, ',', '.')); ?>đ
+                                                                <?php if ($item['discount_amount'] > 0): ?> · giảm <?php echo $escape(number_format($item['discount_amount'], 0, ',', '.')); ?>đ<?php endif; ?>
+                                                                · thành tiền <?php echo $escape(number_format($item['line_total'], 0, ',', '.')); ?>đ
+                                                            </li>
                                                         <?php endforeach; ?>
                                                     </ul>
                                                 <?php else: ?>
@@ -934,8 +1074,8 @@ $statusClasses = [
             const map = {
                 'Tổng đơn hàng': ['', ''],
                 'Chờ xác nhận': ['Chờ xác nhận', ''],
-                'Đang giao': ['Đang vận chuyển', ''],
-                'Đã giao hàng': ['Đã giao hàng', ''],
+                'Đang giao hàng': ['Đang giao hàng', ''],
+                'Đã giao / hoàn thành': ['', ''],
                 'Đã hủy': ['Đã hủy', ''],
                 'Chờ thu COD': ['', 'Chưa thanh toán'],
                 'Đã thu COD': ['', 'Đã thanh toán'],

@@ -82,45 +82,82 @@ if (is_file($bannerConfigFile)) {
             foreach ($displayCats as $cat):
                 $cSlug = $cat['slug'];
                 $cName = $cat['name'];
-                $cImg = $categoryIcons[$cSlug] ?? 'assets/banner/logo.png';
+                $categoryImage = trim((string)($cat['image'] ?? ''));
+                $cImg = $categoryImage !== ''
+                    ? (preg_match('~^https?://~i', $categoryImage)
+                        ? $categoryImage
+                        : $appBaseUrl . '/' . ltrim($categoryImage, '/'))
+                    : ($categoryIcons[$cSlug] ?? 'assets/banner/logo.png');
                 $cLink = $categoryLinks[$cSlug] ?? ('client/category.php?slug=' . urlencode($cSlug));
         ?>
             <a href="<?php echo htmlspecialchars($cLink, ENT_QUOTES, 'UTF-8'); ?>" class="item">
-                <img src="<?php echo htmlspecialchars($cImg, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($cName, ENT_QUOTES, 'UTF-8'); ?>" class="item-icon">
+                <img src="<?php echo htmlspecialchars($cImg, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($cName, ENT_QUOTES, 'UTF-8'); ?>" class="item-icon" onerror="this.onerror=null;this.src='<?php echo htmlspecialchars($appBaseUrl . '/assets/banner/logo.png', ENT_QUOTES, 'UTF-8'); ?>';">
                 <span><?php echo htmlspecialchars($cName, ENT_QUOTES, 'UTF-8'); ?></span>
             </a>
         <?php 
             endforeach;
-        else: 
+        endif;
         ?>
-            <a href="client/bong_tai.php" class="item">
-                <img src="assets/bôngtai/bong1.jpg" alt="Bông tai" class="item-icon">
-                <span>Bông tai</span>
-            </a>
-            <a href="client/day_chuyen.php" class="item">
-                <img src="assets/dây chuyền/dâychuyen/day1.jpg" alt="Dây chuyền" class="item-icon">
-                <span>Dây chuyền</span>
-            </a>
-            <a href="client/nhan.php" class="item">
-                <img src="assets/nhẫn/nhan1.png" alt="Nhẫn" class="item-icon">
-                <span>Nhẫn</span>
-            </a>
-            <a href="client/vong_tay.php" class="item">
-                <img src="assets/vòng tay/vong1.png" alt="Vòng tay" class="item-icon">
-                <span>Vòng tay</span>
-            </a>
-            <a href="client/category.php?slug=set-qua-tang" class="item">
-                <img src="assets/quà/set1.jpg" alt="Set quà tặng" class="item-icon">
-                <span>Set quà tặng</span>
-            </a>
-        <?php endif; ?>
     </section>
 
     <section class="category-page" id="search-results-section" hidden>
         <div class="category-header">
             <h1 class="page-title-left">KẾT QUẢ TÌM KIẾM</h1>
         </div>
+        <div class="search-filter-bar" id="search-filter-bar" aria-label="Bộ lọc kết quả tìm kiếm">
+            <label>
+                Danh mục
+                <select id="search-filter-category">
+                    <option value="">Tất cả danh mục</option>
+                    <?php foreach ($navCategories as $navCategory): ?>
+                        <?php if (in_array($navCategory['slug'], ['combo', 'suggest', 'featured'], true)) continue; ?>
+                        <option value="<?php echo htmlspecialchars($navCategory['slug'], ENT_QUOTES, 'UTF-8'); ?>">
+                            <?php echo htmlspecialchars($navCategory['name'], ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label>
+                Giá từ
+                <input type="number" id="search-filter-min-price" min="0" inputmode="numeric">
+            </label>
+            <label>
+                Giá đến
+                <input type="number" id="search-filter-max-price" min="0" inputmode="numeric">
+            </label>
+            <label class="search-filter-check">
+                <input type="checkbox" id="search-filter-in-stock">
+                Còn hàng
+            </label>
+            <label class="search-filter-check">
+                <input type="checkbox" id="search-filter-discount">
+                Đang giảm giá
+            </label>
+            <label class="search-filter-check">
+                <input type="checkbox" id="search-filter-gift">
+                Có quà tặng
+            </label>
+            <label>
+                Sắp xếp
+                <select id="search-filter-sort">
+                    <option value="relevance">Liên quan nhất</option>
+                    <option value="best_selling">Bán chạy</option>
+                    <option value="newest">Mới nhất</option>
+                    <option value="price_asc">Giá tăng dần</option>
+                    <option value="price_desc">Giá giảm dần</option>
+                    <option value="name_asc">Tên A-Z</option>
+                </select>
+            </label>
+            <button type="button" class="btn-apply-filter" id="search-filter-apply">ÁP DỤNG</button>
+            <button type="button" class="btn-reset-all-filters" id="search-filter-reset">XÓA BỘ LỌC</button>
+        </div>
+        <p id="search-results-count" class="category-results-count"></p>
+        <p id="search-results-error" class="category-filter-error" hidden></p>
         <div class="product-grid category-grid" id="category-products-container" data-db-category=""></div>
+        <div class="filter-empty-state" id="search-empty-state" hidden>
+            <p>Không tìm thấy sản phẩm phù hợp với từ khóa hoặc bộ lọc đã chọn.</p>
+            <button type="button" class="btn-empty-reset" id="search-empty-reset">Xóa bộ lọc</button>
+        </div>
     </section>
 
     <!-- 1. MỤC ĐẦU TIÊN: SẢN PHẨM NỔI BẬT (LỌC BẰNG SQL: is_featured = 1) -->
