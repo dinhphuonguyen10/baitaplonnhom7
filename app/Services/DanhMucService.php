@@ -47,6 +47,23 @@ class DanhMucService
 
     public const STATUSES = ['active', 'inactive'];
 
+    /** Ảnh mặc định theo slug khi danh mục chưa có ảnh riêng (dùng chung cho trang chủ khách và trang quản trị). */
+    public const DEFAULT_IMAGES = [
+        'bong-tai' => 'assets/bôngtai/bong1.jpg',
+        'day-chuyen' => 'assets/dây chuyền/dâychuyen/day1.jpg',
+        'nhan' => 'assets/nhẫn/nhan1.png',
+        'vong-tay' => 'assets/vòng tay/vong1.png',
+        'set-qua-tang' => 'assets/quà/set1.jpg',
+    ];
+
+    private const UPLOAD_MIME = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif',
+    ];
+    private const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
     /** Thông báo chung khi gặp lỗi hệ thống (lỗi chi tiết chỉ ghi vào error_log). */
     public const MSG_SYSTEM_ERROR = 'Không thể hoàn tất thao tác danh mục. Vui lòng thử lại.';
 
@@ -75,11 +92,12 @@ class DanhMucService
         $rows = [];
         foreach ($this->categories->findAllWithProductCountForAdmin() as $cat) {
             $image = trim((string) ($cat['image'] ?? ''));
-            $cat['image_url'] = $image !== ''
-                ? (preg_match('~^https?://~i', (string) $cat['image'])
-                    ? (string) $cat['image']
-                    : $appBaseUrl . '/' . ltrim((string) $cat['image'], '/'))
-                : $appBaseUrl . '/assets/banner/logo.png';
+            // Cùng quy tắc với trang chủ khách: ảnh riêng > ảnh mặc định theo slug > logo.
+            $effective = $image !== '' ? $image : (self::DEFAULT_IMAGES[(string) ($cat['slug'] ?? '')] ?? 'assets/banner/logo.png');
+            $cat['image_url'] = preg_match('~^https?://~i', $effective)
+                ? $effective
+                : $appBaseUrl . '/' . ltrim($effective, '/');
+            $cat['image_name'] = basename((string) (parse_url($effective, PHP_URL_PATH) ?: $effective));
             $cat['is_deleted_flag'] = (int) $cat['is_deleted'] === 1;
             $cat['is_active_flag'] = $cat['status'] === 'active' && !$cat['is_deleted_flag'];
             $rows[] = $cat;
@@ -95,13 +113,13 @@ class DanhMucService
      * @throws DomainException|InvalidArgumentException lỗi nghiệp vụ (thông báo hiển thị cho người dùng)
      * @throws Throwable lỗi hệ thống (controller hiển thị MSG_SYSTEM_ERROR)
      */
-    public function handleAction(string $action, array $input, string $adminUsername): string
+    public function handleAction(string $action, array $input, string $adminUsername, ?array $imageFile = null): string
     {
         switch ($action) {
             case 'add':
-                return $this->add($input);
+                return $this->add($input, $imageFile);
             case 'edit':
-                return $this->edit($input);
+                return $this->edit($input, $imageFile);
             case 'delete':
                 return $this->softDelete($input, $adminUsername);
             case 'restore':
@@ -111,9 +129,9 @@ class DanhMucService
         }
     }
 
-    private function add(array $input): string
+    private function add(array $input, ?array $imageFile): string
     {
-        $category = $this->categoryInput($input);
+        $category = $this->categoryInput($input, $imageFile);
 
         return $this->inTransaction(function () use ($category): string {
             $this->assertUniqueName($category['name'], 0);
@@ -132,10 +150,10 @@ class DanhMucService
         });
     }
 
-    private function edit(array $input): string
+    private function edit(array $input, ?array $imageFile): string
     {
         $id = $this->categoryId($input);
-        $category = $this->categoryInput($input);
+        $category = $this->categoryInput($input, $imageFile);
 
         return $this->inTransaction(function () use ($id, $category): string {
             if ($this->categories->lockByDeletedFlag($id, 0) === null) {
@@ -214,7 +232,7 @@ class DanhMucService
     }
 
     /** Chuẩn hoá + kiểm tra dữ liệu form danh mục: name, description, image, status. */
-    private function categoryInput(array $input): array
+    private function categoryInput(array $input, ?array $imageFile = null): array
     {
         $status = $input['status'] ?? 'active';
         if (!is_string($status) || !in_array($status, self::STATUSES, true)) {
@@ -228,7 +246,7 @@ class DanhMucService
         return [
             'name' => $this->normalizeName($input['name'] ?? null),
             'description' => trim($description),
-            'image' => $this->normalizeImage($input['image'] ?? ''),
+            'image' => $this->saveUploadedImage($imageFile) ?? $this->normalizeImage($input['image'] ?? ''),
             'status' => $status,
         ];
     }
@@ -247,6 +265,39 @@ class DanhMucService
         }
 
         return $name;
+    }
+
+    /** Lưu ảnh tải lên vào assets/uploads; trả về đường dẫn tương đối, hoặc null nếu không chọn tệp nào. */
+    private function saveUploadedImage(?array $file): ?string
+    {
+        $error = is_array($file) ? (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        if ($error !== UPLOAD_ERR_OK || !is_uploaded_file($tmp)) {
+            throw new InvalidArgumentException('Không thể nhận tệp ảnh tải lên.');
+        }
+        if ((int) $file['size'] <= 0 || (int) $file['size'] > self::MAX_UPLOAD_BYTES) {
+            throw new InvalidArgumentException('Ảnh danh mục tải lên phải có dung lượng tối đa 5 MB.');
+        }
+        $uploader = new TaiAnhLenService();
+        $mime = $uploader->detectImageMime($tmp);
+        if (!isset(self::UPLOAD_MIME[$mime])) {
+            throw new InvalidArgumentException('Tệp tải lên không phải ảnh JPEG, PNG, WebP hoặc GIF hợp lệ.');
+        }
+        $directory = APP_ROOT . '/assets/uploads/';
+        $uploader->ensureDirectory($directory);
+        $fileName = $uploader->reserveUniqueFile($directory, 'cat_', self::UPLOAD_MIME[$mime]);
+        if ($fileName === null) {
+            throw new RuntimeException('Không thể cấp tên tệp cho ảnh danh mục.');
+        }
+        if (!$uploader->move($file, $directory . $fileName)) {
+            @unlink($directory . $fileName);
+            throw new RuntimeException('Không thể lưu ảnh danh mục đã tải lên.');
+        }
+
+        return 'assets/uploads/' . $fileName;
     }
 
     /** Ảnh danh mục: rỗng => null; URL http/https; hoặc tệp có thật trong thư mục assets. */

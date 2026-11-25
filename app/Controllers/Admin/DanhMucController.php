@@ -41,7 +41,7 @@ class DanhMucController extends BaseAdminController
                     throw new DomainException('Phiên thao tác không hợp lệ. Vui lòng tải lại trang.');
                 }
                 $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
-                $message = $this->categories->handleAction($action, $_POST, Auth::adminUsername());
+                $message = $this->categories->handleAction($action, $_POST, Auth::adminUsername(), Request::file('image_file'));
                 $messageType = 'success';
             } catch (Throwable $e) {
                 if (!($e instanceof DomainException) && !($e instanceof InvalidArgumentException)) {

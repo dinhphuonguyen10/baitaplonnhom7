@@ -12,13 +12,7 @@ use App\Services\AnhBiaTrangChuService;
 class TrangChuController extends BaseClientController
 {
     /** Ảnh đại diện cho từng danh mục trên trang chủ. */
-    private const CATEGORY_ICONS = [
-        'bong-tai' => 'assets/bôngtai/bong1.jpg',
-        'day-chuyen' => 'assets/dây chuyền/dâychuyen/day1.jpg',
-        'nhan' => 'assets/nhẫn/nhan1.png',
-        'vong-tay' => 'assets/vòng tay/vong1.png',
-        'set-qua-tang' => 'assets/quà/set1.jpg',
-    ];
+    private const CATEGORY_ICONS = \App\Services\DanhMucService::DEFAULT_IMAGES;
 
     /** Danh mục có trang riêng (đường dẫn tương đối từ trang chủ). */
     private const CATEGORY_LINKS = [

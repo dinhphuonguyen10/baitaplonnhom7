@@ -23,13 +23,39 @@
         .cat-status-inactive, .cat-status-deleted { background: #f2f4f7; color: #475467; }
         .cat-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; background: #f2f4f7; }
         .cat-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 220px; }
+        .cat-table { table-layout: auto; }
+        .cat-table th, .cat-table td { padding: 14px 16px; vertical-align: middle; }
+        .cat-table th { white-space: nowrap; }
+        .cat-table td:nth-child(1), .cat-table td:nth-child(4), .cat-table td:nth-child(5), .cat-table td:nth-child(6) { white-space: nowrap; }
+        .cat-table { table-layout: fixed; min-width: 1040px; }
+        .cat-table th:nth-child(1) { width: 12%; }
+        .cat-table th:nth-child(2) { width: 9%; }
+        .cat-table th:nth-child(3) { width: 17%; }
+        .cat-table th:nth-child(4) { width: 13%; }
+        .cat-table th:nth-child(5) { width: 11%; }
+        .cat-table th:nth-child(6) { width: 20%; }
+        .cat-table th:nth-child(7) { width: 18%; }
+        .cat-table th:nth-child(5), .cat-table td:nth-child(5) { text-align: center; }
+        .cat-table td:nth-child(6) small { line-height: 1.7; }
+        .cat-table .cat-actions { justify-content: flex-start; min-width: 0; }
+        .cat-file-name { color: var(--navy); font-size: 12px; font-weight: 500; word-break: break-all; }
+        .cat-edit-image { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .cat-form label { min-width: 0; }
+        .cat-form { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+        .file-picker { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 5px 8px; border: 1px solid #cbd4df; border-radius: 8px; background: #fff; box-sizing: border-box; font-weight: 500; }
+        .file-picker-btn { flex: none; padding: 7px 14px; border: 0; border-radius: 6px; background: #e8edf3; color: var(--navy); font: 600 13px inherit; cursor: pointer; }
+        .file-picker-btn:hover { background: #d5dfeb; }
+        .file-picker-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--navy); font-size: 13px; }
+        .cat-form textarea { height: 44px; min-height: 44px; max-height: 44px; overflow-y: auto; resize: none; box-sizing: border-box; }
+        .cat-table td, .cat-table td small, .cat-table td div { color: var(--navy); }
+        .cat-table td .cat-warning { color: #b54708; }
         .cat-warning { color: #b54708; font-size: 12px; margin-top: 5px; }
         .btn-primary { padding: 10px 20px; border: 0; border-radius: 8px; background: var(--navy); color: #fff; font: 600 14px inherit; cursor: pointer; transition: .2s; }
         .btn-primary:hover { background: #1a3c68; }
 
         .cat-table { width: 100%; border-collapse: collapse; }
         .cat-table th, .cat-table td { padding: 14px; border-bottom: 1px solid var(--line); text-align: left; }
-        .cat-table th { background: #fafbfc; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+        .cat-table th { background: #fafbfc; color: var(--navy); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
         .cat-table tr:hover { background: #fafbfc; }
         .btn-sm { padding: 6px 14px; border: 0; border-radius: 6px; font: 600 13px inherit; cursor: pointer; transition: .2s; }
         .btn-edit { background: #e0f2fe; color: #026aa2; }
@@ -79,7 +105,7 @@
 
             <section class="cat-panel">
                 <h2>Thêm danh mục</h2>
-                <form method="post" class="cat-form">
+                <form method="post" class="cat-form" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="add">
                     <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
                     <label>
@@ -91,8 +117,12 @@
                         <textarea name="description" rows="2"></textarea>
                     </label>
                     <label>
-                        Ảnh đại diện (URL hoặc đường dẫn trong assets)
-                        <input type="text" name="image" maxlength="500" placeholder="assets/... hoặc https://...">
+                        Ảnh danh mục (tải ảnh lên)
+                        <span class="file-picker">
+                            <input type="file" name="image_file" id="addImageFile" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+                            <button type="button" class="file-picker-btn" onclick="document.getElementById('addImageFile').click()">Chọn ảnh</button>
+                            <span class="file-picker-name" id="addImageName"></span>
+                        </span>
                     </label>
                     <label>
                         Trạng thái
@@ -122,7 +152,7 @@
                         </thead>
                         <tbody>
                             <?php if (empty($categories)): ?>
-                                <tr><td colspan="7" style="text-align:center; color: var(--muted);">Chưa có danh mục nào.</td></tr>
+                                <tr><td colspan="7" style="text-align:center; color: var(--navy);">Chưa có danh mục nào.</td></tr>
                             <?php else: ?>
                                 <?php foreach ($categories as $cat): ?>
                                 <tr>
@@ -165,6 +195,8 @@
                                                 data-name="<?php echo $escape($cat['name']); ?>"
                                                 data-description="<?php echo $escape($cat['description']); ?>"
                                                 data-image="<?php echo $escape($cat['image']); ?>"
+                                                data-image-url="<?php echo $escape($cat['image_url']); ?>"
+                                                data-image-name="<?php echo $escape($cat['image_name']); ?>"
                                                 data-status="<?php echo $escape($cat['status']); ?>"
                                                 onclick="openEditModal(this)">Sửa</button>
                                             <?php if ((int)$cat['product_count'] > 0): ?>
@@ -197,7 +229,7 @@
 <div class="modal" id="editModal">
     <div class="modal-box">
         <h3>Chỉnh sửa danh mục</h3>
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             <input type="hidden" name="action" value="edit">
             <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
             <input type="hidden" name="id" id="editId">
@@ -205,8 +237,18 @@
             <input type="text" name="name" id="editName" maxlength="150" required>
             <label for="editDescription">Mô tả:</label>
             <textarea name="description" id="editDescription"></textarea>
-            <label for="editImage">Ảnh đại diện (URL hoặc đường dẫn trong assets):</label>
-            <input type="text" name="image" id="editImage" maxlength="500" placeholder="assets/... hoặc https://...">
+            <input type="hidden" name="image" id="editImage">
+            <label for="editImageFile">Ảnh danh mục:</label>
+            <div class="cat-edit-image">
+                <img class="cat-thumb" id="editImagePreview" src="" alt="">
+                <span id="editImageName" class="cat-file-name"></span>
+            </div>
+            <span class="file-picker" style="margin-bottom:6px;">
+                <input type="file" name="image_file" id="editImageFile" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+                <button type="button" class="file-picker-btn" onclick="document.getElementById('editImageFile').click()">Chọn ảnh mới</button>
+                <span class="file-picker-name" id="editImageNewName"></span>
+            </span>
+            <small class="cat-file-name" style="display:block;margin-bottom:16px;">Chọn ảnh mới để thay thế; bỏ trống để giữ ảnh hiện tại.</small>
             <label for="editStatus">Trạng thái:</label>
             <select name="status" id="editStatus">
                 <option value="active">Hoạt động</option>
@@ -226,6 +268,10 @@ function openEditModal(button) {
     document.getElementById('editName').value = button.dataset.name;
     document.getElementById('editDescription').value = button.dataset.description;
     document.getElementById('editImage').value = button.dataset.image;
+    document.getElementById('editImageFile').value = '';
+    document.getElementById('editImageNewName').textContent = '';
+    document.getElementById('editImagePreview').src = button.dataset.imageUrl;
+    document.getElementById('editImageName').textContent = button.dataset.imageName;
     document.getElementById('editStatus').value = button.dataset.status;
     document.getElementById('editModal').classList.add('is-open');
     document.getElementById('editName').focus();
@@ -234,6 +280,16 @@ function openEditModal(button) {
 function closeEditModal() {
     document.getElementById('editModal').classList.remove('is-open');
 }
+
+// Hiện tên / xem trước ảnh vừa chọn
+document.getElementById('addImageFile').addEventListener('change', function() {
+    document.getElementById('addImageName').textContent = this.files.length ? this.files[0].name : '';
+});
+document.getElementById('editImageFile').addEventListener('change', function() {
+    if (!this.files.length) return;
+    document.getElementById('editImageNewName').textContent = this.files[0].name;
+    document.getElementById('editImagePreview').src = URL.createObjectURL(this.files[0]);
+});
 
 // Bấm ra ngoài modal để đóng
 document.getElementById('editModal').addEventListener('click', function(e) {

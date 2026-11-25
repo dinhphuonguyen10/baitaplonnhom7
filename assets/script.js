@@ -1013,6 +1013,165 @@ function renderCheckoutReceipt(orderId, customer, items, total, paymentMethod = 
     document.querySelector('.checkout-page-layout').hidden = true;
 }
 
+/**
+ * Biến <select> thành ô chọn có tìm kiếm (không phân biệt dấu/hoa thường).
+ * <select> gốc vẫn giữ nguyên giá trị, sự kiện 'change' và kiểm tra bắt buộc;
+ * ô hiển thị tự đồng bộ khi mã khác đổi options, disabled hoặc select.value.
+ */
+function makeSelectSearchable(select, searchPlaceholder) {
+    if (!select || select.dataset.searchable === '1') return;
+    select.dataset.searchable = '1';
+
+    const normalize = text => String(text).toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/đ/g, 'd');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ss-wrap';
+    select.parentNode.insertBefore(wrap, select);
+    wrap.appendChild(select);
+    select.classList.add('ss-native');
+    select.tabIndex = -1;
+
+    const display = document.createElement('button');
+    display.type = 'button';
+    display.className = 'ss-display';
+    display.setAttribute('aria-haspopup', 'listbox');
+    wrap.appendChild(display);
+
+    const panel = document.createElement('div');
+    panel.className = 'ss-panel';
+    panel.hidden = true;
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.className = 'ss-search';
+    search.placeholder = searchPlaceholder;
+    search.autocomplete = 'off';
+    const list = document.createElement('ul');
+    list.className = 'ss-list';
+    list.setAttribute('role', 'listbox');
+    panel.append(search, list);
+    wrap.appendChild(panel);
+
+    let activeIndex = -1;
+
+    function refreshDisplay() {
+        const selected = select.options[select.selectedIndex];
+        display.textContent = selected ? selected.textContent : '';
+        display.classList.toggle('ss-placeholder', !select.value);
+        display.disabled = select.disabled;
+        if (select.disabled) closePanel();
+    }
+
+    function visibleItems() {
+        return Array.from(list.children).filter(item => !item.hidden);
+    }
+
+    function setActive(index) {
+        const items = visibleItems();
+        items.forEach(item => item.classList.remove('ss-active'));
+        if (!items.length) { activeIndex = -1; return; }
+        activeIndex = Math.max(0, Math.min(index, items.length - 1));
+        items[activeIndex].classList.add('ss-active');
+        items[activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function renderList() {
+        list.innerHTML = '';
+        Array.from(select.options).forEach(option => {
+            if (option.value === '') return;
+            const item = document.createElement('li');
+            item.setAttribute('role', 'option');
+            item.textContent = option.textContent;
+            item.dataset.value = option.value;
+            item.dataset.key = normalize(option.textContent);
+            if (option.value === select.value) item.classList.add('ss-selected');
+            list.appendChild(item);
+        });
+    }
+
+    function applyFilter() {
+        const keyword = normalize(search.value.trim());
+        let shown = 0;
+        Array.from(list.children).forEach(item => {
+            item.hidden = keyword !== '' && !item.dataset.key.includes(keyword);
+            if (!item.hidden) shown++;
+        });
+        let empty = list.querySelector('.ss-empty');
+        if (!shown) {
+            if (!empty) {
+                empty = document.createElement('li');
+                empty.className = 'ss-empty';
+                empty.textContent = 'Không tìm thấy kết quả phù hợp';
+                list.appendChild(empty);
+            }
+        } else if (empty) {
+            empty.remove();
+        }
+        setActive(0);
+    }
+
+    function openPanel() {
+        if (select.disabled) return;
+        renderList();
+        search.value = '';
+        applyFilter();
+        panel.hidden = false;
+        wrap.classList.add('ss-open');
+        const selectedItem = list.querySelector('.ss-selected');
+        if (selectedItem) {
+            const items = visibleItems();
+            setActive(items.indexOf(selectedItem));
+        }
+        search.focus();
+    }
+
+    function closePanel() {
+        panel.hidden = true;
+        wrap.classList.remove('ss-open');
+    }
+
+    function choose(value) {
+        select.value = value;
+        refreshDisplay();
+        closePanel();
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        display.focus();
+    }
+
+    display.addEventListener('click', () => (panel.hidden ? openPanel() : closePanel()));
+    search.addEventListener('input', applyFilter);
+    search.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown') { event.preventDefault(); setActive(activeIndex + 1); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(activeIndex - 1); }
+        else if (event.key === 'Enter') {
+            event.preventDefault();
+            const item = visibleItems()[activeIndex];
+            if (item && item.dataset.value !== undefined) choose(item.dataset.value);
+        } else if (event.key === 'Escape') { closePanel(); display.focus(); }
+    });
+    list.addEventListener('mousedown', event => event.preventDefault());
+    list.addEventListener('click', event => {
+        const item = event.target.closest('li[data-value]');
+        if (item) choose(item.dataset.value);
+    });
+    document.addEventListener('click', event => {
+        if (!wrap.contains(event.target)) closePanel();
+    });
+
+    // Đồng bộ khi mã khác thay đổi select (options, disabled, .value)
+    new MutationObserver(refreshDisplay).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+    select.addEventListener('change', refreshDisplay);
+    const valueDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    Object.defineProperty(select, 'value', {
+        configurable: true,
+        get() { return valueDescriptor.get.call(this); },
+        set(newValue) { valueDescriptor.set.call(this, newValue); refreshDisplay(); }
+    });
+
+    refreshDisplay();
+}
+
 async function loadCheckoutLocations() {
     const provinceSelect = document.getElementById('checkout-province');
     const wardSelect = document.getElementById('checkout-ward');
@@ -1717,6 +1876,8 @@ function initCheckoutPage() {
     }
 
     renderCheckoutSummary();
+    makeSelectSearchable(document.getElementById('checkout-province'), 'Tìm tỉnh/thành phố...');
+    makeSelectSearchable(document.getElementById('checkout-ward'), 'Tìm xã/phường...');
     const checkoutLocations = loadCheckoutLocations();
 
     const currentCustomer = getCurrentCustomer();

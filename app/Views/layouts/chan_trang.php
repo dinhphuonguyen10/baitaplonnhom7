@@ -33,13 +33,6 @@
                     <li><a href="<?php echo View::e($appBaseUrl . '/client/thong-tin.php?topic=trang-suc-ecrin'); ?>">Trang sức Écrin</a></li>
                 </ul>
             </div>
-            <div class="footer-column subscribe">
-                <h3>CẬP NHẬT THÔNG TIN KHUYẾN MÃI</h3>
-                <div class="subscribe-box">
-                    <input type="email" placeholder="Email của bạn">
-                    <button>Đăng ký</button>
-                </div>
-            </div>
         </div>
         <div class="footer-note">
             <p>© 2026 ÉCRIN JEWELRY. Công Ty TNHH Thương Mại Và Đầu Tư Xuất Nhập Khẩu Việt Nam. MST: 0107837344</p>
