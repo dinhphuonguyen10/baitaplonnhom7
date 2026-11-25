@@ -10,7 +10,7 @@ use DomainException;
 use Throwable;
 
 /**
- * Lớp DonHangController - các API đơn hàng của khách (api/orders/*.php, client/huydon.php).
+ * Lớp DonHangController - các API đơn hàng của khách (api/orders/*.php).
  */
 class DonHangController extends \App\Core\Controller
 {
@@ -55,7 +55,7 @@ class DonHangController extends \App\Core\Controller
         ]);
     }
 
-    /** POST api/orders/huy_don_hang.php (và client/huydon.php) - khách hủy đơn đang chờ xác nhận kèm lý do. */
+    /** POST api/orders/huy_don_hang.php - khách hủy đơn đang chờ xác nhận kèm lý do. */
     public function cancel(): void
     {
         Response::jsonHeaders(true);

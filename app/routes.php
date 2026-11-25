@@ -26,7 +26,6 @@ return [
     '/client/dat_hang.php' => [Client\DatHangController::class, 'index'],
     '/client/thanh_toan.php' => [Client\ThanhToanTrangController::class, 'index'],
     '/client/tracuudh.php' => [Client\TraCuuDonHangController::class, 'index'],
-    '/client/huydon.php' => [Api\DonHangController::class, 'cancel'],
     '/client/diachi.php' => [Client\SoDiaChiController::class, 'index'],
     '/client/yeu_thich.php' => [Client\DanhSachYeuThichController::class, 'index'],
     '/client/tro_chuyen.php' => [Client\TroChuyenController::class, 'index'],

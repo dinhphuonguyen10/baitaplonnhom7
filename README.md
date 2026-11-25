@@ -48,7 +48,6 @@ Baitaplon/
 ├── assets/                                # CSS, JavaScript và hình ảnh website
 │   ├── style.css                          # CSS cửa hàng
 │   ├── script.js                          # Tương tác giao diện, giỏ hàng và tài khoản
-│   ├── admin.css                          # CSS quản trị
 │   ├── banner/                            # Banner và logo hiện tại
 │   ├── qrcode-generator.js                # Thư viện tạo mã QR cục bộ
 │   ├── bôngtai/                           # Ảnh sản phẩm bông tai
