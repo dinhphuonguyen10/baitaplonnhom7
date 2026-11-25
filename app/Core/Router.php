@@ -27,7 +27,7 @@ final class Router
     }
 
     /**
-     * Đường dẫn của script đang chạy, tính từ thư mục gốc ứng dụng. VD: /client/cart.php
+     * Đường dẫn của script đang chạy, tính từ thư mục gốc ứng dụng. VD: /client/gio_hang.php
      */
     public static function currentPath(): string
     {

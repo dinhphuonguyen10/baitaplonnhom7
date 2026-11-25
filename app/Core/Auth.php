@@ -117,7 +117,7 @@ final class Auth
     public static function requireAdmin(): void
     {
         if (!self::isAdmin()) {
-            Response::redirect(Url::to('/admin/login.php'));
+            Response::redirect(Url::to('/admin/dang_nhap.php'));
         }
     }
 

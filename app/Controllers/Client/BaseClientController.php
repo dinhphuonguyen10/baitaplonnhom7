@@ -3,7 +3,7 @@
 namespace App\Controllers\Client;
 
 use App\Core\Controller;
-use App\Services\StorefrontLayoutService;
+use App\Services\BoCucCuaHangService;
 
 /**
  * Lớp trừu tượng BaseClientController - lớp cha cho các controller trang cửa hàng.
@@ -12,11 +12,11 @@ use App\Services\StorefrontLayoutService;
  */
 abstract class BaseClientController extends Controller
 {
-    private ?StorefrontLayoutService $layout = null;
+    private ?BoCucCuaHangService $layout = null;
 
-    protected function layoutService(): StorefrontLayoutService
+    protected function layoutService(): BoCucCuaHangService
     {
-        return $this->layout ??= new StorefrontLayoutService();
+        return $this->layout ??= new BoCucCuaHangService();
     }
 
     protected function shareLayoutData(array $data): array

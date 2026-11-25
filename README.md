@@ -13,16 +13,14 @@ Baitaplon/
 ├── index.php                              # Trang chủ cửa hàng
 ├── admin/                                 # Trang quản trị nội bộ
 │   ├── index.php                          # Điểm vào/tổng quan quản trị
-│   ├── login.php                          # Đăng nhập nhân viên/quản lý
-│   ├── logout.php                         # Đăng xuất
-│   ├── dashboard.php                      # Dashboard
-│   ├── products.php                       # Giao diện mẫu sản phẩm và đơn hàng
-│   ├── categories.php                     # Giao diện mẫu danh mục
-│   ├── users.php                          # Giao diện mẫu tài khoản nhân viên
-│   ├── chat.php                           # Giao diện mẫu chat
-│   ├── reports.php                        # Giao diện mẫu báo cáo
-│   ├── payments.php                       # Giao diện mẫu thanh toán
-│   ├── stores.php                         # Giao diện mẫu cửa hàng
+│   ├── dang_nhap.php, dang_xuat.php       # Đăng nhập / đăng xuất nhân viên, quản lý
+│   ├── tong_quan.php                      # Chuyển hướng cũ về trang tổng quan
+│   ├── san_pham.php, danh_muc.php         # Quản lý sản phẩm, danh mục
+│   ├── don_hang.php, thanh_toan.php       # Quản lý đơn hàng (thanh_toan.php chuyển hướng về don_hang.php)
+│   ├── tai_khoan.php, cua_hang.php        # Quản lý tài khoản nhân viên, cửa hàng
+│   ├── tro_chuyen.php, anh_bia.php        # Quản lý chat, banner trang chủ
+│   ├── bao_cao.php, danh_gia.php          # Báo cáo thống kê, đánh giá sản phẩm
+│   ├── mau_tra_loi_tu_dong.php            # Mẫu trả lời tự động (sua_mau_tra_loi_tu_dong.php để sửa)
 │   ├── style.css                          #  CSS quản trị
 │   ├── manager/
 │   │   └── index.php                      #  Trang riêng cho quản lý
@@ -39,10 +37,14 @@ Baitaplon/
 │   └── chat/                              # API chat phía khách hàng
 │
 ├── client/                                # Trang và chức năng phía khách hàng
-│   ├── bong_tai.php, day_chuyen.php, ...  # Các trang danh mục
-│   ├── cart.php                           # Trang giỏ hàng toàn màn hình
-│   ├── checkout.php                       # Trang nhập thông tin, đặt COD hoặc lấy mã VietQR
-│   ├── diachi.php, tracuudh.php          # Địa chỉ, tra cứu đơn hàng
+│   ├── bong_tai.php, day_chuyen.php, ...  # Các trang danh mục cố định (nhan.php, vong_tay.php)
+│   ├── danh_muc.php, san_pham.php         # Danh mục theo slug, chi tiết sản phẩm
+│   ├── gio_hang.php                       # Trang giỏ hàng toàn màn hình
+│   ├── dat_hang.php                       # Trang nhập thông tin, đặt COD hoặc lấy mã VietQR
+│   ├── thanh_toan.php                     # Trang thanh toán VietQR
+│   ├── ho_so.php                          # Hồ sơ khách hàng (họ tên, số điện thoại, đổi mật khẩu, đăng xuất)
+│   ├── yeu_thich.php, tro_chuyen.php      # Sản phẩm yêu thích, chat với cửa hàng
+│   ├── diachi.php, tracuudh.php           # Địa chỉ, tra cứu đơn hàng
 ├── assets/                                # CSS, JavaScript và hình ảnh website
 │   ├── style.css                          # CSS cửa hàng
 │   ├── script.js                          # Tương tác giao diện, giỏ hàng và tài khoản
@@ -59,14 +61,14 @@ Baitaplon/
 │   ├── bootstrap.php                      # Autoloader PSR-4 + khởi động session
 │   ├── routes.php                         # Bảng định tuyến: URL -> Controller@action
 │   ├── Core/                              # Router, Controller, View, Database, Session, Auth, Url, Request, Response
-│   ├── Models/                            # (M) BaseModel + mỗi bảng một Model (Product, Order, ...)
+│   ├── Models/                            # (M) BaseModel + mỗi bảng một Model (SanPham, DonHang, KhachHang, ...)
 │   ├── Views/                             # (V) Giao diện HTML
-│   │   ├── layouts/                       #     header, footer, auth_modals, admin_sidebar
-│   │   ├── client/                        #     Trang cửa hàng (home, product, cart, checkout, ...)
-│   │   └── admin/                         #     Trang quản trị (dashboard, products, orders, reports, ...)
+│   │   ├── layouts/                       #     dau_trang, chan_trang, hop_dang_nhap, thanh_ben_quan_tri
+│   │   ├── client/                        #     Trang cửa hàng (trang_chu, chi_tiet_san_pham, gio_hang, dat_hang, ho_so, ...)
+│   │   └── admin/                         #     Trang quản trị (tong_quan, san_pham, don_hang, bao_cao, ...)
 │   ├── Controllers/{Client,Admin,Api}/    # (C) Controller cho từng trang và API
 │   ├── Services/                          # Nghiệp vụ: đặt hàng, thanh toán, chat, báo cáo, ...
-│   ├── Database/                          # SchemaManager (tự đồng bộ CSDL), seeder cho scripts
+│   ├── Database/                          # QuanLyCauTruc (tự đồng bộ CSDL), seeder cho scripts
 │   ├── Helpers/, Exceptions/, Content/    # Lớp định dạng hiển thị, ngoại lệ, nội dung tĩnh
 │
 ├── config/
@@ -88,7 +90,7 @@ Các file `.php` trong `index.php`, `client/`, `admin/`, `api/` chỉ là **đi�
 - Logic xử lý đặt trong Controller/Service, câu SQL đặt trong Model; View không truy vấn dữ liệu.
 - CSS, JavaScript và hình ảnh đặt trong `assets/`.
 - Cấu trúc database và dữ liệu khởi tạo đặt trong `database/`.
-- Đặt tên file PHP theo chức năng, dùng chữ thường và dấu gạch dưới, ví dụ `tracuudh.php`, `place_order.php`.
+- Đặt tên file bằng tiếng Việt không dấu theo chức năng: file trang/điểm vào/View dùng chữ thường và dấu gạch dưới (ví dụ `gio_hang.php`, `dat_hang.php`); file class trong `app/` dùng kiểu PascalCase (ví dụ `DonHangService.php`, `SanPhamController.php`). Giữ nguyên tên kỹ thuật mặc định như `index.php`, `bootstrap.php`, `Router`, `Database`, `Session`, `Auth` và hậu tố `Controller`, `Service`.
 - Chỉ tạo file/thư mục dùng chung khi có từ hai nơi trở lên cần dùng; tránh tạo bản sao cấu hình hoặc helper ở từng module.
 
 
@@ -116,16 +118,16 @@ Quản lý danh mục dùng mã tự sinh, tên đã chuẩn hóa khoảng trắ
 Luồng xử lý một request theo mô hình MVC truyền thống:
 
 ```text
-Trình duyệt ──> client/cart.php (điểm vào) ──> Router (app/routes.php)
+Trình duyệt ──> client/gio_hang.php (điểm vào) ──> Router (app/routes.php)
                                                    │
                                                    ▼
-                              Controller (Client\CartPageController::index)
+                              Controller (Client\GioHangController::index)
                                │  gọi Model / Service lấy dữ liệu
                                ▼
-                              $this->render('client/cart', $data)
+                              $this->render('client/gio_hang', $data)
                                │
                                ▼
-                              View (app/Views/client/cart.php + layouts) ──> HTML trả về
+                              View (app/Views/client/gio_hang.php + layouts) ──> HTML trả về
 ```
 
 - **Model** (`app/Models/`) – mỗi bảng một lớp kế thừa `BaseModel` (CRUD chung: `find`, `all`, `where`, `create`, `update`, `delete`). Mọi câu SQL nằm trong Model hoặc Service.
@@ -136,9 +138,9 @@ Trình duyệt ──> client/cart.php (điểm vào) ──> Router (app/routes
     - `Admin\BaseAdminController` – bắt buộc đăng nhập quản trị / quyền quản lý, CSRF, dữ liệu sidebar
     - `Api\*Controller` – mỗi endpoint một action, trả JSON
 - **Router** (`app/Core/Router.php` + `app/routes.php`) – ánh xạ đường dẫn tới `Controller@action`.
-- **Service** (`app/Services/`) – nghiệp vụ dùng lại giữa nhiều Controller (VD: `OrderService`, `PaymentService`, `VietQrService`, `ChatService`). Báo cáo dùng kế thừa: `AbstractReport` → `SalesReport`, `CustomerReport`.
+- **Service** (`app/Services/`) – nghiệp vụ dùng lại giữa nhiều Controller (VD: `DonHangService`, `ThanhToanService`, `VietQrService`, `TroChuyenService`). Báo cáo dùng kế thừa: `BaoCaoCoSo` → `BaoCaoDoanhThu`, `BaoCaoKhachHang`.
 
-Mỗi điểm vào chỉ gồm 2 dòng, ví dụ `client/cart.php`:
+Mỗi điểm vào chỉ gồm 2 dòng, ví dụ `client/gio_hang.php`:
 
 ```php
 require_once __DIR__ . '/../app/bootstrap.php';
@@ -149,12 +151,12 @@ Khai báo route và action tương ứng:
 
 ```php
 // app/routes.php
-'/client/cart.php' => [Client\CartPageController::class, 'index'],
+'/client/gio_hang.php' => [Client\GioHangController::class, 'index'],
 
-// app/Controllers/Client/CartPageController.php
+// app/Controllers/Client/GioHangController.php
 public function index(): void
 {
-    $this->render('client/cart', $this->indexData());
+    $this->render('client/gio_hang', $this->indexData());
 }
 ```
 
@@ -172,7 +174,7 @@ $product = $db->fetchOne('SELECT * FROM products WHERE id = ?', [$id]);
 
 
 - Thông số kết nối nằm trong `config/database.php`; `App\Core\Database` là nơi duy nhất tạo kết nối MySQL (charset `utf8mb4`). Không tự tạo kết nối MySQL thứ hai trong trang hoặc API.
-- Khi kết nối lần đầu, `App\Database\SchemaManager` tự đồng bộ cấu trúc (bảng, cột, VIEW, FUNCTION, TRIGGER) cho database tạo từ bản SQL cũ.
+- Khi kết nối lần đầu, `App\Database\QuanLyCauTruc` tự đồng bộ cấu trúc (bảng, cột, VIEW, FUNCTION, TRIGGER) cho database tạo từ bản SQL cũ.
 - Cấu hình local XAMPP có thể khác môi trường triển khai. Không đưa mật khẩu, khóa hoặc thông tin máy chủ production vào repository.
 
 ## Cấu hình thanh toán VietQR
@@ -187,7 +189,7 @@ $product = $db->fetchOne('SELECT * FROM products WHERE id = ?', [$id]);
 
   ```text
   Program: D:\xampp\php\php.exe
-  Arguments: D:\xampp\htdocs\baitaplonnhom7\scripts\cleanup_vietqr_orders.php
+  Arguments: D:\xampp\htdocs\baitaplonnhom7\scripts\don_dep_don_vietqr_het_han.php
   ```
 
   Khi website đang hoạt động, trang thanh toán, danh sách đơn của khách và trang quản trị cũng tự xử lý các đơn đã hết hạn. Cột thời hạn được bổ sung tự động cho database hiện có; database mới cũng khai báo cột này trong `database/baitaplon.sql`.
@@ -195,9 +197,9 @@ $product = $db->fetchOne('SELECT * FROM products WHERE id = ?', [$id]);
 ## File dùng chung
 
 
-- `app/Views/layouts/header.php`, `footer.php`, `auth_modals.php`: khung giao diện khách hàng (dữ liệu do `BaseClientController` cung cấp).
+- `app/Views/layouts/dau_trang.php`, `chan_trang.php`, `hop_dang_nhap.php`: khung giao diện khách hàng (dữ liệu do `BaseClientController` cung cấp).
 - `App\Core\Auth` (`requireAdmin()`, `requireManager()`) và `App\Controllers\Admin\BaseAdminController`: kiểm tra đăng nhập và quyền truy cập quản trị.
-- `app/Views/layouts/admin_sidebar.php`: điều hướng khu vực quản trị (menu khai báo trong `BaseAdminController::SIDE_MENU`).
+- `app/Views/layouts/thanh_ben_quan_tri.php`: điều hướng khu vực quản trị (menu khai báo trong `BaseAdminController::SIDE_MENU`).
 - Trước khi sửa file dùng chung, kiểm tra các trang đang nạp file đó để tránh làm lỗi nhiều chức năng cùng lúc.
 
 

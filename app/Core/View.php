@@ -43,7 +43,7 @@ final class View
 
     /**
      * Hiển thị một View (V trong mô hình MVC): giải nén $data thành biến rồi nạp file
-     * app/Views/{$view}.php. VD: View::render('client/cart', ['pageTitle' => 'Giỏ hàng']);
+     * app/Views/{$view}.php. VD: View::render('client/gio_hang', ['pageTitle' => 'Giỏ hàng']);
      */
     public static function render(string $view, array $data = []): void
     {

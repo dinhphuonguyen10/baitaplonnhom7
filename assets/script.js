@@ -124,7 +124,7 @@ function createSliderItems(container, products) {
         const percentTagHTML = calcPercent > 0 ? `<span class="price-discount-percent">-${calcPercent}%</span>` : '';
 
         const itemHTML = `
-            <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
+            <div class="product-card" data-db-id="${product.id || ''}" data-stock="${stock}" data-category="${product.category || ''}" data-detail-url="${appUrl('/client/san_pham.php')}?id=${encodeURIComponent(product.id || '')}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
                 ${discountHTML}
                 <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id || ''}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
                 <img src="${imageUrl}" alt="${product.name}" class="product-image" onerror="this.onerror=null;this.src='${appUrl('/assets/banner/logo.png')}';">
@@ -215,7 +215,7 @@ function initProductSlider(containerId, prevBtnId, nextBtnId, initialData, moreD
 
 async function fetchHomepageSections() {
     try {
-        const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?category=home`);
+        const response = await fetch(`${appUrl('/api/catalog/lay_san_pham.php')}?category=home`);
         if (!response.ok) throw new Error('Không thể tải dữ liệu nhóm sản phẩm trang chủ.');
         const data = await response.json();
         const sectionKeys = ['new', 'featured', 'suggest'];
@@ -477,7 +477,7 @@ async function refreshCartAvailability() {
         for (let offset = 0; offset < productIds.length; offset += 100) {
             const ids = productIds.slice(offset, offset + 100);
             const params = new URLSearchParams({ ids: ids.join(',') });
-            const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?${params}`, { cache: 'no-store' });
+            const response = await fetch(`${appUrl('/api/catalog/lay_san_pham.php')}?${params}`, { cache: 'no-store' });
             if (!response.ok) throw new Error('Không thể xác minh sản phẩm trong giỏ hàng.');
 
             const products = await response.json();
@@ -761,7 +761,7 @@ function initAddToCart() {
         };
         try {
             sessionStorage.setItem(DIRECT_CHECKOUT_KEY, JSON.stringify(directItem));
-            window.location.assign(`${appUrl('/client/checkout.php')}?direct=1`);
+            window.location.assign(`${appUrl('/client/dat_hang.php')}?direct=1`);
         } catch (error) {
             console.error('Không thể bắt đầu mua ngay:', error);
             showToast('Không thể bắt đầu đặt hàng. Vui lòng thử lại.');
@@ -890,7 +890,7 @@ function initAddToCart() {
             return;
         }
 
-        window.location.assign(appUrl('/client/checkout.php'));
+        window.location.assign(appUrl('/client/dat_hang.php'));
     });
 }
 
@@ -1815,7 +1815,7 @@ function initCheckoutPage() {
         submitButton.disabled = true;
         submitButton.textContent = 'Đang xử lý đơn hàng...';
         try {
-            const response = await fetch(appUrl('/api/orders/place_order.php'), {
+            const response = await fetch(appUrl('/api/orders/dat_hang.php'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1857,7 +1857,7 @@ if (paymentMethod === 'BANK_QR') {
 
     // Chuyển đến trang thanh toán riêng
     window.location.href = appUrl(
-        '/client/payment.php?order_id=' +
+        '/client/thanh_toan.php?order_id=' +
         encodeURIComponent(result.order_id)
     );
 
@@ -1947,7 +1947,7 @@ function buildProductCardHTML(product) {
     const hasGift = Boolean(product.gift && product.gift.trim() !== '');
 
     return `
-        <div class="product-card" data-category="${product.category || ''}" data-db-id="${product.id}" data-price="${priceSaleRaw}" data-stock="${stock}" data-discount="${hasDiscount ? '1' : '0'}" data-gift="${hasGift ? '1' : '0'}" data-sold="${soldCount}" data-detail-url="${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id)}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
+        <div class="product-card" data-category="${product.category || ''}" data-db-id="${product.id}" data-price="${priceSaleRaw}" data-stock="${stock}" data-discount="${hasDiscount ? '1' : '0'}" data-gift="${hasGift ? '1' : '0'}" data-sold="${soldCount}" data-detail-url="${appUrl('/client/san_pham.php')}?id=${encodeURIComponent(product.id)}" role="link" tabindex="0" aria-label="Xem chi tiết sản phẩm">
             <div class="product-image-wrap">
                 ${badgeHTML}
                 <button type="button" class="wishlist-btn${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? ' active' : ''}" data-product-id="${product.id}" title="${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? 'Bỏ yêu thích' : 'Yêu thích'}" aria-label="Yêu thích">${(typeof isProductFavorited === 'function' && isProductFavorited(product.id, product.is_favorite)) ? '♥' : '♡'}</button>
@@ -2195,7 +2195,7 @@ function initSearch() {
             searchRequestController = controller;
             const params = new URLSearchParams({ search: query, suggest: '1', sort: 'relevance' });
             try {
-                const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?${params}`, {
+                const response = await fetch(`${appUrl('/api/catalog/lay_san_pham.php')}?${params}`, {
                     signal: controller.signal
                 });
                 const data = await response.json();
@@ -2254,7 +2254,7 @@ function initSearch() {
 
             const item = document.createElement('a');
             item.className = 'search-result-item';
-            item.href = `${appUrl('/client/product.php')}?id=${encodeURIComponent(product.id)}`;
+            item.href = `${appUrl('/client/san_pham.php')}?id=${encodeURIComponent(product.id)}`;
             item.setAttribute('aria-label', `Xem chi tiết ${product.name}`);
 
             const image = document.createElement('img');
@@ -2380,7 +2380,7 @@ function initAuth() {
             submitLogin.disabled = true;
 
             try {
-                const response = await fetch(appUrl('/api/auth/login.php'), {
+                const response = await fetch(appUrl('/api/auth/dang_nhap.php'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
@@ -2398,7 +2398,7 @@ function initAuth() {
                         applyUserRole();
                         const loginRequired = new URLSearchParams(window.location.search).get('login_required');
                         if (loginRequired === 'cart') {
-                            window.location.assign(appUrl('/client/cart.php'));
+                            window.location.assign(appUrl('/client/gio_hang.php'));
                         } else if (loginRequired === 'profile') {
                             window.location.assign(appUrl('/client/ho_so.php'));
                         } else {
@@ -2474,7 +2474,7 @@ function initAuth() {
             submitRegister.disabled = true;
 
             try {
-                const response = await fetch(appUrl('/api/auth/register.php'), {
+                const response = await fetch(appUrl('/api/auth/dang_ky.php'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, phone, password })
@@ -2507,7 +2507,7 @@ function initAuth() {
     document.addEventListener('click', async (e) => {
         if (e.target.classList.contains('logout-btn')) {
             try {
-                const response = await fetch(appUrl('/api/auth/logout.php'));
+                const response = await fetch(appUrl('/api/auth/dang_xuat.php'));
                 const data = await response.json();
                 if (data.status === 'success') {
                     localStorage.removeItem('currentUser');
@@ -2538,7 +2538,7 @@ function initAuth() {
 // Tác dụng: Đồng bộ trạng thái đăng nhập của khách hàng từ máy chủ về trình duyệt, loại bỏ dữ liệu nếu phiên đã hết hạn
 async function checkSession() {
     try {
-        const response = await fetch(appUrl('/api/auth/check_session.php'));
+        const response = await fetch(appUrl('/api/auth/kiem_tra_phien.php'));
         const data = await response.json();
         if (!response.ok) {
             throw new Error(data.message || 'Không thể kiểm tra phiên đăng nhập.');
@@ -2767,7 +2767,7 @@ function initCategoryFilters() {
     if (categorySelect) {
         categorySelect.addEventListener('change', () => {
             if (categorySelect.value) {
-                window.location.href = `${appUrl('/client/category.php')}?slug=${encodeURIComponent(categorySelect.value)}`;
+                window.location.href = `${appUrl('/client/danh_muc.php')}?slug=${encodeURIComponent(categorySelect.value)}`;
             }
         });
     }
@@ -2993,7 +2993,7 @@ function initCategoryFilters() {
         if (reqGift)     params.set('has_gift',      '1');
 
         try {
-            const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?${params}`);
+            const response = await fetch(`${appUrl('/api/catalog/lay_san_pham.php')}?${params}`);
             const data = await response.json();
             if (!response.ok || !Array.isArray(data.products)) {
                 throw new Error(data.message || 'Không thể tải sản phẩm.');
@@ -3185,7 +3185,7 @@ async function initSearchResults(searchQuery, container) {
 
         window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}${window.location.hash}`);
         try {
-            const response = await fetch(`${appUrl('/api/catalog/get_products.php')}?${params}`);
+            const response = await fetch(`${appUrl('/api/catalog/lay_san_pham.php')}?${params}`);
             const data = await response.json();
             if (!response.ok || !Array.isArray(data.products)) {
                 throw new Error(data.message || 'Không thể tìm sản phẩm.');
@@ -3306,7 +3306,7 @@ async function syncWishlistToServer() {
     const localIds = localRaw ? JSON.parse(localRaw) : [];
     if (localIds.length === 0) return;
     try {
-        await fetch(appUrl('/api/catalog/wishlist.php'), {
+        await fetch(appUrl('/api/catalog/yeu_thich.php'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'sync', sync_ids: localIds })
@@ -3346,7 +3346,7 @@ async function initWishlist() {
         // Logged in: sync localStorage → server then load from server
         await syncWishlistToServer();
         try {
-            const res = await fetch(appUrl('/api/catalog/wishlist.php') + '?type=ids');
+            const res = await fetch(appUrl('/api/catalog/yeu_thich.php') + '?type=ids');
             const data = await res.json();
             if (data.status === 'success' && Array.isArray(data.ids)) {
                 wishlistIds = new Set(data.ids.map(Number));
@@ -3386,7 +3386,7 @@ async function initWishlist() {
 
         if (getCurrentCustomer()) {
             // Server toggle
-            fetch(appUrl('/api/catalog/wishlist.php'), {
+            fetch(appUrl('/api/catalog/yeu_thich.php'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'toggle', product_id: productId })

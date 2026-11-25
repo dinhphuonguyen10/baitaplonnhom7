@@ -12,7 +12,7 @@ abstract class Controller
 {
     /**
      * Hiển thị một View trong app/Views với dữ liệu truyền vào.
-     * VD: $this->render('client/cart', ['pageTitle' => 'Giỏ hàng']);
+     * VD: $this->render('client/gio_hang', ['pageTitle' => 'Giỏ hàng']);
      */
     protected function render(string $view, array $data = []): void
     {

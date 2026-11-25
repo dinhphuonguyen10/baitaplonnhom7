@@ -19,15 +19,15 @@ abstract class BaseAdminController extends \App\Core\Controller
     /** Menu sidebar quản trị: [icon, nhãn, đường dẫn, tên file, chỉ dành cho quản lý]. */
     public const SIDE_MENU = [
         ['icon' => '▦', 'label' => 'Tổng quan',                    'href' => '/admin/index.php',     'file' => 'index.php'],
-        ['icon' => '◇', 'label' => 'Quản lý sản phẩm',             'href' => '/admin/products.php',  'file' => 'products.php'],
-        ['icon' => '☆', 'label' => 'Quản lý đánh giá',             'href' => '/admin/reviews.php',   'file' => 'reviews.php'],
-        ['icon' => '▧', 'label' => 'Quản lý danh mục',             'href' => '/admin/categories.php','file' => 'categories.php'],
-        ['icon' => '♙', 'label' => 'Quản lý tài khoản', 'href' => '/admin/users.php',     'file' => 'users.php', 'manager_only' => true],
-        ['icon' => '▤', 'label' => 'Đơn hàng & Thanh toán',         'href' => '/admin/orders.php',    'file' => 'orders.php'],
-        ['icon' => '☏', 'label' => 'Quản lý chat',                 'href' => '/admin/chat.php',      'file' => 'chat.php'],
-        ['icon' => '▣', 'label' => 'Quản lý banner',               'href' => '/admin/banners.php',   'file' => 'banners.php', 'manager_only' => true],
-        ['icon' => '▥', 'label' => 'Báo cáo và thống kê',          'href' => '/admin/reports.php',   'file' => 'reports.php', 'manager_only' => true],
-        ['icon' => '⌖', 'label' => 'Cửa hàng',                     'href' => '/admin/stores.php',    'file' => 'stores.php', 'manager_only' => true],
+        ['icon' => '◇', 'label' => 'Quản lý sản phẩm',             'href' => '/admin/san_pham.php',  'file' => 'san_pham.php'],
+        ['icon' => '☆', 'label' => 'Quản lý đánh giá',             'href' => '/admin/danh_gia.php',   'file' => 'danh_gia.php'],
+        ['icon' => '▧', 'label' => 'Quản lý danh mục',             'href' => '/admin/danh_muc.php','file' => 'danh_muc.php'],
+        ['icon' => '♙', 'label' => 'Quản lý tài khoản', 'href' => '/admin/tai_khoan.php',     'file' => 'tai_khoan.php', 'manager_only' => true],
+        ['icon' => '▤', 'label' => 'Đơn hàng & Thanh toán',         'href' => '/admin/don_hang.php',    'file' => 'don_hang.php'],
+        ['icon' => '☏', 'label' => 'Quản lý chat',                 'href' => '/admin/tro_chuyen.php',      'file' => 'tro_chuyen.php'],
+        ['icon' => '▣', 'label' => 'Quản lý banner',               'href' => '/admin/anh_bia.php',   'file' => 'anh_bia.php', 'manager_only' => true],
+        ['icon' => '▥', 'label' => 'Báo cáo và thống kê',          'href' => '/admin/bao_cao.php',   'file' => 'bao_cao.php', 'manager_only' => true],
+        ['icon' => '⌖', 'label' => 'Cửa hàng',                     'href' => '/admin/cua_hang.php',    'file' => 'cua_hang.php', 'manager_only' => true],
         ['icon' => '⌂', 'label' => 'Về cửa hàng chính',           'href' => '/index.php',           'file' => 'storefront-home'],
     ];
 
@@ -77,7 +77,7 @@ abstract class BaseAdminController extends \App\Core\Controller
     }
 
     /**
-     * Bổ sung dữ liệu cho sidebar quản trị (app/Views/layouts/admin_sidebar.php) khi render View.
+     * Bổ sung dữ liệu cho sidebar quản trị (app/Views/layouts/thanh_ben_quan_tri.php) khi render View.
      */
     protected function shareLayoutData(array $data): array
     {

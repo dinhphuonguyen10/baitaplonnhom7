@@ -2,7 +2,7 @@
 
 namespace App\Core;
 
-use App\Database\SchemaManager;
+use App\Database\QuanLyCauTruc;
 use mysqli;
 use mysqli_result;
 use mysqli_stmt;
@@ -59,11 +59,11 @@ final class Database
         if (self::$instance === null) {
             $config = require APP_ROOT . '/config/database.php';
             self::$instance = new self(is_array($config) ? $config : []);
-            $hasOrders = (new SchemaManager(self::$instance))->migrate();
+            $hasOrders = (new QuanLyCauTruc(self::$instance))->migrate();
 
-            // Mỗi request web tự hủy các đơn đã hết thời gian giữ tồn kho (CLI dùng scripts/expire_order_inventory.php).
+            // Mỗi request web tự hủy các đơn đã hết thời gian giữ tồn kho (CLI dùng scripts/het_han_giu_ton_kho.php).
             if ($hasOrders && PHP_SAPI !== 'cli') {
-                (new \App\Services\OrderInventoryService(self::$instance))->expireReservations();
+                (new \App\Services\TonKhoDonHangService(self::$instance))->expireReservations();
             }
         }
 
