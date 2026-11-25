@@ -2,18 +2,19 @@
 
 namespace App\Controllers\Admin;
 
-use App\Core\Auth;
 use App\Core\Database;
 use App\Core\Request;
 use App\Services\ProductAdminService;
-use InvalidArgumentException;
-use RuntimeException;
+use Throwable;
 
 /**
- * Controller trang admin/products.php - CRUD sản phẩm, tải ảnh, xóa mềm / khôi phục / xóa vĩnh viễn.
+ * Controller trang admin/products.php - thêm / sửa sản phẩm (SKU, khuyến mãi, ảnh), xóa mềm / khôi phục.
+ * Không còn xóa vĩnh viễn. Mọi thao tác POST cần CSRF token riêng (khóa phiên products_csrf_token).
  */
 class ProductController extends BaseAdminController
 {
+    private const CSRF_KEY = 'products_csrf_token';
+
     private ProductAdminService $products;
 
     public function __construct(?Database $db = null, ?ProductAdminService $products = null)
@@ -26,50 +27,46 @@ class ProductController extends BaseAdminController
     protected function handle(): array
     {
         $layout = $this->layoutData('products.php');
+        $csrfToken = $this->csrfToken(self::CSRF_KEY);
         $message = '';
         $messageType = '';
 
         if (Request::isPost()) {
-            try {
-                $result = $this->dispatch((string) Request::post('action', ''), (string) $layout['adminUsername']);
-                if ($result !== null) {
-                    $message = $result;
-                    $messageType = 'success';
-                }
-            } catch (InvalidArgumentException | RuntimeException $e) {
-                $message = $e->getMessage();
+            $action = $_POST['action'] ?? '';
+            if (!$this->verifyCsrf(is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null, self::CSRF_KEY)) {
+                $message = 'Phiên thao tác không hợp lệ. Vui lòng tải lại trang.';
                 $messageType = 'error';
+            } else {
+                $result = $this->products->handleAction(
+                    is_string($action) ? $action : '',
+                    $_POST,
+                    Request::file('image_file'),
+                    (string) $layout['adminUsername']
+                );
+                if ($result !== null) {
+                    [$message, $messageType] = $result;
+                }
             }
         }
 
         // Chế độ xem: 'active' (đang hoạt động) hoặc 'trash' (thùng rác)
         $currentView = Request::query('view', 'active') === 'trash' ? 'trash' : 'active';
 
-        return array_merge($layout, $this->products->listing($currentView), [
+        try {
+            $listing = $this->products->listing($currentView);
+        } catch (Throwable $e) {
+            error_log('Admin product list failed: ' . $e->getMessage());
+            $listing = ['countActive' => 0, 'countTrash' => 0, 'categories' => [], 'products' => []];
+            $message = 'Không thể tải danh sách sản phẩm.';
+            $messageType = 'error';
+        }
+
+        return array_merge($layout, $listing, [
             'message' => $message,
             'messageType' => $messageType,
             'currentView' => $currentView,
+            'productsCsrfToken' => $csrfToken,
         ]);
-    }
-
-    private function dispatch(string $action, string $adminUsername): ?string
-    {
-        $id = (int) Request::post('id', 0);
-
-        switch ($action) {
-            case 'add':
-                return $this->products->create($_POST, Request::file('image_file'));
-            case 'edit':
-                return $this->products->update($_POST, Request::file('image_file'));
-            case 'delete':
-                return $this->products->softDelete($id, $adminUsername);
-            case 'restore':
-                return $this->products->restore($id);
-            case 'force_delete':
-                return $this->products->forceDelete($id);
-            default:
-                return null;
-        }
     }
 
     /** Action: hiển thị View admin/products. */

@@ -33,7 +33,8 @@ return [
     '/client/htch.php' => [Client\StoreLocatorController::class, 'index'],
     '/client/thong-tin.php' => [Client\InfoPageController::class, 'index'],
     '/client/quen_mat_khau.php' => [Client\ForgotPasswordPageController::class, 'index'],
-    '/client/categories.php' => [Admin\CategoryController::class, 'index'],
+    '/client/ho_so.php' => [Client\ProfileController::class, 'index'],
+    '/client/categories.php' => [Admin\LegacyRedirectController::class, 'clientCategories'],
 
     // ───────────── Quản trị (Admin) ─────────────
     '/admin/login.php' => [Admin\LoginController::class, 'index'],
@@ -71,9 +72,9 @@ return [
     '/api/orders/cancel_order.php' => [Api\OrderController::class, 'cancel'],
     '/api/orders/lookup_order.php' => [Api\OrderController::class, 'lookup'],
     '/api/orders/my_orders.php' => [Api\OrderController::class, 'myOrders'],
+    '/api/orders/order_detail.php' => [Api\OrderController::class, 'detail'],
     '/api/orders/place_order.php' => [Api\OrderController::class, 'place'],
     '/api/payment/change_vietqr_method.php' => [Api\PaymentController::class, 'changeMethod'],
-    '/api/payment/confirm_demo.php' => [Api\PaymentController::class, 'confirmDemo'],
     '/api/payment/refresh_vietqr.php' => [Api\PaymentController::class, 'refresh'],
     '/api/payment/report_vietqr.php' => [Api\PaymentController::class, 'report'],
 ];

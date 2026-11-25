@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Core\Auth;
 use App\Core\DatabaseException;
+use App\Core\Session;
 use App\Exceptions\AuthException;
 use App\Models\Admin;
 use App\Models\User;
@@ -80,6 +81,28 @@ class AuthService
     public function logoutCustomer(): void
     {
         Auth::logoutCustomer();
+    }
+
+    /**
+     * Kiểm tra phiên khách hàng (role = customer) còn khớp với tài khoản trong DB.
+     * Còn tồn tại: đồng bộ lại user_id/username trong session và trả về [id, username].
+     * Tài khoản không còn: xóa thông tin đăng nhập khách hàng khỏi session, trả về null.
+     */
+    public function refreshCustomerSession(): ?array
+    {
+        $userId = filter_var(Session::get('user_id'), FILTER_VALIDATE_INT);
+        $user = ($userId !== false && $userId > 0) ? $this->users->find((int) $userId) : null;
+
+        if ($user === null) {
+            Auth::logoutCustomer();
+
+            return null;
+        }
+
+        Session::set('user_id', (int) $user['id']);
+        Session::set('username', (string) $user['username']);
+
+        return ['id' => (int) $user['id'], 'username' => (string) $user['username']];
     }
 
     // ───────────── Đăng ký ─────────────

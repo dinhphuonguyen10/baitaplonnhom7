@@ -47,7 +47,7 @@ class CustomerReport extends AbstractReport
 
         $sql = "SELECT u.id, u.username, u.phone, u.created_at,
                            COUNT(DISTINCT o.id) AS order_count,
-                           COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng','Đã giao') THEN o.total_price ELSE 0 END),0) AS revenue,
+                           COALESCE(SUM(CASE WHEN o.status IN ('Đã giao hàng','Đã giao','Hoàn thành') THEN o.total_price ELSE 0 END),0) AS revenue,
                            MAX(o.created_at) AS last_order
                     FROM users u
                     LEFT JOIN orders o ON o.user_id = u.id

@@ -1,5 +1,5 @@
 <?php
-
+// View: trang quản trị sản phẩm. Dữ liệu do Admin\ProductController cung cấp.
 use App\Helpers\ProductAdminFormatter;
 
 ?>
@@ -51,8 +51,6 @@ use App\Helpers\ProductAdminFormatter;
         .btn-delete:hover { background: #fecdca; }
         .btn-restore { background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; }
         .btn-restore:hover { background: #d1fadf; }
-        .btn-force { background: #7f1d1d; color: #fff; margin-left: 6px; }
-        .btn-force:hover { background: #991b1b; }
 
         /* Tabs chuyển đổi Active / Trash */
         .admin-nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
@@ -123,7 +121,7 @@ use App\Helpers\ProductAdminFormatter;
             <!-- TABS CHUYỂN ĐỔI: SẢN PHẨM HOẠT ĐỘNG / THÙNG RÁC -->
             <div class="admin-nav-tabs">
                 <a href="products.php?view=active" class="admin-nav-tab <?php echo $currentView === 'active' ? 'active' : ''; ?>">
-                    <span>🛍️ Sản phẩm đang hoạt động</span>
+                    <span>🛍️ Danh sách sản phẩm</span>
                     <span class="tab-count"><?php echo $countActive; ?></span>
                 </a>
                 <a href="products.php?view=trash" class="admin-nav-tab <?php echo $currentView === 'trash' ? 'active' : ''; ?>">
@@ -192,14 +190,16 @@ use App\Helpers\ProductAdminFormatter;
                                     ?>
                                     <tr class="product-row"
                                         data-name="<?php echo strtolower($escape($p['name'])); ?>"
+                                        data-sku="<?php echo strtolower($escape($p['sku'])); ?>"
                                         data-cat-id="<?php echo (int)$p['category_id']; ?>"
                                         data-status="<?php echo $escape($prodStatus); ?>"
                                         data-stock="<?php echo $stockNum; ?>">
                                         <td>
-                                            <img src="<?php echo $escape($imgSrc); ?>" alt="" class="thumb-img" onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'">
+                                            <img src="<?php echo $escape($imgSrc); ?>" alt="" class="thumb-img" onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>'">
                                         </td>
                                         <td class="prod-name-cell">
                                             <div class="prod-name"><?php echo $escape($p['name']); ?></div>
+                                            <small style="color: #64748b;">SKU: <?php echo $escape($p['sku']); ?></small>
                                             <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
                                                 <?php if (!empty($p['is_featured'])): ?>
                                                     <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #fef08a; color: #854d0e; font-weight: 600;">⭐ Nổi bật</span>
@@ -250,16 +250,12 @@ use App\Helpers\ProductAdminFormatter;
                                         <?php endif; ?>
                                         <td style="text-align: center;">
                                             <?php if ($currentView === 'trash'): ?>
-                                                <!-- THAO TÁC TRONG THÙNG RÁC: KHÔI PHỤC HOẶC XÓA VĨNH VIỄN -->
-                                                <form method="post" style="display:inline;" onsubmit="return confirm('Khôi phục sản phẩm \'<?php echo $escape($p['name']); ?>\' về danh sách hoạt động?');">
+                                                <!-- THAO TÁC TRONG THÙNG RÁC: KHÔI PHỤC -->
+                                                <form method="post" style="display:inline;" onsubmit="return confirm('Khôi phục sản phẩm này về danh sách hoạt động?');">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo $escape($productsCsrfToken); ?>">
                                                     <input type="hidden" name="action" value="restore">
                                                     <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
                                                     <button type="submit" class="btn-sm btn-restore" title="Khôi phục sản phẩm">↺ Khôi phục</button>
-                                                </form>
-                                                <form method="post" style="display:inline;" onsubmit="return confirm('CẢNH BÁO NGUY HIỂM!\n\nBạn có chắc chắn muốn XÓA VĨNH VIỄN sản phẩm \'<?php echo $escape($p['name']); ?>\' khỏi hệ thống không?\n\nLưu ý: Chỉ cho phép xóa khi sản phẩm chưa từng phát sinh đơn hàng.');">
-                                                    <input type="hidden" name="action" value="force_delete">
-                                                    <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
-                                                    <button type="submit" class="btn-sm btn-force" title="Xóa cứng vĩnh viễn (chỉ khi chưa có đơn hàng)">✕ Xóa vĩnh viễn</button>
                                                 </form>
                                             <?php else: ?>
                                                 <!-- THAO TÁC ĐANG HOẠT ĐỘNG: SỬA HOẶC XÓA MỀM -->
@@ -267,7 +263,8 @@ use App\Helpers\ProductAdminFormatter;
                                                     onclick='openEditModal(<?php echo json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>, "<?php echo $escape($imgSrc); ?>")'>
                                                     Sửa
                                                 </button>
-                                                <form method="post" style="display:inline;" onsubmit="return confirm('Chuyển sản phẩm \'<?php echo $escape($p['name']); ?>\' vào Thùng rác (xóa mềm)?\n\nSản phẩm sẽ ẩn khỏi Client nhưng vẫn bảo toàn lịch sử đơn hàng và báo cáo.');">
+                                                <form method="post" style="display:inline;" onsubmit="return confirm('Chuyển sản phẩm này vào Thùng rác (xóa mềm)?\n\nSản phẩm sẽ ẩn khỏi Client nhưng vẫn bảo toàn lịch sử đơn hàng và báo cáo.');">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo $escape($productsCsrfToken); ?>">
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
                                                     <button type="submit" class="btn-sm btn-delete" title="Xóa mềm vào thùng rác">Xóa</button>
@@ -293,11 +290,17 @@ use App\Helpers\ProductAdminFormatter;
     <div class="modal-box">
         <h3>+ Thêm sản phẩm mới</h3>
         <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="<?php echo $escape($productsCsrfToken); ?>">
             <input type="hidden" name="action" value="add">
             <div class="form-grid">
                 <div class="form-field">
                     <label>Tên sản phẩm (*):</label>
                     <input type="text" name="name" placeholder="Ví dụ: Bông tai ÉCRIN ánh vàng" required>
+                </div>
+
+                <div class="form-field">
+                    <label>Mã sản phẩm / SKU (*):</label>
+                    <input type="text" name="sku" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9._-]*" placeholder="Ví dụ: ER-BT-001" required>
                 </div>
 
                 <div class="form-field">
@@ -311,8 +314,13 @@ use App\Helpers\ProductAdminFormatter;
                 </div>
 
                 <div class="form-field">
-                    <label>Giá bán (VNĐ) (*):</label>
-                    <input type="number" name="price" placeholder="Ví dụ: 450000" min="0" step="1000" required>
+                    <label>Giá gốc (VNĐ) (*):</label>
+                    <input type="number" name="regular_price" min="0" max="9999999999.99" step="0.01" required>
+                    <label for="add-promotion-price">Giá khuyến mãi (để trống nếu không có):</label>
+                    <input type="number" name="promotion_price" id="add-promotion-price" min="0" max="9999999999.99" step="0.01">
+                    <label for="add-promotion-ends-at">Kết thúc khuyến mãi (không bắt buộc):</label>
+                    <input type="datetime-local" name="promotion_ends_at" id="add-promotion-ends-at">
+                    <small>Giá khuyến mãi phải thấp hơn giá gốc. Hết thời hạn, giá hiển thị tự trở về giá gốc.</small>
                 </div>
 
                 <div class="form-field">
@@ -384,6 +392,7 @@ use App\Helpers\ProductAdminFormatter;
     <div class="modal-box">
         <h3>Chỉnh sửa sản phẩm</h3>
         <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="<?php echo $escape($productsCsrfToken); ?>">
             <input type="hidden" name="action" value="edit">
             <input type="hidden" name="id" id="edit-id">
 
@@ -391,6 +400,11 @@ use App\Helpers\ProductAdminFormatter;
                 <div class="form-field">
                     <label>Tên sản phẩm (*):</label>
                     <input type="text" name="name" id="edit-name" required>
+                </div>
+
+                <div class="form-field">
+                    <label>Mã sản phẩm / SKU (*):</label>
+                    <input type="text" name="sku" id="edit-sku" maxlength="100" pattern="[A-Za-z0-9][A-Za-z0-9._-]*" required>
                 </div>
 
                 <div class="form-field">
@@ -403,9 +417,12 @@ use App\Helpers\ProductAdminFormatter;
                 </div>
 
                 <div class="form-field">
-                    <label>Giá bán hiện tại (VNĐ) (*):</label>
-                    <input type="number" name="price" id="edit-price" min="0" step="1000" required>
-                    <input type="hidden" name="price_original" id="edit-price-original" value="0">
+                    <label>Giá gốc (VNĐ) (*):</label>
+                    <input type="number" name="regular_price" id="edit-regular-price" min="0" max="9999999999.99" step="0.01" required>
+                    <label for="edit-promotion-price">Giá khuyến mãi (để trống nếu không có):</label>
+                    <input type="number" name="promotion_price" id="edit-promotion-price" min="0" max="9999999999.99" step="0.01">
+                    <label for="edit-promotion-ends-at">Kết thúc khuyến mãi (không bắt buộc):</label>
+                    <input type="datetime-local" name="promotion_ends_at" id="edit-promotion-ends-at">
                     <div style="margin-top: 8px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
                             <label style="font-size: 13px; font-weight: 600; color: #334155;">Áp dụng % giảm giá nhanh:</label>
@@ -483,10 +500,14 @@ use App\Helpers\ProductAdminFormatter;
 
                 <div class="form-field">
                     <label>Ảnh sản phẩm hiện tại:</label>
-                    <div><img id="edit-img-preview" src="" alt="" class="current-img-preview"></div>
+                    <div><img id="edit-img-preview" src="<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>" alt="" class="current-img-preview"></div>
                     <label>Đổi ảnh mới (nếu muốn):</label>
                     <input type="file" name="image_file" accept="image/*">
                     <input type="text" name="image_url_new" id="edit-img-url" placeholder="Hoặc nhập đường dẫn ảnh mới..." style="margin-top: 6px;">
+                    <label style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+                        <input type="checkbox" name="remove_image" id="edit-remove-image" value="1">
+                        <span>Gỡ ảnh khỏi sản phẩm, dùng ảnh mặc định</span>
+                    </label>
                 </div>
             </div>
 
@@ -499,6 +520,8 @@ use App\Helpers\ProductAdminFormatter;
 </div>
 
 <script>
+const productImageFallbackUrl = <?php echo json_encode($appBaseUrl . '/assets/banner/logo.png', JSON_UNESCAPED_SLASHES); ?>;
+
 // Mẫu mô tả cuốn hút theo từng danh mục
 const descTemplates = {
     2: 'Lấy cảm hứng từ những đóa hoa tuyết đầu mùa và giọt sương mai thuần khiết, đôi bông tai được chế tác thủ công từ Bạc Ý 925 mạ bạch kim cao cấp, đính kết đá Zirconia đa diện phát sáng rực rỡ dưới mọi góc nhìn. Thiết kế thanh thoát tôn vinh trọn vẹn nét đài các, yêu kiều và là phụ kiện hoàn mỹ giúp nàng tự tin tỏa sáng rạng ngời trong các buổi dạ hội sang trọng lẫn phong cách thường nhật.',
@@ -544,12 +567,23 @@ function closeAddModal() {
 // Modal Sửa sản phẩm
 let originalStock = 0;
 let basePriceForDiscount = 0;
+let currentEditImageSrc = productImageFallbackUrl;
+
+function setEditImagePreview(src) {
+    const imagePreview = document.getElementById('edit-img-preview');
+    imagePreview.onerror = () => {
+        imagePreview.onerror = null;
+        imagePreview.src = productImageFallbackUrl;
+    };
+    imagePreview.src = src || productImageFallbackUrl;
+}
 
 function openEditModal(prod, imgSrc) {
     document.getElementById('edit-id').value          = prod.id;
     document.getElementById('edit-name').value        = prod.name;
+    document.getElementById('edit-sku').value         = prod.sku || '';
     document.getElementById('edit-category').value    = prod.category_id;
-    document.getElementById('edit-price').value       = prod.price_sale;
+    document.getElementById('edit-regular-price').value = prod.price_original;
     document.getElementById('edit-stock').value       = prod.stock;
     document.getElementById('edit-status').value      = prod.status || 'active';
     document.getElementById('edit-description').value = prod.description || descTemplates[prod.category_id] || '';
@@ -558,12 +592,13 @@ function openEditModal(prod, imgSrc) {
     document.getElementById('edit-is-new').checked       = parseInt(prod.is_new, 10) === 1;
     originalStock = parseInt(prod.stock, 10) || 0;
 
-    // Giá gốc tham chiếu khi tính giảm giá
     const origPrice = parseFloat(prod.price_original) || 0;
-    const salePrice = parseFloat(prod.price_sale) || 0;
-    basePriceForDiscount = origPrice > salePrice ? origPrice : salePrice;
-
-    document.getElementById('edit-price-original').value = origPrice > salePrice ? origPrice : 0;
+    const promotionPrice = prod.promotion_price !== null ? parseFloat(prod.promotion_price) : NaN;
+    basePriceForDiscount = origPrice;
+    document.getElementById('edit-promotion-price').value = Number.isFinite(promotionPrice) ? promotionPrice : '';
+    document.getElementById('edit-promotion-ends-at').value = Number.isFinite(promotionPrice) && prod.promotion_ends_at
+        ? String(prod.promotion_ends_at).replace(' ', 'T').slice(0, 16)
+        : '';
     updatePriceCalcHint();
 
     // Reset ô nhập thêm hàng
@@ -571,18 +606,21 @@ function openEditModal(prod, imgSrc) {
     addStockInput.value = '';
     document.getElementById('stock-calc-hint').textContent = 'Hiện tại đang có ' + originalStock + ' sản phẩm trong kho.';
 
-    document.getElementById('edit-img-preview').src = imgSrc;
+    currentEditImageSrc = imgSrc || productImageFallbackUrl;
+    document.getElementById('edit-remove-image').checked = false;
+    setEditImagePreview(currentEditImageSrc);
     document.getElementById('edit-img-url').value   = '';
     document.getElementById('editModal').classList.add('is-open');
 }
 
 function updatePriceCalcHint() {
     const hint = document.getElementById('price-calc-hint');
-    const orig = parseFloat(document.getElementById('edit-price-original').value) || 0;
-    const current = parseFloat(document.getElementById('edit-price').value) || 0;
-    if (orig > current && current > 0) {
-        const pct = Math.round((1 - (current / orig)) * 100);
-        hint.innerHTML = '🏷️ Giá gốc: <strong>' + orig.toLocaleString('vi-VN') + 'đ</strong> ➡ Giá sau giảm: <strong>' + current.toLocaleString('vi-VN') + 'đ</strong> (Giảm <strong>-' + pct + '%</strong>)';
+    const regular = parseFloat(document.getElementById('edit-regular-price').value) || 0;
+    const promotionInput = document.getElementById('edit-promotion-price').value;
+    const promotion = parseFloat(promotionInput);
+    if (promotionInput !== '' && Number.isFinite(promotion) && promotion >= 0 && promotion < regular) {
+        const pct = Math.round((1 - (promotion / regular)) * 100);
+        hint.innerHTML = '🏷️ Giá gốc: <strong>' + regular.toLocaleString('vi-VN') + 'đ</strong> ➡ Giá khuyến mãi: <strong>' + promotion.toLocaleString('vi-VN') + 'đ</strong> (Giảm <strong>-' + pct + '%</strong>)';
     } else {
         hint.innerHTML = '💡 Sản phẩm đang bán với giá thường (không giảm giá).';
     }
@@ -590,30 +628,42 @@ function updatePriceCalcHint() {
 
 function applyDiscountPercent(pct) {
     if (basePriceForDiscount <= 0) return;
-    const discountedPrice = Math.round(basePriceForDiscount * (1 - pct / 100) / 1000) * 1000;
-    document.getElementById('edit-price').value = discountedPrice;
-    document.getElementById('edit-price-original').value = basePriceForDiscount;
+    const discountedPrice = Math.round(basePriceForDiscount * (1 - pct / 100) * 100) / 100;
+    document.getElementById('edit-promotion-price').value = discountedPrice;
     updatePriceCalcHint();
 }
 
 function removeDiscount() {
-    document.getElementById('edit-price').value = basePriceForDiscount;
-    document.getElementById('edit-price-original').value = 0;
+    document.getElementById('edit-promotion-price').value = '';
+    document.getElementById('edit-promotion-ends-at').value = '';
     updatePriceCalcHint();
 }
 
-document.getElementById('edit-price')?.addEventListener('input', function() {
-    const current = parseFloat(this.value) || 0;
-    const orig = parseFloat(document.getElementById('edit-price-original').value) || 0;
-    if (current >= orig) {
-        document.getElementById('edit-price-original').value = 0;
-    }
+document.getElementById('edit-regular-price')?.addEventListener('input', function() {
+    basePriceForDiscount = parseFloat(this.value) || 0;
+    updatePriceCalcHint();
+});
+document.getElementById('edit-promotion-price')?.addEventListener('input', function() {
     updatePriceCalcHint();
 });
 
 function closeEditModal() {
     document.getElementById('editModal').classList.remove('is-open');
 }
+
+document.getElementById('edit-remove-image').addEventListener('change', function() {
+    setEditImagePreview(this.checked ? productImageFallbackUrl : currentEditImageSrc);
+});
+document.querySelector('#editModal input[name="image_file"]').addEventListener('change', function() {
+    if (this.files.length > 0) {
+        document.getElementById('edit-remove-image').checked = false;
+    }
+});
+document.getElementById('edit-img-url').addEventListener('input', function() {
+    if (this.value.trim() !== '') {
+        document.getElementById('edit-remove-image').checked = false;
+    }
+});
 
 // Tính năng tự động cộng kho khi nhập thêm hàng
 document.getElementById('add-stock-input').addEventListener('input', function() {
@@ -660,11 +710,12 @@ function filterProducts() {
 
     rows.forEach(row => {
         const name = row.getAttribute('data-name') || '';
+        const sku = row.getAttribute('data-sku') || '';
         const catId = row.getAttribute('data-cat-id') || '';
         const status = row.getAttribute('data-status') || '';
         const stock = parseInt(row.getAttribute('data-stock'), 10) || 0;
 
-        const matchName = query === '' || name.includes(query);
+        const matchName = query === '' || name.includes(query) || sku.includes(query);
         const matchCat = selectedCat === '' || catId === selectedCat;
 
         let matchStatus = true;

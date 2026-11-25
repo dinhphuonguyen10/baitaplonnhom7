@@ -2,6 +2,7 @@
 
 namespace App\Controllers\Admin;
 
+use App\Core\Auth;
 use App\Core\Database;
 use App\Core\Request;
 use App\Core\Session;
@@ -54,7 +55,8 @@ class OrderController extends BaseAdminController
             } else {
                 $orderNotice = $this->service->updateStatus(
                     (int) Request::post('order_id', 0),
-                    trim((string) Request::post('status', ''))
+                    trim((string) Request::post('status', '')),
+                    Auth::adminUsername()
                 );
             }
         }

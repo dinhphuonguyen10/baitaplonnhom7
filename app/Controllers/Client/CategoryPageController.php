@@ -3,6 +3,7 @@
 namespace App\Controllers\Client;
 
 use App\Core\Request;
+use App\Core\Url;
 use App\Services\ProductCatalogService;
 
 /**
@@ -51,15 +52,29 @@ class CategoryPageController extends BaseClientController
         ];
     }
 
+    /**
+     * Danh mục đã ngừng hoạt động / bị xóa mềm (hoặc slug không tồn tại) thì quay về trang chủ.
+     * Slug rỗng (category.php không có ?slug) vẫn hiển thị trang danh mục chung.
+     */
+    private function renderCategoryPage(array $data): void
+    {
+        $key = (string) $data['categoryKey'];
+        if ($key !== '' && !$this->catalog->isActiveCategorySlug($key, $this->catalog->navigationCategories())) {
+            $this->redirect(Url::to('/index.php'));
+        }
+
+        $this->render('client/category', $data);
+    }
+
     /** Action: hiển thị View client/category. */
     public function fixed(string $title, string $key): void
     {
-        $this->render('client/category', $this->fixedData($title, $key));
+        $this->renderCategoryPage($this->fixedData($title, $key));
     }
 
     /** Action: hiển thị View client/category. */
     public function bySlug(): void
     {
-        $this->render('client/category', $this->bySlugData());
+        $this->renderCategoryPage($this->bySlugData());
     }
 }

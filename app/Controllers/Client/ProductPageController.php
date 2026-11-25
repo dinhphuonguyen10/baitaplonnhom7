@@ -100,7 +100,7 @@ class ProductPageController extends BaseClientController
             : Url::base() . '/' . ltrim($imagePath, '/') . '?v=' . $imgVersion;
 
         $stock = (int) $product['stock'];
-        $isDiscontinued = ($product['status'] ?? 'active') === 'inactive';
+        $isDiscontinued = ($product['status'] ?? '') !== 'active';
 
         $original = (float) $product['price_original'];
         $sale = (float) $product['price_sale'];

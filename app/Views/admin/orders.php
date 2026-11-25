@@ -517,13 +517,13 @@ use App\Helpers\AdminOrderFormatter;
                     <div class="om-stat-accent"></div>
                     <div class="om-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h11v10H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M14 14h7"/></svg></div>
                     <div class="om-stat-value"><?php echo $statCounts['shipping'] + $statCounts['delivering']; ?></div>
-                    <div class="om-stat-label">Đang giao</div>
+                    <div class="om-stat-label">Đang giao hàng</div>
                 </div>
                 <div class="om-stat om-stat--done">
                     <div class="om-stat-accent"></div>
                     <div class="om-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/></svg></div>
                     <div class="om-stat-value"><?php echo $statCounts['completed']; ?></div>
-                    <div class="om-stat-label">Đã giao hàng</div>
+                    <div class="om-stat-label">Đã giao / hoàn thành</div>
                 </div>
                 <div class="om-stat om-stat--cancel">
                     <div class="om-stat-accent"></div>
@@ -604,8 +604,9 @@ use App\Helpers\AdminOrderFormatter;
                             <?php
                             $date = strtotime($o['date']);
                             $normalizedStatus = AdminOrderFormatter::normalize((string) $o['status']);
+                            $allowedStatusTransitions = AdminOrderFormatter::allowedTransitions((string) $o['status']);
                             $searchText = AdminOrderFormatter::searchText($o);
-                            $stClass = AdminOrderFormatter::statusClass((string) $o['status']);
+                            $stClass = AdminOrderFormatter::statusClass($normalizedStatus);
                             $isCOD = $o['payment_method'] === 'COD';
                             $isBankQr = $o['payment_method'] === 'BANK_QR';
                             $isPaid = $o['payment_status'] === 'Đã thanh toán';
@@ -637,12 +638,17 @@ use App\Helpers\AdminOrderFormatter;
                                             <input type="hidden" name="csrf_token" value="<?php echo $escape($ordersCsrf); ?>">
                                             <input type="hidden" name="action" value="update_status">
                                             <input type="hidden" name="order_id" value="<?php echo (int) $o['id']; ?>">
-                                            <select name="status" class="om-status-select" aria-label="Trạng thái đơn #<?php echo (int) $o['id']; ?>">
-                                                <?php foreach ($orderStatuses as $statusOption): ?>
-                                                    <option value="<?php echo $escape($statusOption); ?>" <?php echo $normalizedStatus === $statusOption ? 'selected' : ''; ?>><?php echo $escape($statusOption); ?></option>
+                                            <select name="status" class="om-status-select" aria-label="Trạng thái tiếp theo đơn #<?php echo (int) $o['id']; ?>" <?php echo $allowedStatusTransitions === [] ? 'disabled' : ''; ?>>
+                                                <?php if ($allowedStatusTransitions === []): ?>
+                                                    <option value="" selected>Đơn đã ở trạng thái cuối</option>
+                                                <?php else: ?>
+                                                    <option value="" selected disabled>Chọn bước tiếp theo</option>
+                                                <?php foreach ($allowedStatusTransitions as $statusOption): ?>
+                                                    <option value="<?php echo $escape($statusOption); ?>"><?php echo $escape($statusOption); ?></option>
                                                 <?php endforeach; ?>
+                                                <?php endif; ?>
                                             </select>
-                                            <button type="submit" class="om-btn-save">Lưu</button>
+                                            <button type="submit" class="om-btn-save" <?php echo $allowedStatusTransitions === [] ? 'disabled' : ''; ?>>Lưu</button>
                                         </form>
                                         <!-- Xác nhận COD hoặc đối soát VietQR -->
                                         <div class="om-action-row">
@@ -686,7 +692,15 @@ use App\Helpers\AdminOrderFormatter;
                                                     <strong>Sản phẩm:</strong>
                                                     <ul class="om-detail-items">
                                                         <?php foreach ($o['items'] as $item): ?>
-                                                            <li><?php echo $escape($item['name']); ?> × <?php echo $escape($item['quantity']); ?> — <?php echo $escape(number_format($item['price'], 0, ',', '.')); ?>đ / sp</li>
+                                                            <li>
+                                                                <?php echo $escape($item['name']); ?>
+                                                                <?php if ($item['sku'] !== null): ?> · SKU <?php echo $escape($item['sku']); ?><?php endif; ?>
+                                                                <?php if ($item['attributes'] !== ''): ?> · <?php echo $escape($item['attributes']); ?><?php endif; ?>
+                                                                <?php if ($item['category'] !== ''): ?> · <?php echo $escape($item['category']); ?><?php endif; ?>
+                                                                · <?php echo $escape($item['quantity']); ?> × <?php echo $escape(number_format($item['price'], 0, ',', '.')); ?>đ
+                                                                <?php if ($item['discount_amount'] > 0): ?> · giảm <?php echo $escape(number_format($item['discount_amount'], 0, ',', '.')); ?>đ<?php endif; ?>
+                                                                · thành tiền <?php echo $escape(number_format($item['line_total'], 0, ',', '.')); ?>đ
+                                                            </li>
                                                         <?php endforeach; ?>
                                                     </ul>
                                                 <?php else: ?>
@@ -747,8 +761,8 @@ use App\Helpers\AdminOrderFormatter;
             const map = {
                 'Tổng đơn hàng': ['', ''],
                 'Chờ xác nhận': ['Chờ xác nhận', ''],
-                'Đang giao': ['Đang vận chuyển', ''],
-                'Đã giao hàng': ['Đã giao hàng', ''],
+                'Đang giao hàng': ['Đang giao hàng', ''],
+                'Đã giao / hoàn thành': ['', ''],
                 'Đã hủy': ['Đã hủy', ''],
                 'Chờ thu COD': ['', 'Chưa thanh toán'],
                 'Đã thu COD': ['', 'Đã thanh toán'],

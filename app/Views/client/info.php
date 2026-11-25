@@ -59,7 +59,7 @@ include VIEW_PATH . '/layouts/header.php';
 
             <?php if (!empty($topic['actions'])): ?>
                 <nav class="info-actions" aria-label="Liên kết hữu ích">
-                    <?php foreach ($topic['actions'] as $action): ?>
+                    <?php foreach ($topicActions as $action): ?>
                         <a class="info-action<?php echo !empty($action['primary']) ? ' info-action-primary' : ''; ?>"
                             href="<?php echo View::e(strpos($action['href'], 'tel:') === 0 ? $action['href'] : $appBaseUrl . $action['href']); ?>">
                             <?php echo View::e($action['label']); ?>

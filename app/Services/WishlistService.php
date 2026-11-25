@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Core\View;
 use App\Models\Product;
 use App\Models\Wishlist;
+use DomainException;
 use InvalidArgumentException;
 
 /**
  * Lớp WishlistService - nghiệp vụ "thả tim" sản phẩm yêu thích của khách hàng:
  * lấy danh sách, bật/tắt, xóa, đồng bộ từ localStorage và phân trang cho trang wishlist.
+ * Chỉ sản phẩm đang kinh doanh thuộc danh mục đang hoạt động mới được đếm / hiển thị / thêm mới.
  */
 class WishlistService
 {
@@ -25,18 +27,19 @@ class WishlistService
         $this->products = $products ?? new Product();
     }
 
-    /** Danh sách ID sản phẩm yêu thích (mới nhất trước). */
+    /** Danh sách ID sản phẩm yêu thích còn kinh doanh (mới nhất trước). */
     public function ids(int $userId): array
     {
-        return $this->wishlists->productIdsForUser($userId, true);
+        return $this->wishlists->activeProductIdsForUser($userId, true);
     }
 
+    /** Số sản phẩm yêu thích còn kinh doanh. */
     public function count(int $userId): int
     {
         return $this->wishlists->countForUser($userId);
     }
 
-    /** Chi tiết sản phẩm yêu thích, đã định dạng giá cho API. */
+    /** Chi tiết sản phẩm yêu thích (giá hiệu lực sau khuyến mãi), đã định dạng giá cho API. */
     public function items(int $userId): array
     {
         $items = [];
@@ -47,7 +50,7 @@ class WishlistService
             $row['price_sale_raw'] = (float) $row['price_sale'];
             $row['price_original_raw'] = (float) ($row['price_original'] ?? 0);
             $row['price_sale'] = View::money($row['price_sale']);
-            $row['price_original'] = $row['price_original_raw'] > 0 ? View::money($row['price_original_raw']) : null;
+            $row['price_original'] = $row['price_original_raw'] > $row['price_sale_raw'] ? View::money($row['price_original_raw']) : null;
             $row['is_favorite'] = true;
             $items[] = $row;
         }
@@ -55,30 +58,35 @@ class WishlistService
         return $items;
     }
 
-    /** Đồng bộ danh sách ID từ localStorage khi khách vừa đăng nhập, trả về danh sách ID mới nhất. */
+    /**
+     * Đồng bộ danh sách ID từ localStorage khi khách vừa đăng nhập (bỏ qua sản phẩm không còn kinh doanh),
+     * trả về danh sách ID còn hiển thị.
+     */
     public function sync(int $userId, $syncIds): array
     {
         if (is_array($syncIds)) {
             foreach ($syncIds as $productId) {
                 $productId = (int) $productId;
                 if ($productId > 0) {
-                    $this->wishlists->addForUserIgnoreDuplicate($userId, $productId);
+                    $this->wishlists->addActiveForUserIgnoreDuplicate($userId, $productId);
                 }
             }
         }
 
-        return $this->wishlists->productIdsForUser($userId);
+        return $this->wishlists->activeProductIdsForUser($userId);
     }
 
     /**
-     * Bật / tắt yêu thích một sản phẩm.
+     * Bật / tắt yêu thích một sản phẩm. Bỏ tim luôn được phép; thả tim mới chỉ khi sản phẩm còn kinh doanh.
      *
      * @return array{favorited: bool, count: int, message: string}
      * @throws InvalidArgumentException khi mã sản phẩm không hợp lệ / không tồn tại
+     * @throws DomainException khi sản phẩm không còn được kinh doanh (HTTP 409)
      */
-    public function toggle(int $userId, int $productId, ?string $productName = null): array
+    public function toggle(int $userId, int $productId, ?array $product = null): array
     {
-        $productName = $productName ?? $this->requireProductName($productId);
+        $product = $product ?? $this->requireProduct($productId);
+        $productName = (string) $product['name'];
 
         if ($this->wishlists->isFavorited($userId, $productId)) {
             // Đã tim rồi -> Hủy tim
@@ -86,6 +94,10 @@ class WishlistService
             $favorited = false;
             $message = "Đã bỏ yêu thích '{$productName}'";
         } else {
+            if ((int) $product['is_deleted'] === 1 || $product['status'] !== 'active'
+                || (int) $product['category_is_deleted'] === 1 || $product['category_status'] !== 'active') {
+                throw new DomainException('Sản phẩm hiện không còn được kinh doanh.');
+            }
             $this->wishlists->addForUser($userId, $productId);
             $favorited = true;
             $message = "❤️ Đã lưu '{$productName}' vào danh sách yêu thích!";
@@ -99,12 +111,31 @@ class WishlistService
      *
      * @return array{favorited: bool, count: int, message: string}
      */
-    public function remove(int $userId, int $productId, ?string $productName = null): array
+    public function remove(int $userId, int $productId, ?array $product = null): array
     {
-        $productName = $productName ?? $this->requireProductName($productId);
+        $product = $product ?? $this->requireProduct($productId);
         $this->wishlists->removeForUser($userId, $productId);
 
-        return ['favorited' => false, 'count' => $this->count($userId), 'message' => "Đã bỏ yêu thích '{$productName}'"];
+        return ['favorited' => false, 'count' => $this->count($userId), 'message' => "Đã bỏ yêu thích '{$product['name']}'"];
+    }
+
+    /**
+     * Kiểm tra sản phẩm (có danh mục) tồn tại; trả về id, name, status, is_deleted, category_status, category_is_deleted.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function requireProduct(int $productId): array
+    {
+        if ($productId <= 0) {
+            throw new InvalidArgumentException('Mã sản phẩm không hợp lệ!');
+        }
+
+        $product = $this->products->findWithCategoryStatus($productId);
+        if (!$product) {
+            throw new InvalidArgumentException('Sản phẩm không tồn tại!');
+        }
+
+        return $product;
     }
 
     /**
@@ -114,16 +145,7 @@ class WishlistService
      */
     public function requireProductName(int $productId): string
     {
-        if ($productId <= 0) {
-            throw new InvalidArgumentException('Mã sản phẩm không hợp lệ!');
-        }
-
-        $product = $this->products->findIdAndName($productId);
-        if (!$product) {
-            throw new InvalidArgumentException('Sản phẩm không tồn tại!');
-        }
-
-        return (string) $product['name'];
+        return (string) $this->requireProduct($productId)['name'];
     }
 
     /**

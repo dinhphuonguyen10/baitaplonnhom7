@@ -11,7 +11,7 @@ class ChatMessage extends BaseModel
     protected string $table = 'chat_messages';
 
     /** Các cột trả về cho giao diện chat (kèm thông tin sản phẩm được chia sẻ). */
-    private const CHAT_VIEW_COLUMNS = 'cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, p.price_sale AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at';
+    private const CHAT_VIEW_COLUMNS = 'cm.id, cm.username, cm.sender, cm.message_type, cm.message, cm.product_id, p.name AS product_name, p.image AS product_image, CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW() THEN p.price_original ELSE p.price_sale END AS product_price, cm.attachment_name, cm.attachment_mime, cm.attachment_size, cm.created_at';
 
     /** Danh sách hội thoại cho trang quản trị (mới nhất trước, kèm số tin chưa đọc). */
     public function conversationsForAdmin(): array
@@ -143,6 +143,31 @@ class ChatMessage extends BaseModel
             "SELECT message_type, attachment_path, attachment_name, attachment_mime
                             FROM chat_messages
                             WHERE id = ? AND message_type IN ('image', 'file') LIMIT 1",
+            [$messageId],
+            'i'
+        );
+    }
+
+    // ───────────── Phía khách: chỉ kèm sản phẩm còn kinh doanh (portOrders) ─────────────
+
+    /** LEFT JOIN sản phẩm còn kinh doanh (sản phẩm và danh mục đang hoạt động, chưa xóa mềm). */
+    private const ACTIVE_PRODUCT_JOIN = "LEFT JOIN products p ON p.id = cm.product_id AND p.is_deleted = 0 AND p.status = 'active' AND EXISTS (SELECT 1 FROM categories c WHERE c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0)";
+
+    /** Toàn bộ tin nhắn của khách (cũ -> mới), chỉ kèm thông tin sản phẩm còn kinh doanh. */
+    public function allCustomerChatViewForUser(int $userId): array
+    {
+        return $this->db->fetchAll(
+            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm ' . self::ACTIVE_PRODUCT_JOIN . ' WHERE cm.user_id = ? ORDER BY cm.created_at ASC',
+            [$userId],
+            'i'
+        );
+    }
+
+    /** Một tin nhắn theo ID cho phía khách, chỉ kèm thông tin sản phẩm còn kinh doanh. */
+    public function findCustomerChatView(int $messageId): ?array
+    {
+        return $this->db->fetchOne(
+            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm ' . self::ACTIVE_PRODUCT_JOIN . ' WHERE cm.id = ? LIMIT 1',
             [$messageId],
             'i'
         );

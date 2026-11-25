@@ -159,7 +159,7 @@
                             <?php foreach ($recentOrders as $order): ?>
                                 <?php
                                 $orderStatus = (string) $order['status'];
-                                $statusClass = in_array($orderStatus, ['Đã giao hàng', 'Đã giao'], true) ? 'is-done' : (in_array($orderStatus, ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true) ? 'is-cancelled' : (in_array($orderStatus, ['Chờ xác nhận', 'Pending'], true) ? 'is-pending' : ''));
+                                $statusClass = in_array($orderStatus, ['Đã giao hàng', 'Đã giao', 'Hoàn thành'], true) ? 'is-done' : (in_array($orderStatus, ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true) ? 'is-cancelled' : (in_array($orderStatus, ['Chờ xác nhận', 'Pending'], true) ? 'is-pending' : ''));
                                 ?>
                                 <article class="recent-order">
                                     <div class="recent-order-main">
@@ -185,16 +185,16 @@
                         <?php if ($topProducts === []): ?>
                             <p class="page-subtitle">Chưa có sản phẩm bán ra trong khoảng thời gian này.</p>
                         <?php else: ?>
-                            <?php foreach ($topProducts as $index => $product): ?>
+                            <?php foreach ($topProducts as $product): ?>
                                 <?php $quantity = (int) $product['quantity_sold']; ?>
                                 <?php $progress = $topProducts ? min(100, $quantity / max(1, (int) $topProducts[0]['quantity_sold']) * 100) : 0; ?>
                                 <article class="best-item">
                                     <div class="product-thumb">
-                                        <?php if (!empty($product['image'])): ?>
-                                            <img src="<?php echo $escape($appBaseUrl . '/' . ltrim($product['image'], '/')); ?>" alt="">
-                                        <?php else: ?>
-                                            <?php echo $index === 0 ? '◇' : ($index === 1 ? '◈' : '✦'); ?>
-                                        <?php endif; ?>
+                                        <img
+                                            src="<?php echo $escape($product['image_url']); ?>"
+                                            alt=""
+                                            onerror="this.onerror=null;this.src='<?php echo $escape($fallbackImageUrl); ?>'"
+                                        >
                                     </div>
                                     <div class="product-info">
                                         <strong><?php echo $escape($product['product_name']); ?></strong>

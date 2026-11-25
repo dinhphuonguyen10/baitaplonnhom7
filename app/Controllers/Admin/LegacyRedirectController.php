@@ -15,4 +15,16 @@ class LegacyRedirectController extends Controller
     {
         $this->redirect(Url::to('/admin/orders.php'), 301);
     }
+
+    /**
+     * client/categories.php (đường dẫn cũ): quản trị viên được chuyển về admin/categories.php,
+     * chưa đăng nhập quản trị thì chuyển tới trang đăng nhập admin.
+     */
+    public function clientCategories(): void
+    {
+        if (!\App\Core\Auth::isAdmin()) {
+            $this->redirect(Url::to('/admin/login.php'));
+        }
+        $this->redirect(Url::to('/admin/categories.php'));
+    }
 }

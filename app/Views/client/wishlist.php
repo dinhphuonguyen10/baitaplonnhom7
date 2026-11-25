@@ -42,13 +42,13 @@ include VIEW_PATH . '/layouts/header.php';
                 <div class="product-card" data-db-id="<?php echo $id; ?>" data-stock="<?php echo $stock; ?>" data-detail-url="<?php echo $escape($detailUrl); ?>" role="link" tabindex="0">
                     <div class="product-image-wrap">
                         <button class="wishlist-btn active" data-product-id="<?php echo $id; ?>" title="Bỏ yêu thích">♥</button>
-                        <img src="<?php echo $escape($imgSrc); ?>" alt="<?php echo $escape($name); ?>" class="product-image" onerror="this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';">
+                        <img src="<?php echo $escape($imgSrc); ?>" alt="<?php echo $escape($name); ?>" class="product-image" onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';">
                     </div>
                     <div class="product-info">
                         <h3><?php echo $escape($name); ?></h3>
                         <div class="product-price">
                             <span class="price-sale"><?php echo number_format($priceSale, 0, ',', '.'); ?><sup>đ</sup></span>
-                            <?php if ($priceOriginal > 0): ?>
+                            <?php if ($priceOriginal > $priceSale): ?>
                                 <span class="price-original"><?php echo number_format($priceOriginal, 0, ',', '.'); ?><sup>đ</sup></span>
                             <?php endif; ?>
                         </div>
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const sold = Number(p.sold_count) || 0;
                         const priceSaleFormatted = typeof p.price_sale === 'string' && p.price_sale.includes('.') ? p.price_sale : formatPrice(p.price_sale);
                         const priceOriginalFormatted = p.price_original ? (typeof p.price_original === 'string' && p.price_original.includes('.') ? p.price_original : formatPrice(p.price_original)) : '';
-                        const priceOriginalHTML = p.price_original && parsePrice(p.price_original) > 0 ? `<span class="price-original">${priceOriginalFormatted}<sup>đ</sup></span>` : '';
+                        const priceOriginalHTML = p.price_original && p.price_original_raw > priceSaleRaw ? `<span class="price-original">${priceOriginalFormatted}<sup>đ</sup></span>` : '';
                         const badgeHTML = hasDiscount ? `<span class="product-badge">${p.discount || 'ƯU ĐÃI'}</span>` : '';
                         const metaHTML = renderProductMeta(sold);
 
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div class="product-image-wrap">
                                     ${badgeHTML}
                                     <button class="wishlist-btn active" data-product-id="${p.id}" title="Bỏ yêu thích">♥</button>
-                                    <img src="${typeof getProductImageUrl === 'function' ? getProductImageUrl(p.image) : p.image}" alt="${p.name}" class="product-image">
+                                    <img src="${typeof getProductImageUrl === 'function' ? getProductImageUrl(p.image) : p.image}" alt="${p.name}" class="product-image" onerror="this.onerror=null;this.src='${window.APP_BASE_URL || ''}/assets/banner/logo.png'">
                                 </div>
                                 <div class="product-info">
                                     <h3>${p.name}</h3>

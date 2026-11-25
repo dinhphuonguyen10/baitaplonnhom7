@@ -177,7 +177,7 @@ class ChatService
 
     public function customerMessages(int $userId): array
     {
-        return $this->messages->allChatViewForUser($userId);
+        return $this->messages->allCustomerChatViewForUser($userId);
     }
 
     /** Kiểm tra nội dung tin nhắn khách gửi, trả về nội dung đã trim. */
@@ -204,12 +204,12 @@ class ChatService
         }
 
         try {
-            $exists = (new Product($this->db))->exists((int) $productId);
+            $exists = (new Product($this->db))->findActiveIdAndName((int) $productId) !== null;
         } catch (Throwable $e) {
             throw new ChatException('Không thể kiểm tra sản phẩm được chia sẻ.', 500);
         }
         if (!$exists) {
-            throw new ChatException('Không tìm thấy sản phẩm được chia sẻ.', 404);
+            throw new ChatException('Sản phẩm không còn được kinh doanh hoặc không tìm thấy.', 404);
         }
 
         return (int) $productId;
@@ -228,7 +228,7 @@ class ChatService
             return false;
         }
 
-        return $this->messages->findChatView($messageId);
+        return $this->messages->findCustomerChatView($messageId);
     }
 
     /** Gửi tin chăm sóc một lần mỗi ngày, khi đây là tin nhắn đầu tiên của khách trong ngày. */

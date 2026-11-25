@@ -38,7 +38,19 @@ class DashboardController extends BaseAdminController
         );
         $data['formatCompact'] = static fn(float $value): string => DashboardService::formatCompact($value);
 
-        return array_merge($this->layoutData('index.php'), $data);
+        $layout = $this->layoutData('index.php');
+        $appBaseUrl = (string) ($layout['appBaseUrl'] ?? Url::base());
+        // Ảnh sản phẩm bán chạy: URL tuyệt đối giữ nguyên, thiếu ảnh dùng logo.
+        foreach ($data['topProducts'] as &$product) {
+            $productImage = trim((string) ($product['image'] ?? ''));
+            $product['image_url'] = preg_match('~^https?://~i', $productImage)
+                ? $productImage
+                : $appBaseUrl . '/' . ltrim($productImage !== '' ? $productImage : 'assets/banner/logo.png', '/');
+        }
+        unset($product);
+        $data['fallbackImageUrl'] = $appBaseUrl . '/assets/banner/logo.png';
+
+        return array_merge($layout, $data);
     }
 
     /** admin/dashboard.php: chuyển về trang tổng quan. */

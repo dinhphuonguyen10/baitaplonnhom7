@@ -29,7 +29,7 @@ class SalesReport extends AbstractReport
         'orders' => 'sales-order-status',
     ];
 
-    private const DELIVERED = "('Đã giao hàng', 'Đã giao')";
+    private const DELIVERED = "('Đã giao hàng', 'Đã giao', 'Hoàn thành')";
 
     private const CANCELLED = "('Đã hủy', 'Canceled', 'cancelled', 'huy')";
 
@@ -62,10 +62,10 @@ class SalesReport extends AbstractReport
     private array $statusCounts = [
         'Chờ xác nhận' => 0,
         'Đã xác nhận' => 0,
-        'Chuẩn bị đơn hàng' => 0,
-        'Đang vận chuyển' => 0,
-        'Đang giao' => 0,
+        'Đang chuẩn bị hàng' => 0,
+        'Đang giao hàng' => 0,
         'Đã giao hàng' => 0,
+        'Hoàn thành' => 0,
         'Đã hủy' => 0,
     ];
 
@@ -341,7 +341,8 @@ class SalesReport extends AbstractReport
         $rows = $this->query(
             "SELECT CASE
                 WHEN o.status IN ('Đang xử lý') THEN 'Đã xác nhận'
-                WHEN o.status IN ('Đang chuẩn bị') THEN 'Chuẩn bị đơn hàng'
+                WHEN o.status IN ('Chuẩn bị đơn hàng', 'Đang chuẩn bị') THEN 'Đang chuẩn bị hàng'
+                WHEN o.status IN ('Đang vận chuyển', 'Đang giao') THEN 'Đang giao hàng'
                 WHEN o.status IN ('Đã giao') THEN 'Đã giao hàng'
                 WHEN o.status IN ('Canceled', 'cancelled', 'huy') THEN 'Đã hủy'
                 ELSE o.status

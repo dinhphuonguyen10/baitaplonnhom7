@@ -7,6 +7,7 @@ use App\Database\SchemaManager;
 use App\Models\Address;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderStatusHistory;
 use App\Models\Product;
 use App\Models\User;
 use DomainException;
@@ -22,26 +23,15 @@ use Throwable;
  */
 class OrderService
 {
+    /** Khóa phiên chứa CSRF token cho thao tác hủy đơn của khách. */
+    public const CANCEL_CSRF_KEY = 'order_cancel_csrf';
+
     /** Nhóm trạng thái dùng cho bộ lọc "Đơn hàng của tôi". */
     public const STATUS_GROUPS = [
-        'processing' => ['Chờ xác nhận', 'Đã xác nhận', 'Chuẩn bị đơn hàng'],
-        'shipping' => ['Đang vận chuyển', 'Đang giao'],
-        'delivered' => ['Đã giao hàng', 'Đã giao'],
-        'cancelled' => ['Đã hủy'],
-    ];
-
-    /** Ánh xạ trạng thái => nhóm khi đếm số đơn. */
-    public const STATUS_TO_GROUP = [
-        'Chờ xác nhận' => 'processing',
-        'Đã xác nhận' => 'processing',
-        'Chuẩn bị đơn hàng' => 'processing',
-        'Đang xử lý' => 'processing',
-        'Đang chuẩn bị' => 'processing',
-        'Đang vận chuyển' => 'shipping',
-        'Đang giao' => 'shipping',
-        'Đã giao hàng' => 'delivered',
-        'Đã giao' => 'delivered',
-        'Đã hủy' => 'cancelled',
+        'processing' => ['Chờ xác nhận', 'Đã xác nhận', 'Đang chuẩn bị hàng', 'Chuẩn bị đơn hàng', 'Đang xử lý', 'Đang chuẩn bị', 'Pending'],
+        'shipping' => ['Đang giao hàng', 'Đang vận chuyển', 'Đang giao'],
+        'delivered' => ['Đã giao hàng', 'Đã giao', 'Hoàn thành'],
+        'cancelled' => ['Đã hủy', 'Canceled', 'cancelled', 'huy'],
     ];
 
     private Database $db;
@@ -50,6 +40,7 @@ class OrderService
     private Product $products;
     private Address $addresses;
     private User $users;
+    private OrderStatusHistory $history;
 
     public function __construct(?Database $db = null)
     {
@@ -59,6 +50,7 @@ class OrderService
         $this->products = new Product($this->db);
         $this->addresses = new Address($this->db);
         $this->users = new User($this->db);
+        $this->history = new OrderStatusHistory($this->db);
     }
 
     // ─────────────────────────── Đặt hàng ───────────────────────────
@@ -141,7 +133,11 @@ class OrderService
             }
 
             $quantities[$productId] = ($quantities[$productId] ?? 0) + $quantity;
+            if ($quantities[$productId] > 99) {
+                throw new DomainException('Số lượng mỗi sản phẩm không được vượt quá 99.');
+            }
         }
+        ksort($quantities, SORT_NUMERIC);
 
         return [
             'payment_method' => $paymentMethod,
@@ -159,13 +155,16 @@ class OrderService
     }
 
     /**
-     * Tạo đơn hàng trong một transaction: kiểm tra tài khoản/địa chỉ, khóa sản phẩm, trừ kho,
-     * lưu chi tiết đơn; sau đó gửi tin cảm ơn tự động.
+     * Tạo đơn hàng trong một transaction: kiểm tra tài khoản/địa chỉ, khóa sản phẩm (theo thứ tự ID),
+     * tính tiền theo giá hiệu lực (đơn vị xu), giữ tồn kho, lưu snapshot sản phẩm, kiểm tra tổng tiền
+     * và ghi lịch sử trạng thái; sau đó gửi tin cảm ơn tự động.
      * DomainException = lỗi hiển thị cho khách; lỗi khác = lỗi hệ thống.
      *
-     * @return array{order_id:int, total_price:float, items:array}
+     * @param bool $isCustomerRole phiên có role = customer
+     * @param mixed $sessionUserId giá trị user_id trong phiên (chưa kiểm tra)
+     * @return array{order_id:int, subtotal:string, total_price:string, discount_amount:string, items:array}
      */
-    public function placeOrder(array $input, ?int $sessionUserId): array
+    public function placeOrder(array $input, bool $isCustomerRole, $sessionUserId, ?string $sessionUsername): array
     {
         $fullName = $input['full_name'];
         $phone = $input['phone'];
@@ -175,19 +174,25 @@ class OrderService
         $longitude = $input['longitude'];
         $requestedAddressId = $input['requested_address_id'];
         $makeDefault = $input['make_default'];
+        $paymentMethod = $input['payment_method'];
 
         try {
             (new SchemaManager($this->db))->ensureOrderEmailColumn();
 
             $this->db->beginTransaction();
 
-            $userId = $sessionUserId;
+            $userId = null;
             $addressId = null;
 
-            // Session cũ có thể còn giữ ID tài khoản đã bị xóa hoặc sau khi đổi database.
-            // Khi đó không được ghi ID không tồn tại vào orders vì sẽ vi phạm khóa ngoại.
-            if ($userId !== null && !$this->users->exists($userId)) {
-                $userId = null;
+            if ($isCustomerRole) {
+                $validatedUserId = filter_var($sessionUserId, FILTER_VALIDATE_INT);
+                if ($validatedUserId === false || $validatedUserId < 1) {
+                    throw new DomainException('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại trước khi đặt hàng.');
+                }
+                if (!$this->users->exists($validatedUserId)) {
+                    throw new DomainException('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại trước khi đặt hàng.');
+                }
+                $userId = (int) $validatedUserId;
             }
 
             if ($requestedAddressId !== null && $userId === null) {
@@ -233,30 +238,66 @@ class OrderService
             }
 
             $products = [];
-            $totalPrice = 0;
+            $totalPriceCents = 0;
+            $totalDiscountCents = 0;
+            $grossSubtotalCents = 0;
+            $maxOrderAmountCents = 999999999999;
             foreach ($input['quantities'] as $productId => $quantity) {
-                $product = $this->products->lockForOrder((int) $productId);
+                $product = $this->products->lockForOrderWithPricing((int) $productId);
 
                 if (!$product || (int) $product['is_deleted'] === 1) {
                     throw new DomainException('Sản phẩm không tồn tại hoặc đã ngừng cung cấp.');
                 }
-                if (($product['status'] ?? 'active') === 'inactive') {
-                    throw new DomainException('Sản phẩm "' . $product['name'] . '" đã ngừng kinh doanh, không thể đặt mua.');
-                }
-                if (($product['status'] ?? 'active') === 'hidden') {
-                    throw new DomainException('Sản phẩm "' . $product['name'] . '" hiện không khả dụng.');
+                if (($product['status'] ?? '') !== 'active') {
+                    throw new DomainException('Sản phẩm "' . $product['name'] . '" hiện không còn được kinh doanh.');
                 }
                 if ((int) $product['stock'] < $quantity) {
                     throw new DomainException('Sản phẩm "' . $product['name'] . '" không đủ số lượng tồn kho.');
                 }
+                if (!is_string($product['sku']) || trim($product['sku']) === '') {
+                    throw new RuntimeException('Sản phẩm chưa có mã SKU hợp lệ.');
+                }
+
+                $unitPriceCents = self::parseMoneyCents($product['effective_price']);
+                $originalPriceCents = self::parseMoneyCents($product['price_original']);
+                if ($unitPriceCents === null || $originalPriceCents === null
+                    || $unitPriceCents > $originalPriceCents) {
+                    throw new RuntimeException('Giá sản phẩm trong cơ sở dữ liệu không hợp lệ.');
+                }
+
+                $unitDiscountCents = $originalPriceCents - $unitPriceCents;
+                $lineTotalCents = $unitPriceCents * $quantity;
+                $lineDiscountCents = $unitDiscountCents * $quantity;
+                $lineGrossCents = $originalPriceCents * $quantity;
+                if ($lineTotalCents > $maxOrderAmountCents
+                    || $lineDiscountCents > $maxOrderAmountCents
+                    || $lineGrossCents > $maxOrderAmountCents
+                    || $totalPriceCents > $maxOrderAmountCents - $lineTotalCents
+                    || $totalDiscountCents > $maxOrderAmountCents - $lineDiscountCents
+                    || $grossSubtotalCents > $maxOrderAmountCents - $lineGrossCents) {
+                    throw new DomainException('Tổng giá trị đơn hàng vượt quá giới hạn thanh toán.');
+                }
 
                 $product['quantity'] = $quantity;
+                $product['effective_price_decimal'] = self::formatMoneyCents($unitPriceCents);
+                $product['original_price_decimal'] = self::formatMoneyCents($originalPriceCents);
+                $product['discount_amount_decimal'] = self::formatMoneyCents($lineDiscountCents);
+                $product['line_total_decimal'] = self::formatMoneyCents($lineTotalCents);
+                $product['attributes_snapshot'] = '';
+                $product['category_name_snapshot'] = (string) $product['category_name'];
                 $products[] = $product;
-                $totalPrice += (float) $product['price_sale'] * $quantity;
+                $totalPriceCents += $lineTotalCents;
+                $totalDiscountCents += $lineDiscountCents;
+                $grossSubtotalCents += $lineGrossCents;
             }
 
-            $totalPrice = round($totalPrice, 2);
-            $orderId = $this->orders->createCustomerOrder(
+            if ($grossSubtotalCents - $totalDiscountCents !== $totalPriceCents) {
+                throw new RuntimeException('Không thể cân đối tổng tiền và giảm giá đơn hàng.');
+            }
+
+            $totalPrice = self::formatMoneyCents($totalPriceCents);
+            $totalDiscount = self::formatMoneyCents($totalDiscountCents);
+            [$inserted, $orderId] = $this->orders->createReservedCustomerOrder(
                 $userId,
                 $userId === null ? null : $addressId,
                 $fullName,
@@ -264,8 +305,12 @@ class OrderService
                 $email,
                 $address,
                 $totalPrice,
-                $input['payment_method']
+                $totalDiscount,
+                $paymentMethod
             );
+            if ($inserted !== 1) {
+                throw new RuntimeException('Không thể lưu đơn hàng.');
+            }
 
             foreach ($products as $product) {
                 $productId = (int) $product['id'];
@@ -275,15 +320,42 @@ class OrderService
                     throw new DomainException('Số lượng tồn kho vừa thay đổi. Vui lòng thử đặt hàng lại.');
                 }
 
-                $this->orderItems->createLine(
+                $lineInserted = $this->orderItems->createSnapshotLine(
                     $orderId,
                     $productId,
+                    (string) $product['sku'],
+                    (string) $product['attributes_snapshot'],
+                    (string) $product['category_name_snapshot'],
                     (string) $product['name'],
                     $quantity,
-                    (float) $product['price_sale'],
+                    $product['effective_price_decimal'],
+                    $product['original_price_decimal'],
+                    $product['discount_amount_decimal'],
+                    $product['line_total_decimal'],
                     $product['image'] === null ? null : (string) $product['image']
                 );
+                if ($lineInserted !== 1) {
+                    throw new RuntimeException('Không thể lưu chi tiết sản phẩm của đơn hàng.');
+                }
             }
+
+            $orderCheck = $this->orders->findAmountConsistency($orderId);
+            if (!$orderCheck
+                || (int) $orderCheck['item_count'] !== count($products)
+                || self::parseMoneyCents((string) $orderCheck['total_price']) !== $totalPriceCents
+                || self::parseMoneyCents((string) $orderCheck['discount_amount']) !== $totalDiscountCents
+                || self::parseMoneyCents((string) $orderCheck['line_total_sum']) !== $totalPriceCents
+                || self::parseMoneyCents((string) $orderCheck['calculated_line_total']) !== $totalPriceCents
+                || self::parseMoneyCents((string) $orderCheck['item_discount_sum']) !== $totalDiscountCents
+                || self::parseMoneyCents((string) $orderCheck['gross_subtotal']) !== $grossSubtotalCents
+                || self::parseMoneyCents((string) $orderCheck['calculated_payable']) !== $totalPriceCents) {
+                throw new RuntimeException('Tổng tiền đơn hàng không khớp với chi tiết sản phẩm.');
+            }
+
+            $actorName = $userId !== null
+                ? mb_substr((string) ($sessionUsername ?? 'Khách hàng'), 0, 100, 'UTF-8')
+                : 'Khách vãng lai';
+            $this->history->log($orderId, 'Chờ xác nhận', null, 'Đơn hàng được tạo.', $actorName);
 
             $this->db->commit();
         } catch (Throwable $e) {
@@ -291,102 +363,138 @@ class OrderService
             throw $e;
         }
 
-        // Gửi tin cảm ơn tự động cho khách đã đăng nhập
+        // Phản hồi tự động không được làm đơn hàng đã commit bị báo thất bại.
         if ($userId !== null) {
-            (new AutoReplyService($this->db))->send($userId, 'order_thankyou');
+            try {
+                (new AutoReplyService($this->db))->send($userId, 'order_thankyou');
+            } catch (Throwable $e) {
+                error_log('Order confirmation auto-reply failed: ' . $e->getMessage());
+            }
         }
 
         return [
             'order_id' => $orderId,
+            'subtotal' => self::formatMoneyCents($grossSubtotalCents),
             'total_price' => $totalPrice,
+            'discount_amount' => $totalDiscount,
             'items' => array_map(static function (array $product): array {
                 return [
                     'product_name' => $product['name'],
+                    'product_sku' => $product['sku'],
+                    'attributes_snapshot' => $product['attributes_snapshot'],
+                    'category_name_snapshot' => $product['category_name_snapshot'],
                     'quantity' => (int) $product['quantity'],
-                    'price' => (float) $product['price_sale'],
+                    'price' => $product['effective_price_decimal'],
+                    'original_price' => $product['original_price_decimal'],
+                    'discount_amount' => $product['discount_amount_decimal'],
+                    'line_total' => $product['line_total_decimal'],
                 ];
             }, $products),
         ];
     }
 
+    /** Chuỗi tiền "123.45" (tối đa 10 chữ số phần nguyên, 2 chữ số thập phân) => số xu; null nếu sai định dạng. */
+    public static function parseMoneyCents($value): ?int
+    {
+        if (!is_string($value) && !is_int($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+        if (!preg_match('/^\d{1,10}(?:\.\d{1,2})?$/D', $value)) {
+            return null;
+        }
+
+        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '');
+
+        return (int) $whole * 100 + (int) str_pad($fraction, 2, '0');
+    }
+
+    /** Số xu => chuỗi decimal "123.45". */
+    public static function formatMoneyCents(int $cents): string
+    {
+        return intdiv($cents, 100) . '.' . str_pad((string) ($cents % 100), 2, '0', STR_PAD_LEFT);
+    }
+
     // ─────────────────────────── Hủy đơn ───────────────────────────
 
     /**
-     * Khách hàng hủy đơn đang chờ xác nhận và hoàn kho sản phẩm.
-     * Mọi lỗi hiển thị cho khách được ném dưới dạng DomainException (kể cả lỗi hệ thống khi cập nhật).
+     * Khách hàng hủy đơn đang chờ xác nhận (kèm lý do): hoàn tồn kho đang giữ, ghi lịch sử.
+     * DomainException = xung đột hiển thị cho khách (409); lỗi khác = lỗi hệ thống.
      */
-    public function cancelCustomerOrder(int $userId, int $orderId): void
+    public function cancelCustomerOrder(int $userId, int $orderId, string $reason, string $actorName): void
     {
-        $order = $this->orders->findOwnerAndStatus($orderId);
-        if ($order === null) {
-            throw new DomainException('Không tìm thấy đơn hàng');
-        }
-        if ((int) $order['user_id'] !== $userId) {
-            throw new DomainException('Bạn không có quyền hủy đơn này');
-        }
-
-        $status = $order['status'];
-        if ($status === 'Đã hủy' || $status === 'Canceled') {
-            throw new DomainException('Đơn đã được hủy trước đó');
-        }
-
-        // Khách hàng chỉ được hủy khi đơn đang chờ xác nhận.
-        if (!in_array($status, ['Chờ xác nhận', 'Pending', '', null], true)) {
-            throw new DomainException("Chỉ có thể hủy khi đơn ở trạng thái 'Chờ xác nhận'");
-        }
-
         $this->db->beginTransaction();
         try {
-            foreach ($this->orderItems->listStockLinesByOrder($orderId) as $item) {
-                if ($item['product_id'] === null) {
-                    continue;
-                }
-                $this->products->incrementStock((int) $item['product_id'], (int) $item['quantity']);
+            $order = $this->orders->lockForCustomerCancel($orderId, $userId);
+            if (!$order) {
+                throw new DomainException('Không tìm thấy đơn hàng của bạn.');
             }
 
-            if ($this->orders->updateStatusIfUnchanged($orderId, 'Đã hủy', $status) !== 1) {
-                throw new RuntimeException('Trạng thái đơn hàng đã được thay đổi.');
+            if (
+                OrderStatusWorkflow::normalize((string) $order['status']) !== 'Chờ xác nhận'
+                || !OrderStatusWorkflow::canTransition((string) $order['status'], 'Đã hủy')
+            ) {
+                throw new DomainException('Chỉ có thể hủy đơn hàng khi đơn đang chờ xác nhận.');
             }
+            $previousStatus = (string) $order['status'];
+
+            if ($order['inventory_status'] === 'reserved') {
+                if (!(new OrderInventoryService($this->db))->releaseReserved($orderId)) {
+                    throw new RuntimeException('Không thể hoàn tồn kho cho đơn hàng.');
+                }
+            } elseif ($order['inventory_status'] !== 'legacy') {
+                throw new DomainException('Tồn kho của đơn hàng đã được xử lý; vui lòng tải lại trang.');
+            }
+
+            if ($this->orders->cancelByCustomer($orderId, $userId, $reason) !== 1) {
+                throw new DomainException('Trạng thái đơn hàng đã thay đổi. Vui lòng tải lại trang.');
+            }
+
+            $this->history->log($orderId, 'Đã hủy', $previousStatus, $reason, $actorName);
 
             $this->db->commit();
         } catch (Throwable $e) {
             $this->db->rollback();
-            error_log('Order cancellation failed: ' . $e->getMessage());
-            throw new DomainException('Không thể hủy đơn hàng lúc này.', 0, $e);
+            throw $e;
         }
     }
 
     // ─────────────────────────── Tra cứu ───────────────────────────
 
-    /** Tra cứu đơn (kèm chi tiết sản phẩm) theo mã đơn hoặc số điện thoại. */
-    public function lookup(string $query): array
+    /** Tra cứu một đơn (kèm chi tiết sản phẩm) theo mã đơn thuộc tài khoản khách; null nếu không có. */
+    public function lookup(int $orderId, int $userId): ?array
     {
-        $orders = [];
-        foreach ($this->orders->findByIdOrPhone($query) as $row) {
-            $row['items'] = $this->orderItems->listByOrder((int) $row['id']);
-            $orders[] = $row;
+        $order = $this->orders->findForCustomerLookup($orderId, $userId);
+        if (!$order) {
+            return null;
         }
+        $order['items'] = $this->orderItems->listByOrderOrdered($orderId);
 
-        return $orders;
+        return $order;
+    }
+
+    /** Chi tiết đơn của khách kèm sản phẩm (cờ is_reviewed) và lịch sử trạng thái; null nếu không có. */
+    public function customerOrderDetail(int $orderId, int $userId): ?array
+    {
+        $order = $this->orders->findDetailForCustomer($orderId, $userId);
+        if (!$order) {
+            return null;
+        }
+        $order['items'] = $this->orderItems->listByOrderWithReviewFlagOrdered($orderId, $userId);
+        $order['status_history'] = $this->history->listForOrder($orderId);
+
+        return $order;
     }
 
     /**
-     * Danh sách "Đơn hàng của tôi" kèm số lượng đơn theo nhóm trạng thái.
+     * Danh sách "Đơn hàng của tôi" (đã kiểm tra bộ lọc) kèm số đơn theo nhóm và phân trang.
      *
-     * @return array{orders:array, counts:array<string,int>}
+     * @return array{orders:array, counts:array<string,int>, pagination:array}
      */
-    public function customerOrders(int $userId, string $statusFilter, string $timeFilter): array
+    public function customerOrders(int $userId, string $statusFilter, string $timeFilter, string $search, int $page, int $pageSize): array
     {
-        $statuses = [];
-        if ($statusFilter !== '' && $statusFilter !== 'all') {
-            $statuses = self::STATUS_GROUPS[$statusFilter] ?? [$statusFilter];
-        }
-
-        $orders = [];
-        foreach ($this->orders->findForCustomer($userId, $timeFilter, $statuses) as $row) {
-            $row['items'] = $this->orderItems->listByOrderWithReviewFlag((int) $row['id'], $userId);
-            $orders[] = $row;
-        }
+        (new OrderExpiryService($this->db))->ensureSchema();
 
         $counts = [
             'all' => 0,
@@ -394,14 +502,54 @@ class OrderService
             'shipping' => 0,
             'delivered' => 0,
             'cancelled' => 0,
+            'payment_pending' => 0,
         ];
-        foreach ($this->orders->countByStatusForCustomer($userId, $timeFilter) as $countRow) {
-            $count = (int) $countRow['cnt'];
-            $counts['all'] += $count;
-            $group = self::STATUS_TO_GROUP[$countRow['status']] ?? 'processing';
-            $counts[$group] += $count;
+        $statusToGroup = [];
+        foreach (self::STATUS_GROUPS as $group => $statuses) {
+            foreach ($statuses as $status) {
+                $statusToGroup[$status] = $group;
+            }
+        }
+        foreach ($this->orders->countByStatusForCustomerList($userId, $timeFilter, $search) as $countRow) {
+            $statusCount = (int) $countRow['total'];
+            $counts['all'] += $statusCount;
+            $counts['payment_pending'] += (int) $countRow['payment_pending'];
+            $group = $statusToGroup[$countRow['status']] ?? null;
+            if ($group !== null) {
+                $counts[$group] += $statusCount;
+            }
         }
 
-        return ['orders' => $orders, 'counts' => $counts];
+        $filter = [];
+        if ($statusFilter === 'payment_pending') {
+            $filter = 'payment_pending';
+        } elseif ($statusFilter !== 'all') {
+            $filter = self::STATUS_GROUPS[$statusFilter];
+        }
+
+        $total = $this->orders->countForCustomerList($userId, $timeFilter, $search, $filter);
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $pageSize;
+
+        $orders = [];
+        foreach ($this->orders->findPageForCustomerList($userId, $timeFilter, $search, $filter, $pageSize, $offset) as $row) {
+            $row['items'] = [];
+            $orders[(int) $row['id']] = $row;
+        }
+        foreach ($this->orderItems->listByOrdersWithReviewFlag(array_keys($orders), $userId) as $item) {
+            $orders[(int) $item['order_id']]['items'][] = $item;
+        }
+
+        return [
+            'orders' => array_values($orders),
+            'counts' => $counts,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
+        ];
     }
 }

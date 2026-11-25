@@ -25,7 +25,16 @@ class AuthController extends \App\Core\Controller
     /** GET api/auth/check_session.php - chỉ kiểm tra phiên khách hàng, không trả trạng thái quản trị. */
     public function checkSession(): void
     {
-        if (Auth::isCustomer()) {
+        // Phiên khách hàng phải còn khớp với tài khoản trong DB; tài khoản đã bị xóa thì đăng xuất.
+        if (Session::get('role', '') === 'customer') {
+            try {
+                $user = $this->auth->refreshCustomerSession();
+            } catch (\App\Core\DatabaseException $e) {
+                Response::json(['status' => 'error', 'message' => 'Không thể kiểm tra phiên đăng nhập.'], 500, 0);
+            }
+            if ($user === null) {
+                Response::json(['status' => 'error', 'message' => 'Not logged in'], 200, 0);
+            }
             Response::json([
                 'status' => 'success',
                 'username' => Session::get('username'),

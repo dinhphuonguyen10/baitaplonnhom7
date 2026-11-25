@@ -55,7 +55,8 @@ class StorefrontLayoutService
 
         $navCategories = $this->catalog->navigationCategories();
         $navCategoryLinks = [];
-        foreach ($this->catalog->visibleCategories($navCategories) as $category) {
+        $visibleNavCategories = $this->catalog->visibleCategories($navCategories);
+        foreach ($visibleNavCategories as $category) {
             $navCategoryLinks[] = [
                 'href' => isset(self::CATEGORY_PAGE_MAP[$category['slug']])
                     ? $appBaseUrl . self::CATEGORY_PAGE_MAP[$category['slug']]
@@ -78,6 +79,8 @@ class StorefrontLayoutService
             'isCustomerLoggedIn' => $isCustomerLoggedIn,
             'navCategories' => $navCategories,
             'navCategoryLinks' => $navCategoryLinks,
+            // Danh mục đang hoạt động, bỏ slug nội bộ - dùng cho ô chọn danh mục ở bộ lọc / tìm kiếm.
+            'visibleNavCategories' => $visibleNavCategories,
             'initialWishlistCount' => $isCustomerLoggedIn && $customerId !== null ? $this->wishlists->countForUser($customerId) : 0,
             'headerLogoUrl' => $this->banners->logoUrl($appBaseUrl),
         ];

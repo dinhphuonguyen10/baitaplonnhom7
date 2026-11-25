@@ -21,12 +21,15 @@ class DashboardService
         'custom' => 'Tùy chọn ngày',
     ];
 
-    private const COMPLETED_STATUSES_SQL = "('Đã giao hàng','Đã giao')";
+    private const COMPLETED_STATUSES_SQL = "('Đã giao hàng','Đã giao','Hoàn thành')";
     private const CANCELLED_STATUSES_SQL = "('Đã hủy','Canceled','cancelled','huy')";
 
     private const LEGACY_STATUS_MAP = [
         'Đang xử lý' => 'Đã xác nhận',
-        'Đang chuẩn bị' => 'Chuẩn bị đơn hàng',
+        'Chuẩn bị đơn hàng' => 'Đang chuẩn bị hàng',
+        'Đang chuẩn bị' => 'Đang chuẩn bị hàng',
+        'Đang vận chuyển' => 'Đang giao hàng',
+        'Đang giao' => 'Đang giao hàng',
         'Đã giao' => 'Đã giao hàng',
         'Canceled' => 'Đã hủy',
         'cancelled' => 'Đã hủy',
@@ -200,10 +203,10 @@ class DashboardService
         $statusCounts = [
             'Chờ xác nhận' => 0,
             'Đã xác nhận' => 0,
-            'Chuẩn bị đơn hàng' => 0,
-            'Đang vận chuyển' => 0,
-            'Đang giao' => 0,
+            'Đang chuẩn bị hàng' => 0,
+            'Đang giao hàng' => 0,
             'Đã giao hàng' => 0,
+            'Hoàn thành' => 0,
             'Đã hủy' => 0,
         ];
         $rows = $this->db->fetchAll(

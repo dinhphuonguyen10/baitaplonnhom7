@@ -35,7 +35,9 @@ final class Router
         $base = Url::base();
         $path = $base !== '' && strpos($script, $base) === 0 ? substr($script, strlen($base)) : $script;
 
-        return '/' . ltrim($path, '/');
+        // Windows/Apache vẫn chạy file khi URL có dấu chấm thừa ở cuối (ho_so.php.) hoặc khác hoa/thường,
+        // nên chuẩn hóa để khớp bảng route (toàn chữ thường).
+        return '/' . strtolower(rtrim(ltrim($path, '/'), '.'));
     }
 
     /** Gọi action của controller tương ứng với $path. */

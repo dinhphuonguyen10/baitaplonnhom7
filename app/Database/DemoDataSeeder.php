@@ -102,24 +102,47 @@ class DemoDataSeeder
         }
 
         foreach (self::FEATURED_SALES as $productId => $quantity) {
-            $product = $this->db->fetchOne('SELECT name, price_sale, image FROM products WHERE id = ?', [$productId], 'i');
+            // Giá bán hiệu lực: hết hạn khuyến mãi thì quay về giá gốc; lưu kèm ảnh chụp SKU/danh mục.
+            $product = $this->db->fetchOne(
+                "SELECT p.sku, p.name, p.price_original, c.name AS category_name,
+                        CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                             THEN p.price_original ELSE p.price_sale END AS effective_price,
+                        (CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                              THEN p.price_original ELSE p.price_sale END) * ? AS line_total,
+                        (p.price_original - CASE WHEN p.promotion_ends_at IS NOT NULL AND p.promotion_ends_at <= NOW()
+                                                 THEN p.price_original ELSE p.price_sale END) * ? AS line_discount,
+                        p.image
+                 FROM products p
+                 INNER JOIN categories c ON c.id = p.category_id
+                 WHERE p.id = ?",
+                [$quantity, $quantity, $productId],
+                'iii'
+            );
             if (!$product) {
                 continue;
             }
 
             $randomUser = $userIds[array_rand($userIds)];
-            $totalPrice = (float) $product['price_sale'] * $quantity;
+            $totalPrice = (string) $product['line_total'];
+            $discountAmount = (string) $product['line_discount'];
 
             $orderId = $this->db->insert(
-                "INSERT INTO orders (user_id, full_name, phone, email, address, total_price, status, payment_status, payment_method, created_at) VALUES (?, 'Khách hàng VIP', '0912345678', 'order@ecrin.vn', 'Hà Nội', ?, 'Đã giao hàng', 'Đã thanh toán', 'COD', NOW() - INTERVAL FLOOR(RAND() * 30) DAY)",
-                [$randomUser, $totalPrice],
-                'id'
+                "INSERT INTO orders (user_id, full_name, phone, email, address, total_price, discount_amount, status, payment_status, payment_method, created_at) VALUES (?, 'Khách hàng VIP', '0912345678', 'order@ecrin.vn', 'Hà Nội', ?, ?, 'Đã giao hàng', 'Đã thanh toán', 'COD', NOW() - INTERVAL FLOOR(RAND() * 30) DAY)",
+                [$randomUser, $totalPrice, $discountAmount],
+                'iss'
             );
 
             $this->db->insert(
-                'INSERT INTO order_items (order_id, product_id, product_name, quantity, price, image) VALUES (?, ?, ?, ?, ?, ?)',
-                [$orderId, $productId, $product['name'], $quantity, (float) $product['price_sale'], $product['image']],
-                'iisids'
+                'INSERT INTO order_items
+                    (order_id, product_id, product_sku, attributes_snapshot, category_name_snapshot,
+                     product_name, quantity, price, original_price, discount_amount, line_total, image)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $orderId, $productId, $product['sku'], '', $product['category_name'],
+                    $product['name'], $quantity, $product['effective_price'], $product['price_original'],
+                    $discountAmount, $totalPrice, $product['image'],
+                ],
+                'iissssisssss'
             );
         }
 

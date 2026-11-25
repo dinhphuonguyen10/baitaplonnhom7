@@ -3,7 +3,7 @@
 
 Website bán trang sức xây dựng bằng PHP, MySQL, HTML, CSS và JavaScript, chạy local qua XAMPP.
 
-Phạm vi hiện tại của nhóm là các chức năng phía khách hàng và giao diện admin. Admin mới là giao diện mẫu; đăng nhập/phân quyền được giữ để truy cập, còn các thao tác quản trị và dữ liệu thống kê chưa triển khai.
+Phạm vi hiện tại gồm các chức năng phía khách hàng và một số nghiệp vụ Admin. Quản lý sản phẩm có thêm trạng thái kinh doanh, xóa mềm, thùng rác, khôi phục và bảo vệ dữ liệu liên quan; một số khu vực Admin khác vẫn là giao diện mẫu.
 
 
 # Cấu trúc dự án
@@ -100,6 +100,14 @@ Database trong `database/baitaplon.sql` hiện có các bảng cho tài khoản/
 Trang quản lý đơn hàng phía Admin đọc trực tiếp đơn hàng và chi tiết sản phẩm từ các bảng `orders`/`order_items`; trang tổng quan cũng hiển thị số đơn và số đơn đang chờ xác nhận.
 
 Giỏ hàng được lưu theo tài khoản/khách trong trình duyệt. Trang đặt hàng tải danh sách tỉnh/thành và xã/phường từ `provinces.open-api.vn`; chỉ yêu cầu dữ liệu địa giới, không gửi thông tin người đặt hàng đến dịch vụ này. API đặt hàng tự bổ sung cột email cho bảng `orders` nếu cơ sở dữ liệu cũ chưa có cột đó.
+
+Quản lý vòng đời sản phẩm dùng MySQL/MariaDB qua MySQLi. `products.status` phân biệt `active`, `inactive` và `hidden`; hết hàng được xác định riêng bằng `stock = 0`. Xóa trong Admin luôn là xóa mềm qua `is_deleted`, `deleted_at` và `deleted_by`. Sản phẩm đã xóa mềm được xem/khôi phục trong Thùng rác; Admin không có thao tác xóa cứng. Khóa ngoại của sản phẩm và chi tiết đơn hàng dùng `RESTRICT` để tránh xóa dây chuyền làm mất lịch sử.
+
+Thêm/sửa sản phẩm yêu cầu SKU duy nhất, giá gốc không âm và giá khuyến mãi (nếu có) thấp hơn giá gốc. `promotion_ends_at` xác định thời hạn khuyến mãi; các trang Client và API đặt hàng tự dùng giá gốc sau khi khuyến mãi hết hạn. Mỗi lần thay đổi giá được ghi vào `product_price_history` trong cùng transaction với cập nhật sản phẩm. Giá trong `order_items` được lưu thành snapshot khi tạo đơn, không bị thay đổi khi Admin cập nhật giá.
+
+Mỗi sản phẩm dùng một ảnh đại diện tại `products.image`, phù hợp với cấu trúc và giao diện hiện tại; chưa triển khai gallery ảnh phụ. Admin có thể thêm, thay hoặc gỡ ảnh (gỡ sẽ chuyển sang ảnh mặc định). Ảnh tải lên phải là JPEG, PNG, WebP hoặc GIF hợp lệ, tối đa 5 MB; ảnh có sẵn trong `assets` cũng được kiểm tra đường dẫn, MIME và dung lượng. Tệp ảnh cũ không bị xóa khi thay/gỡ ảnh hoặc xóa sản phẩm vì có thể còn được sản phẩm khác hoặc `order_items.image` dùng làm snapshot. Giao diện dùng `assets/banner/logo.png` nếu ảnh rỗng, sai đường dẫn hoặc không tải được.
+
+Quản lý danh mục dùng mã tự sinh, tên đã chuẩn hóa khoảng trắng, mô tả, ảnh đại diện tùy chọn, trạng thái hoạt động và dấu thời gian tạo/cập nhật. Danh mục được xóa mềm và có thể khôi phục; nếu còn sản phẩm, Admin cần chuyển chúng trong trang Quản lý sản phẩm trước, hệ thống không tự chuyển hàng loạt. Danh mục ngừng hoạt động hoặc đã xóa mềm không xuất hiện trong luồng mua sắm Client và không thể được chọn khi tạo/sửa sản phẩm.
 
 
 ## Kiến trúc MVC hướng đối tượng

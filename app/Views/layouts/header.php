@@ -33,7 +33,9 @@ use App\Core\View;
             </a>
         </div>
         <!-- Ô tìm kiếm -->
-        <input type="search" placeholder="Bạn đang tìm món trang sức nào?" class="search" aria-label="Tìm kiếm sản phẩm">
+        <div class="search-wrapper">
+            <input type="search" placeholder="Bạn đang tìm món trang sức nào?" class="search" aria-label="Tìm kiếm sản phẩm">
+        </div>
 
         <!-- Đăng nhập / đăng ký -->
         <div class="auth-cart-wrapper" style="display: flex; align-items: center; gap: 15px;">
@@ -44,6 +46,7 @@ use App\Core\View;
                     <a class="auth-btn" href="<?php echo View::e($appBaseUrl . '/admin/logout.php'); ?>">Đăng xuất</a>
                 <?php elseif ($accountRole === 'customer'): ?>
                     <span style="font-weight: bold; color: var(--navy);">Xin chào, <?php echo View::e($accountUsername); ?></span> |
+                    <a class="auth-btn" href="<?php echo View::e($appBaseUrl . '/client/ho_so.php'); ?>">Hồ sơ</a> |
                     <span class="auth-btn logout-btn" style="cursor: pointer;">Đăng xuất</span>
                 <?php else: ?>
                     <span class="auth-btn register-trigger" style="cursor: pointer;">Đăng ký</span> /
@@ -83,22 +86,6 @@ use App\Core\View;
                             <a href="<?php echo View::e($catItem['href']); ?>"><?php echo View::e($catItem['name']); ?></a>
                         </div>
                     <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="dropdown-item">
-                        <a href="<?php echo View::e($appBaseUrl . '/client/bong_tai.php'); ?>">Bông tai</a>
-                    </div>
-                    <div class="dropdown-item">
-                        <a href="<?php echo View::e($appBaseUrl . '/client/day_chuyen.php'); ?>">Dây chuyền</a>
-                    </div>
-                    <div class="dropdown-item">
-                        <a href="<?php echo View::e($appBaseUrl . '/client/nhan.php'); ?>">Nhẫn</a>
-                    </div>
-                     <div class="dropdown-item">
-                        <a href="<?php echo View::e($appBaseUrl . '/client/vong_tay.php'); ?>">Vòng tay</a>
-                    </div>
-                     <div class="dropdown-item">
-                         <a href="<?php echo View::e($appBaseUrl . '/client/category.php?slug=set-qua-tang'); ?>">Set quà tặng</a>
-                     </div>
                 <?php endif; ?>
             </div>
         </div>

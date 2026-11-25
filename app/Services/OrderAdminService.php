@@ -5,12 +5,15 @@ namespace App\Services;
 use App\Core\Database;
 use App\Helpers\AdminOrderFormatter;
 use App\Models\Order;
+use App\Models\OrderStatusHistory;
+use DomainException;
 use RuntimeException;
 use Throwable;
 
 /**
  * Lớp OrderAdminService - nghiệp vụ quản lý đơn hàng & thanh toán ở trang quản trị:
- * cập nhật trạng thái, xác nhận thu COD / đối soát VietQR, tải danh sách và thống kê.
+ * cập nhật trạng thái theo quy trình (OrderStatusWorkflow, giữ/hoàn tồn kho, lịch sử),
+ * xác nhận thu COD / đối soát VietQR, tải danh sách và thống kê.
  */
 class OrderAdminService
 {
@@ -25,19 +28,90 @@ class OrderAdminService
     }
 
     /**
-     * Cập nhật trạng thái đơn hàng. Trả về thông báo hiển thị cho quản trị viên.
+     * Cập nhật trạng thái đơn hàng theo các bước chuyển hợp lệ, trong một transaction:
+     * hủy => hoàn tồn kho đang giữ; giao hàng => chốt tồn kho; ghi lịch sử trạng thái.
+     * Trả về thông báo hiển thị cho quản trị viên.
      */
-    public function updateStatus(int $orderId, string $newStatus): string
+    public function updateStatus(int $orderId, string $newStatus, string $adminUsername = ''): string
     {
-        if ($orderId < 1 || !in_array($newStatus, AdminOrderFormatter::STATUSES, true)) {
+        if ($orderId < 1 || !in_array($newStatus, OrderStatusWorkflow::STATUSES, true)) {
             return 'Trạng thái đơn hàng không hợp lệ.';
         }
 
         try {
-            $this->orders->updateStatusForAdmin($orderId, $newStatus);
+            $this->db->beginTransaction();
+            $currentOrder = $this->orders->lockForAdminStatusChange($orderId);
+            if (!$currentOrder) {
+                throw new RuntimeException('Không tìm thấy đơn hàng.');
+            }
+
+            $currentStatus = (string) $currentOrder['status'];
+            $normalizedCurrentStatus = OrderStatusWorkflow::normalize($currentStatus);
+            if ($normalizedCurrentStatus === $newStatus) {
+                $this->db->commit();
+
+                return 'Đơn hàng đã ở trạng thái này.';
+            }
+
+            if (
+                (int) $currentOrder['is_expired'] === 1
+                && $currentOrder['inventory_status'] === 'reserved'
+                && $normalizedCurrentStatus === 'Chờ xác nhận'
+                && $newStatus !== 'Đã hủy'
+            ) {
+                throw new DomainException('Đơn hàng đã hết thời gian giữ tồn kho; không thể tiếp tục xử lý.');
+            }
+            if (
+                $currentOrder['payment_method'] === 'BANK_QR'
+                && $currentOrder['payment_status'] !== 'Đã thanh toán'
+                && $newStatus !== 'Đã hủy'
+            ) {
+                throw new DomainException('Chỉ xử lý đơn thanh toán QR sau khi đã xác nhận thanh toán.');
+            }
+            if (!OrderStatusWorkflow::canTransition($currentStatus, $newStatus)) {
+                throw new DomainException(
+                    'Không thể chuyển trạng thái từ "' . $normalizedCurrentStatus . '" sang "' . $newStatus . '".'
+                );
+            }
+
+            if ($newStatus === 'Đã hủy') {
+                if ($currentOrder['inventory_status'] === 'reserved') {
+                    if (!(new OrderInventoryService($this->db))->releaseReserved($orderId)) {
+                        throw new RuntimeException('Không thể hoàn tồn kho cho đơn hàng.');
+                    }
+                } elseif ($currentOrder['inventory_status'] !== 'legacy') {
+                    throw new DomainException('Tồn kho của đơn hàng đã được xử lý; không thể hủy trạng thái này.');
+                }
+                $affected = $this->orders->cancelByAdmin($orderId, $newStatus);
+            } elseif ($newStatus === 'Đang giao hàng') {
+                if ($currentOrder['inventory_status'] === 'released') {
+                    throw new DomainException('Đơn hàng đã hoàn tồn kho và không thể chuyển sang giao hàng.');
+                }
+                $affected = $this->orders->shipByAdmin($orderId, $newStatus);
+            } else {
+                $affected = $this->orders->updateStatusForAdmin($orderId, $newStatus);
+            }
+            if ($affected !== 1) {
+                throw new RuntimeException('Không thể cập nhật trạng thái đơn hàng.');
+            }
+
+            $actorName = mb_substr($adminUsername !== '' ? $adminUsername : 'Quản trị viên', 0, 100, 'UTF-8');
+            $historyNote = $newStatus === 'Đã hủy'
+                ? 'Đơn hàng được hủy bởi quản trị viên.'
+                : 'Cập nhật trạng thái bởi quản trị viên.';
+            (new OrderStatusHistory($this->db))->log($orderId, $newStatus, $currentStatus, $historyNote, $actorName);
+
+            $this->db->commit();
 
             return 'Đã cập nhật trạng thái đơn hàng.';
+        } catch (DomainException $e) {
+            $this->db->rollback();
+
+            return $e->getMessage();
         } catch (Throwable $e) {
+            $this->db->rollback();
+            error_log('Admin order status update failed: ' . $e->getMessage());
+
             return 'Không thể cập nhật trạng thái đơn hàng.';
         }
     }
@@ -74,7 +148,7 @@ class OrderAdminService
     }
 
     /**
-     * Danh sách đơn hàng (key = id) kèm mảng items.
+     * Danh sách đơn hàng (key = id) kèm mảng items (snapshot SKU/danh mục/giá).
      *
      * @throws RuntimeException với thông báo hiển thị khi không tải được dữ liệu
      */
@@ -113,9 +187,15 @@ class OrderAdminService
             }
             if ($row['product_name'] !== null) {
                 $orders[$orderId]['items'][] = [
+                    'sku' => $row['product_sku'],
+                    'attributes' => $row['attributes_snapshot'],
+                    'category' => $row['category_name_snapshot'],
                     'name' => $row['product_name'],
                     'quantity' => (int) $row['quantity'],
                     'price' => (float) $row['price'],
+                    'original_price' => (float) $row['original_price'],
+                    'discount_amount' => (float) $row['discount_amount'],
+                    'line_total' => (float) $row['line_total'],
                 ];
             }
         }
@@ -123,7 +203,7 @@ class OrderAdminService
         return $orders;
     }
 
-    /** Thống kê số đơn theo trạng thái và tình trạng thu COD. */
+    /** Thống kê số đơn theo trạng thái (đã chuẩn hóa) và tình trạng thu COD. */
     public function statistics(array $orders): array
     {
         $statCounts = [
@@ -134,10 +214,10 @@ class OrderAdminService
         $statusKeys = [
             'Chờ xác nhận' => 'pending',
             'Đã xác nhận' => 'confirmed',
-            'Chuẩn bị đơn hàng' => 'preparing',
-            'Đang vận chuyển' => 'shipping',
-            'Đang giao' => 'delivering',
+            'Đang chuẩn bị hàng' => 'preparing',
+            'Đang giao hàng' => 'shipping',
             'Đã giao hàng' => 'completed',
+            'Hoàn thành' => 'completed',
             'Đã hủy' => 'cancelled',
         ];
 

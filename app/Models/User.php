@@ -54,5 +54,49 @@ class User extends BaseModel
         );
     }
 
+    /** Thông tin hiển thị trên trang hồ sơ khách hàng (không gồm mật khẩu). */
+    public function findProfile(int $id): ?array
+    {
+        return $this->db->fetchOne(
+            'SELECT id, username, full_name, phone, created_at FROM users WHERE id = ? LIMIT 1',
+            [$id],
+            'i'
+        );
+    }
+
+    /** Mật khẩu (đã băm) hiện tại của khách hàng, dùng để xác nhận trước khi đổi. */
+    public function findPasswordHash(int $id): ?string
+    {
+        $hash = $this->db->fetchValue('SELECT password FROM users WHERE id = ? LIMIT 1', [$id], 'i');
+
+        return $hash === null ? null : (string) $hash;
+    }
+
+    /** Số điện thoại đã được tài khoản khác (khác $exceptUserId) sử dụng chưa. */
+    public function phoneUsedByOtherUser(string $phone, int $exceptUserId): bool
+    {
+        return $this->db->fetchOne(
+            'SELECT id FROM users WHERE phone = ? AND id <> ? LIMIT 1',
+            [$phone, $exceptUserId],
+            'si'
+        ) !== null;
+    }
+
+    /** Cập nhật số điện thoại của khách hàng. */
+    public function updatePhone(int $id, string $phone): int
+    {
+        return $this->db->execute('UPDATE users SET phone = ? WHERE id = ?', [$phone, $id], 'si');
+    }
+
+    /** Cập nhật họ tên và số điện thoại của khách hàng. */
+    public function updateProfileInfo(int $id, string $fullName, string $phone): int
+    {
+        return $this->db->execute(
+            'UPDATE users SET full_name = ?, phone = ? WHERE id = ?',
+            [$fullName, $phone, $id],
+            'ssi'
+        );
+    }
+
     // --- end of methods ---
 }

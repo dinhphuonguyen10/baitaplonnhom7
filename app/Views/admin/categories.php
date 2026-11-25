@@ -1,4 +1,6 @@
 <?php
+// View: trang quản trị danh mục. Dữ liệu do Admin\CategoryController cung cấp
+// ($categories đã kèm image_url / is_deleted_flag / is_active_flag, $categoriesCsrfToken).
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -10,10 +12,18 @@
     <style>
         .cat-panel { margin: 20px 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow); }
         .cat-panel h2 { margin: 0 0 16px; font-size: 1.15rem; color: var(--navy); }
-        .cat-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-        .cat-form label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; color: var(--navy); flex: 1; max-width: 400px; }
-        .cat-form input { padding: 10px 14px; border: 1px solid #cbd4df; border-radius: 8px; font: inherit; outline: none; }
-        .cat-form input:focus { border-color: var(--navy); }
+        .cat-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: end; gap: 12px; }
+        .cat-form label { display: grid; gap: 6px; font-weight: 600; font-size: 14px; color: var(--navy); }
+        .cat-form input, .cat-form select, .cat-form textarea { width: 100%; padding: 10px 14px; border: 1px solid #cbd4df; border-radius: 8px; font: inherit; outline: none; }
+        .cat-form input:focus, .cat-form select:focus, .cat-form textarea:focus { border-color: var(--navy); }
+        .cat-form textarea { min-height: 42px; resize: vertical; }
+        .cat-form .form-actions { display: flex; align-items: flex-end; }
+        .cat-status { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .cat-status-active { background: #ecfdf3; color: #027a48; }
+        .cat-status-inactive, .cat-status-deleted { background: #f2f4f7; color: #475467; }
+        .cat-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; background: #f2f4f7; }
+        .cat-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 220px; }
+        .cat-warning { color: #b54708; font-size: 12px; margin-top: 5px; }
         .btn-primary { padding: 10px 20px; border: 0; border-radius: 8px; background: var(--navy); color: #fff; font: 600 14px inherit; cursor: pointer; transition: .2s; }
         .btn-primary:hover { background: #1a3c68; }
 
@@ -34,10 +44,11 @@
         /* Modal Sửa */
         .modal { display: none; position: fixed; inset: 0; background: rgba(15, 39, 71, .5); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
         .modal.is-open { display: flex; }
-        .modal-box { width: min(440px, 92%); background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,.15); }
+        .modal-box { width: min(600px, 92%); background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,.15); }
         .modal-box h3 { margin: 0 0 16px; color: var(--navy); font-size: 1.2rem; }
         .modal-box label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: var(--navy); }
-        .modal-box input { width: 100%; padding: 10px 12px; border: 1px solid #cbd4df; border-radius: 8px; margin-bottom: 18px; font: inherit; }
+        .modal-box input, .modal-box select, .modal-box textarea { width: 100%; padding: 10px 12px; border: 1px solid #cbd4df; border-radius: 8px; margin-bottom: 16px; font: inherit; }
+        .modal-box textarea { min-height: 90px; resize: vertical; }
         .modal-box .actions { display: flex; justify-content: flex-end; gap: 10px; }
         .btn-cancel { padding: 9px 16px; border: 1px solid #cbd4df; border-radius: 8px; background: #fff; cursor: pointer; font: inherit; }
     </style>
@@ -66,46 +77,110 @@
                 <div class="alert alert-<?php echo $messageType; ?>"><?php echo $escape($message); ?></div>
             <?php endif; ?>
 
-            <!-- Form Thêm danh mục -->
             <section class="cat-panel">
                 <h2>Thêm danh mục</h2>
                 <form method="post" class="cat-form">
                     <input type="hidden" name="action" value="add">
+                    <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
                     <label>
                         Tên danh mục
-                        <input type="text" name="name" placeholder="Nhập tên danh mục mới..." required>
+                        <input type="text" name="name" maxlength="150" placeholder="Nhập tên danh mục mới..." required>
                     </label>
-                    <button type="submit" class="btn-primary">Lưu danh mục</button>
+                    <label>
+                        Mô tả
+                        <textarea name="description" rows="2"></textarea>
+                    </label>
+                    <label>
+                        Ảnh đại diện (URL hoặc đường dẫn trong assets)
+                        <input type="text" name="image" maxlength="500" placeholder="assets/... hoặc https://...">
+                    </label>
+                    <label>
+                        Trạng thái
+                        <select name="status">
+                            <option value="active">Hoạt động</option>
+                            <option value="inactive">Ngừng hoạt động</option>
+                        </select>
+                    </label>
+                    <div class="form-actions"><button type="submit" class="btn-primary">Lưu danh mục</button></div>
                 </form>
             </section>
 
-            <!-- Bảng danh sách danh mục (Chỉ gồm: Tên danh mục và Thao tác) -->
             <section class="cat-panel">
                 <h2>Danh sách danh mục</h2>
                 <div style="overflow-x:auto">
                     <table class="cat-table">
                         <thead>
                             <tr>
-                                <th style="width: 70px;">STT</th>
-                                <th>Tên danh mục</th>
-                                <th style="width: 170px; text-align: center;">Thao tác</th>
+                                <th>Mã</th>
+                                <th>Ảnh</th>
+                                <th>Tên / mô tả</th>
+                                <th>Trạng thái</th>
+                                <th>Sản phẩm</th>
+                                <th>Thời điểm</th>
+                                <th>Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($categories)): ?>
-                                <tr><td colspan="3" style="text-align:center; color: var(--muted);">Chưa có danh mục nào.</td></tr>
+                                <tr><td colspan="7" style="text-align:center; color: var(--muted);">Chưa có danh mục nào.</td></tr>
                             <?php else: ?>
-                                <?php foreach ($categories as $index => $cat): ?>
+                                <?php foreach ($categories as $cat): ?>
                                 <tr>
-                                    <td><strong>#<?php echo $index + 1; ?></strong></td>
-                                    <td><strong><?php echo $escape($cat['name']); ?></strong></td>
-                                    <td style="text-align: center;">
-                                        <button type="button" class="btn-sm btn-edit" onclick="openEditModal(<?php echo (int)$cat['id']; ?>, '<?php echo $escape($cat['name']); ?>')">Sửa</button>
-                                        <form method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc chắn muốn xóa danh mục \'<?php echo $escape($cat['name']); ?>\' không?');">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="id" value="<?php echo (int)$cat['id']; ?>">
-                                            <button type="submit" class="btn-sm btn-delete">Xóa</button>
-                                        </form>
+                                    <td><strong><?php echo $escape($cat['code']); ?></strong></td>
+                                    <td><img class="cat-thumb" src="<?php echo $escape($cat['image_url']); ?>" alt="" onerror="this.onerror=null;this.src='<?php echo $escape($appBaseUrl . '/assets/banner/logo.png'); ?>';"></td>
+                                    <td>
+                                        <strong><?php echo $escape($cat['name']); ?></strong>
+                                        <?php if (trim((string)$cat['description']) !== ''): ?>
+                                            <div><?php echo nl2br($escape($cat['description'])); ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($cat['is_deleted_flag']): ?>
+                                            <span class="cat-status cat-status-deleted">Đã xóa mềm</span>
+                                        <?php elseif ($cat['is_active_flag']): ?>
+                                            <span class="cat-status cat-status-active">Hoạt động</span>
+                                        <?php else: ?>
+                                            <span class="cat-status cat-status-inactive">Ngừng hoạt động</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo (int)$cat['product_count']; ?></td>
+                                    <td>
+                                        <small>Tạo: <?php echo $escape($cat['created_at']); ?></small><br>
+                                        <small>Cập nhật: <?php echo $escape($cat['updated_at']); ?></small>
+                                    </td>
+                                    <td>
+                                        <div class="cat-actions">
+                                        <?php if ($cat['is_deleted_flag']): ?>
+                                            <form method="post" onsubmit="return confirm('Khôi phục danh mục này? Trạng thái hoạt động hiện tại sẽ được giữ nguyên.');">
+                                                <input type="hidden" name="action" value="restore">
+                                                <input type="hidden" name="id" value="<?php echo (int)$cat['id']; ?>">
+                                                <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
+                                                <button type="submit" class="btn-sm btn-edit">Khôi phục</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <button
+                                                type="button"
+                                                class="btn-sm btn-edit"
+                                                data-id="<?php echo (int)$cat['id']; ?>"
+                                                data-name="<?php echo $escape($cat['name']); ?>"
+                                                data-description="<?php echo $escape($cat['description']); ?>"
+                                                data-image="<?php echo $escape($cat['image']); ?>"
+                                                data-status="<?php echo $escape($cat['status']); ?>"
+                                                onclick="openEditModal(this)">Sửa</button>
+                                            <?php if ((int)$cat['product_count'] > 0): ?>
+                                                <div class="cat-warning">
+                                                    Còn <?php echo (int)$cat['product_count']; ?> sản phẩm. Hãy chuyển chúng sang danh mục khác trước.
+                                                </div>
+                                            <?php else: ?>
+                                                <form method="post" onsubmit="return confirm('Xóa mềm danh mục này?');">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="id" value="<?php echo (int)$cat['id']; ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
+                                                    <button type="submit" class="btn-sm btn-delete">Xóa mềm</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -124,9 +199,19 @@
         <h3>Chỉnh sửa danh mục</h3>
         <form method="post">
             <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="csrf_token" value="<?php echo $escape($categoriesCsrfToken); ?>">
             <input type="hidden" name="id" id="editId">
             <label for="editName">Tên danh mục:</label>
-            <input type="text" name="name" id="editName" required>
+            <input type="text" name="name" id="editName" maxlength="150" required>
+            <label for="editDescription">Mô tả:</label>
+            <textarea name="description" id="editDescription"></textarea>
+            <label for="editImage">Ảnh đại diện (URL hoặc đường dẫn trong assets):</label>
+            <input type="text" name="image" id="editImage" maxlength="500" placeholder="assets/... hoặc https://...">
+            <label for="editStatus">Trạng thái:</label>
+            <select name="status" id="editStatus">
+                <option value="active">Hoạt động</option>
+                <option value="inactive">Ngừng hoạt động</option>
+            </select>
             <div class="actions">
                 <button type="button" class="btn-cancel" onclick="closeEditModal()">Hủy</button>
                 <button type="submit" class="btn-primary">Cập nhật</button>
@@ -136,9 +221,12 @@
 </div>
 
 <script>
-function openEditModal(id, name) {
-    document.getElementById('editId').value = id;
-    document.getElementById('editName').value = name;
+function openEditModal(button) {
+    document.getElementById('editId').value = button.dataset.id;
+    document.getElementById('editName').value = button.dataset.name;
+    document.getElementById('editDescription').value = button.dataset.description;
+    document.getElementById('editImage').value = button.dataset.image;
+    document.getElementById('editStatus').value = button.dataset.status;
     document.getElementById('editModal').classList.add('is-open');
     document.getElementById('editName').focus();
 }

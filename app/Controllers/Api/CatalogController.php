@@ -3,7 +3,6 @@
 namespace App\Controllers\Api;
 
 use App\Core\Auth;
-use App\Core\Request;
 use App\Core\Response;
 use App\Services\ProductCatalogService;
 
@@ -19,26 +18,17 @@ class CatalogController extends \App\Core\Controller
         $this->catalog = $catalog ?? new ProductCatalogService();
     }
 
-    /** GET api/catalog/get_products.php?category=&sort=&min_price=&max_price=&in_stock=&has_discount=&has_gift= */
+    /**
+     * GET api/catalog/get_products.php
+     *  ?ids=1,2 | ?category=home|featured|suggest|new|latest
+     *  | ?category=&search=&suggest=&sort=&page=&min_price=&max_price=&in_stock=&has_discount=&has_gift=
+     */
     public function products(): void
     {
         Response::jsonHeaders(true);
 
-        $filters = [
-            'min_price' => Request::query('min_price') !== null ? (float) Request::query('min_price') : null,
-            'max_price' => Request::query('max_price') !== null ? (float) Request::query('max_price') : null,
-            'in_stock' => Request::query('in_stock') === '1',
-            'has_discount' => Request::query('has_discount') === '1',
-            'has_gift' => Request::query('has_gift') === '1',
-        ];
+        $result = $this->catalog->handleProductsRequest($_GET, Auth::customerId());
 
-        $products = $this->catalog->listProducts(
-            Request::string('category', '', 'query'),
-            Request::string('sort', '', 'query'),
-            $filters,
-            Auth::customerId()
-        );
-
-        Response::json($products);
+        Response::json($result['body'], $result['status']);
     }
 }

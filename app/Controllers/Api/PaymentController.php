@@ -34,17 +34,6 @@ class PaymentController extends \App\Core\Controller
         $this->respond($result['status'], $result['message'], $result['code']);
     }
 
-    /** POST api/payment/confirm_demo.php - xác nhận thủ công không còn được hỗ trợ. */
-    public function confirmDemo(): void
-    {
-        Response::jsonHeaders();
-        $this->requireCustomer();
-        $this->requirePost();
-        $this->requireCsrf(Request::json());
-
-        $this->respond('error', 'Thanh toán VietQR được xác nhận bởi cửa hàng sau khi đối soát giao dịch.', 409);
-    }
-
     /** POST api/payment/refresh_vietqr.php - tạo mã QR mới cho đơn. */
     public function refresh(): void
     {

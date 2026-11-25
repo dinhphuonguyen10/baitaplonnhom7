@@ -22,7 +22,7 @@ class ChatController extends BaseClientController
         $chatProduct = null;
         $requestedProductId = filter_var(Request::query('product_id'), FILTER_VALIDATE_INT);
         if ($isCustomerLoggedIn && $requestedProductId !== false && $requestedProductId !== null && $requestedProductId > 0) {
-            $product = (new Product())->find((int) $requestedProductId);
+            $product = (new Product())->findActiveIdAndName((int) $requestedProductId);
             $chatProduct = $product === null ? null : ['id' => $product['id'], 'name' => $product['name']];
         }
 

@@ -49,4 +49,31 @@ class ImageUploadService
     {
         return move_uploaded_file($file['tmp_name'], $destination);
     }
+
+    /** MIME ảnh thật đọc từ nội dung file (getimagesize); chuỗi rỗng nếu không phải ảnh. */
+    public function detectImageMime(string $path): string
+    {
+        $imageInfo = @getimagesize($path);
+
+        return is_array($imageInfo) ? (string) ($imageInfo['mime'] ?? '') : '';
+    }
+
+    /**
+     * Giữ chỗ một tên file ngẫu nhiên chưa tồn tại trong thư mục (tạo file rỗng bằng mode 'x'),
+     * dạng {prefix}{32 ký tự hex}.{ext}; trả về tên file hoặc null sau 5 lần thử không được.
+     */
+    public function reserveUniqueFile(string $directory, string $prefix, string $extension): ?string
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $fileName = $prefix . bin2hex(random_bytes(16)) . '.' . $extension;
+            $reservation = @fopen($directory . $fileName, 'x');
+            if ($reservation !== false) {
+                fclose($reservation);
+
+                return $fileName;
+            }
+        }
+
+        return null;
+    }
 }

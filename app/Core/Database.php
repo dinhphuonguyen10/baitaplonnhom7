@@ -59,7 +59,12 @@ final class Database
         if (self::$instance === null) {
             $config = require APP_ROOT . '/config/database.php';
             self::$instance = new self(is_array($config) ? $config : []);
-            (new SchemaManager(self::$instance))->migrate();
+            $hasOrders = (new SchemaManager(self::$instance))->migrate();
+
+            // Mỗi request web tự hủy các đơn đã hết thời gian giữ tồn kho (CLI dùng scripts/expire_order_inventory.php).
+            if ($hasOrders && PHP_SAPI !== 'cli') {
+                (new \App\Services\OrderInventoryService(self::$instance))->expireReservations();
+            }
         }
 
         return self::$instance;

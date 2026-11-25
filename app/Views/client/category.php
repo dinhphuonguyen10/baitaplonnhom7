@@ -22,6 +22,17 @@ include VIEW_PATH . '/layouts/header.php';
                 <h2 class="filter-header-title">BỘ LỌC TÌM KIẾM</h2>
             </div>
 
+            <div class="filter-group">
+                <label class="filter-group-title" for="filter-category">DANH MỤC</label>
+                <select id="filter-category" class="filter-category-select">
+                    <?php foreach ($visibleNavCategories as $navCategory): ?>
+                        <option value="<?php echo View::e($navCategory['slug']); ?>" <?php echo $navCategory['slug'] === $categoryKey ? 'selected' : ''; ?>>
+                            <?php echo View::e($navCategory['name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
             <!-- NHÓM 1: KHOẢNG GIÁ -->
             <div class="filter-group">
                 <h3 class="filter-group-title">KHOẢNG GIÁ</h3>

@@ -2,17 +2,23 @@
 
 namespace App\Controllers\Admin;
 
+use App\Core\Auth;
 use App\Core\Database;
 use App\Core\Request;
+use App\Core\Response;
 use App\Services\CategoryService;
+use DomainException;
 use InvalidArgumentException;
-use RuntimeException;
+use Throwable;
 
 /**
- * Controller trang admin/categories.php - thêm / sửa / xóa danh mục sản phẩm.
+ * Controller trang admin/categories.php - thêm / sửa / xóa mềm / khôi phục danh mục sản phẩm.
+ * Mọi thao tác POST cần CSRF token riêng (khóa phiên categories_csrf_token).
  */
 class CategoryController extends BaseAdminController
 {
+    private const CSRF_KEY = 'categories_csrf_token';
+
     private CategoryService $categories;
 
     public function __construct(?Database $db = null, ?CategoryService $categories = null)
@@ -24,41 +30,45 @@ class CategoryController extends BaseAdminController
     /** Xử lý form (nếu có) và trả về dữ liệu cho view. */
     protected function handle(): array
     {
+        $layout = $this->layoutData('categories.php');
+        $csrfToken = $this->csrfToken(self::CSRF_KEY);
         $message = '';
         $messageType = '';
 
         if (Request::isPost()) {
             try {
-                $result = $this->dispatch((string) Request::post('action', ''));
-                if ($result !== null) {
-                    $message = $result;
-                    $messageType = 'success';
+                if (!$this->verifyCsrf(is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null, self::CSRF_KEY)) {
+                    throw new DomainException('Phiên thao tác không hợp lệ. Vui lòng tải lại trang.');
                 }
-            } catch (InvalidArgumentException | RuntimeException $e) {
-                $message = $e->getMessage();
+                $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+                $message = $this->categories->handleAction($action, $_POST, Auth::adminUsername());
+                $messageType = 'success';
+            } catch (Throwable $e) {
+                if (!($e instanceof DomainException) && !($e instanceof InvalidArgumentException)) {
+                    error_log('Category management failed: ' . $e->getMessage());
+                }
+                $message = $e instanceof DomainException || $e instanceof InvalidArgumentException
+                    ? $e->getMessage()
+                    : CategoryService::MSG_SYSTEM_ERROR;
                 $messageType = 'error';
             }
         }
 
-        return array_merge($this->layoutData('categories.php'), [
+        try {
+            $categories = $this->categories->listForAdmin((string) $layout['appBaseUrl']);
+        } catch (Throwable $e) {
+            error_log('Admin category list failed: ' . $e->getMessage());
+            $categories = [];
+            $message = 'Không thể tải danh sách danh mục.';
+            $messageType = 'error';
+        }
+
+        return array_merge($layout, [
             'message' => $message,
             'messageType' => $messageType,
-            'categories' => $this->categories->listForAdmin(),
+            'categories' => $categories,
+            'categoriesCsrfToken' => $csrfToken,
         ]);
-    }
-
-    private function dispatch(string $action): ?string
-    {
-        switch ($action) {
-            case 'add':
-                return $this->categories->add(Request::string('name', '', 'post'));
-            case 'edit':
-                return $this->categories->edit((int) Request::post('id', 0), Request::string('name', '', 'post'));
-            case 'delete':
-                return $this->categories->delete((int) Request::post('id', 0));
-            default:
-                return null;
-        }
     }
 
     /** Action: hiển thị View admin/categories. */

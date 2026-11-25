@@ -95,6 +95,24 @@ class PaymentService
         return $this->orders->findQrPaymentForCustomer($orderId, $userId);
     }
 
+    /** Đơn của khách (QR hoặc COD) cho trang thanh toán / biên nhận đặt hàng thành công. */
+    public function findPaymentPageOrder(int $orderId, int $userId): ?array
+    {
+        return $this->orders->findForPaymentPage($orderId, $userId);
+    }
+
+    /** Các dòng sản phẩm cho biên nhận, kèm thành tiền từng dòng (item_total = đơn giá × số lượng). */
+    public function receiptItems(int $orderId): array
+    {
+        $items = (new \App\Models\OrderItem($this->db))->listReceiptLines($orderId);
+        foreach ($items as &$item) {
+            $item['item_total'] = (float) $item['price'] * (int) $item['quantity'];
+        }
+        unset($item);
+
+        return $items;
+    }
+
     /**
      * Làm mới mã QR cho đơn (đã kiểm tra hạn ở bước trước).
      *

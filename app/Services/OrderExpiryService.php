@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Core\Database;
 use App\Database\SchemaManager;
+use App\Models\OrderStatusHistory;
 use RuntimeException;
 use Throwable;
 
@@ -54,7 +55,7 @@ class OrderExpiryService
             $transactionStarted = true;
 
             $order = $this->db->fetchOne(
-                'SELECT status, payment_status, payment_method, payment_deadline_at,
+                'SELECT status, payment_status, payment_method, payment_deadline_at, inventory_status,
                         payment_deadline_at <= NOW() AS deadline_passed
                  FROM orders
                  WHERE id = ?
@@ -77,7 +78,9 @@ class OrderExpiryService
 
             $affected = $this->db->execute(
                 "UPDATE orders
-                 SET status = 'Đã hủy'
+                 SET status = 'Đã hủy',
+                     cancelled_at = COALESCE(cancelled_at, NOW()),
+                     cancellation_reason = COALESCE(NULLIF(cancellation_reason, ''), 'Đơn hàng quá hạn thanh toán VietQR.')
                  WHERE id = ?
                    AND payment_method = 'BANK_QR'
                    AND payment_status = 'Thanh toán thất bại'
@@ -89,22 +92,24 @@ class OrderExpiryService
                 throw new RuntimeException('Trạng thái đơn hàng đã thay đổi khi hết hạn.');
             }
 
-            $items = $this->db->fetchAll(
-                'SELECT product_id, quantity FROM order_items WHERE order_id = ? FOR UPDATE',
-                [$orderId]
-            );
-            foreach ($items as $item) {
-                if ($item['product_id'] === null) {
-                    continue;
-                }
-                $restocked = $this->db->execute(
-                    'UPDATE products SET stock = stock + ? WHERE id = ?',
-                    [(int) $item['quantity'], (int) $item['product_id']]
-                );
-                if ($restocked !== 1) {
-                    throw new RuntimeException('Không thể hoàn kho sản phẩm của đơn đã hết hạn.');
-                }
+            // Hoàn kho đúng một lần theo trạng thái tồn kho của đơn:
+            //  - 'reserved': dùng OrderInventoryService (đánh dấu 'released' rồi cộng kho)
+            //  - 'legacy'  : đơn tạo trước khi có cơ chế giữ tồn kho -> cộng kho theo chi tiết đơn
+            //  - 'released' / 'committed': kho đã được xử lý trước đó -> không cộng lại
+            $inventoryStatus = (string) ($order['inventory_status'] ?? 'legacy');
+            if ($inventoryStatus === 'reserved') {
+                (new OrderInventoryService($this->db))->releaseReserved($orderId);
+            } elseif ($inventoryStatus === 'legacy') {
+                $this->restockLegacyOrder($orderId);
             }
+
+            (new OrderStatusHistory($this->db))->log(
+                $orderId,
+                'Đã hủy',
+                (string) $order['status'],
+                'Đơn hàng quá hạn thanh toán VietQR; hệ thống đã hủy đơn và hoàn kho.',
+                'Hệ thống'
+            );
 
             $this->db->commit();
             $transactionStarted = false;
@@ -115,6 +120,27 @@ class OrderExpiryService
                 $this->db->rollback();
             }
             throw $e;
+        }
+    }
+
+    /** Cộng lại tồn kho cho đơn cũ (chưa có cơ chế giữ tồn kho) theo chi tiết đơn. */
+    private function restockLegacyOrder(int $orderId): void
+    {
+        $items = $this->db->fetchAll(
+            'SELECT product_id, quantity FROM order_items WHERE order_id = ? FOR UPDATE',
+            [$orderId]
+        );
+        foreach ($items as $item) {
+            if ($item['product_id'] === null) {
+                continue;
+            }
+            $restocked = $this->db->execute(
+                'UPDATE products SET stock = stock + ? WHERE id = ?',
+                [(int) $item['quantity'], (int) $item['product_id']]
+            );
+            if ($restocked !== 1) {
+                throw new RuntimeException('Không thể hoàn kho sản phẩm của đơn đã hết hạn.');
+            }
         }
     }
 

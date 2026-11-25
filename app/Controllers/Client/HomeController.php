@@ -52,14 +52,19 @@ class HomeController extends BaseClientController
      *
      * @return array<int, array{name: string, image: string, link: string}>
      */
-    protected function categoryTiles(array $navCategories): array
+    protected function categoryTiles(array $navCategories, string $appBaseUrl): array
     {
         $tiles = [];
         foreach ($this->catalog->visibleCategories($navCategories) as $category) {
             $slug = $category['slug'];
+            // Ưu tiên ảnh danh mục do quản trị đặt (URL tuyệt đối hoặc đường dẫn trong assets).
+            $categoryImage = trim((string) ($category['image'] ?? ''));
+            $image = $categoryImage !== ''
+                ? (preg_match('~^https?://~i', $categoryImage) ? $categoryImage : $appBaseUrl . '/' . ltrim($categoryImage, '/'))
+                : (self::CATEGORY_ICONS[$slug] ?? 'assets/banner/logo.png');
             $tiles[] = [
                 'name' => $category['name'],
-                'image' => self::CATEGORY_ICONS[$slug] ?? 'assets/banner/logo.png',
+                'image' => $image,
                 'link' => self::CATEGORY_LINKS[$slug] ?? ('client/category.php?slug=' . urlencode($slug)),
             ];
         }
@@ -71,7 +76,7 @@ class HomeController extends BaseClientController
     public function index(): void
     {
         $data = $this->shareLayoutData($this->handle());
-        $data['homeCategories'] = $this->categoryTiles($data['navCategories']);
+        $data['homeCategories'] = $this->categoryTiles($data['navCategories'], (string) $data['appBaseUrl']);
         \App\Core\View::render('client/home', $data);
     }
 }

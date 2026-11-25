@@ -100,15 +100,20 @@ class WishlistController extends \App\Core\Controller
         }
 
         try {
-            $productName = $this->wishlist->requireProductName($productId);
+            $product = $this->wishlist->requireProduct($productId);
         } catch (InvalidArgumentException $e) {
             Response::json(['status' => 'error', 'message' => $e->getMessage()]);
         }
 
         if ($action === 'toggle' || $action === 'remove') {
-            $result = $action === 'toggle'
-                ? $this->wishlist->toggle($userId, $productId, $productName)
-                : $this->wishlist->remove($userId, $productId, $productName);
+            try {
+                $result = $action === 'toggle'
+                    ? $this->wishlist->toggle($userId, $productId, $product)
+                    : $this->wishlist->remove($userId, $productId, $product);
+            } catch (\DomainException $e) {
+                // Sản phẩm/danh mục ngừng kinh doanh: không cho thả tim mới.
+                Response::json(['status' => 'unavailable', 'message' => $e->getMessage()], 409);
+            }
 
             Response::json([
                 'status' => 'success',
