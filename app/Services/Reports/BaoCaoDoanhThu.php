@@ -306,7 +306,7 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
                    WHERE o.created_at >= ? AND o.created_at < ?
                      AND o.status IN " . self::DELIVERED . $categoryFilter .
             ' GROUP BY oi.product_id, oi.product_name
-      ORDER BY quantity_sold DESC, product_revenue DESC',
+      ORDER BY quantity_sold DESC, product_revenue DESC, oi.product_name ASC, oi.product_id ASC',
             $params
         ) ?? [];
     }
@@ -330,7 +330,7 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
                        WHERE o.created_at >= ? AND o.created_at < ?
                          AND o.status IN " . self::DELIVERED . $categoryFilter . "
                        GROUP BY c.id, c.name
-                       ORDER BY revenue DESC, items_sold DESC",
+                       ORDER BY revenue DESC, items_sold DESC, c.name ASC",
             $params
         ) ?? [];
     }

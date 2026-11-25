@@ -66,11 +66,12 @@ class BaoCaoKhachHang extends BaoCaoCoSo
             $sql .= ' HAVING COUNT(DISTINCT o.id) > 0';
         }
         if ($this->type === 'revenue') {
-            $sql .= ' ORDER BY revenue DESC, order_count DESC';
+            $sql .= ' ORDER BY revenue DESC, order_count DESC, u.id DESC';
         } elseif ($this->type === 'orders' || $this->type === 'repeat') {
-            $sql .= ' ORDER BY order_count DESC, revenue DESC';
+            $sql .= ' ORDER BY order_count DESC, revenue DESC, u.id DESC';
         } else {
-            $sql .= ' ORDER BY u.created_at DESC';
+            // u.id làm tiêu chí phụ: nhiều khách có thể được tạo cùng một thời điểm
+            $sql .= ' ORDER BY u.created_at DESC, u.id DESC';
         }
         $sql .= ' LIMIT 100';
 
