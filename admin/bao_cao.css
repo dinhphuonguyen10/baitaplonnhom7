@@ -1,0 +1,175 @@
+/* ===== Giao diện trang Báo cáo và thống kê (ghi đè nhẹ lên style từng trang) ===== */
+:root {
+    --rp-accent: #1685ff;
+    --rp-accent-soft: #e8f3ff;
+    --rp-radius: 14px;
+    --rp-shadow: 0 6px 24px rgba(15, 39, 71, .06);
+    --rp-shadow-hover: 0 10px 30px rgba(15, 39, 71, .11);
+}
+
+.page-content h1 { color: var(--navy); letter-spacing: -.02em; }
+
+/* ---------- Trang danh sách ---------- */
+.report-index-heading h1 { font-size: 28px; }
+.report-index-search {
+    height: 46px;
+    padding: 0 16px 0 44px;
+    border: 1px solid #dce2e9;
+    border-radius: 12px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%238793a2' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 15px center;
+    box-shadow: var(--rp-shadow);
+    transition: border-color .15s, box-shadow .15s;
+}
+.report-index-search:focus { border-color: var(--rp-accent); box-shadow: 0 0 0 4px rgba(22, 133, 255, .12); outline: none; }
+
+.report-index-grid { gap: 20px; }
+.report-index-card {
+    border: 1px solid #e6ebf1;
+    border-radius: var(--rp-radius);
+    box-shadow: var(--rp-shadow);
+    transition: box-shadow .2s, transform .2s;
+}
+.report-index-card:hover { box-shadow: var(--rp-shadow-hover); }
+.report-index-card h2 {
+    padding: 18px 22px;
+    border-bottom: 1px solid #edf0f4;
+    background: linear-gradient(180deg, #fbfcfe 0%, #f5f8fc 100%);
+    font-size: 15px;
+    letter-spacing: .06em;
+}
+.report-index-icon { width: 34px; height: 34px; border-radius: 10px; font-size: 17px; }
+.report-index-card:nth-of-type(2) .report-index-icon { background: #eafaf1; color: #16a05b; }
+.report-exported-card .report-index-icon { background: #fff4e5; color: #e58a12; }
+.report-index-list { padding: 8px 14px 14px; }
+.report-index-item { padding: 13px 12px 13px 28px; border-radius: 8px; border-bottom: 0; }
+.report-index-item::before { top: 50%; left: 12px; width: 7px; height: 7px; margin-top: -3px; background: #c3ccd7; transition: background .15s, transform .15s; }
+.report-index-item:hover::before { background: var(--rp-accent); transform: scale(1.3); }
+.report-index-item strong { font-weight: 600; }
+.report-saved-item { padding: 10px 12px; border-bottom: 0; border-radius: 8px; transition: background .15s; }
+.report-saved-item:hover { background: #f4f8fc; }
+.report-saved-link strong { font-weight: 600; }
+.report-exported-info small { margin-top: 4px; }
+.report-row-action { border-radius: 8px; }
+.report-row-delete .report-row-action:hover { background: #fdecec; color: #d33b3b; }
+.report-notice { border-radius: 10px; }
+
+/* ---------- Trang chi tiết (bán hàng / khách hàng / đã xuất) ---------- */
+.report-detail-heading, .customer-detail-heading, .exp-heading { margin-bottom: 22px; }
+.report-detail-heading h1, .customer-detail-heading h1, .exp-heading h1 { font-size: 28px; }
+.report-back-button, .exp-back { border-radius: 10px !important; box-shadow: var(--rp-shadow); transition: color .15s, border-color .15s, transform .15s; }
+.report-back-button:hover, .exp-back:hover { border-color: var(--rp-accent) !important; transform: translateX(-2px); }
+
+.report-detail-actions > button, .customer-detail-actions > button, .exp-export-btn {
+    min-height: 42px;
+    padding: 0 18px !important;
+    border: 1px solid #0784f9 !important;
+    border-radius: 10px;
+    background: #fff !important;
+    color: #0784f9 !important;
+    transition: background .15s, box-shadow .15s;
+}
+.report-detail-actions > button:hover, .customer-detail-actions > button:hover, .exp-export-btn:hover { background: #f0f7ff !important; box-shadow: 0 4px 14px rgba(7, 132, 249, .18); }
+.report-detail-actions .report-save-button, .customer-detail-actions .report-save-button {
+    border: 0 !important;
+    border-radius: 10px;
+    background: var(--navy) !important;
+    color: #fff !important;
+}
+
+/* Thanh lọc dạng thẻ */
+.report-detail-filterbar, .customer-filterbar {
+    padding: 14px 16px;
+    border: 1px solid #e6ebf1;
+    border-radius: var(--rp-radius);
+    background: #fff;
+    box-shadow: var(--rp-shadow);
+}
+.report-field select, .report-field input, .customer-filterbar > select, .customer-filterbar > input {
+    border-radius: 9px;
+    transition: border-color .15s, box-shadow .15s;
+}
+.report-field select:focus, .report-field input:focus, .customer-filterbar > select:focus, .customer-filterbar > input:focus {
+    border-color: var(--rp-accent);
+    box-shadow: 0 0 0 3px rgba(22, 133, 255, .12);
+    outline: none;
+}
+.report-compare-label, .customer-compare-label {
+    padding: 6px 12px;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: var(--rp-accent-soft) !important;
+    color: #0b63c4 !important;
+    font-size: 13px;
+    font-weight: 600;
+}
+.report-button, .customer-filterbar .report-button { border-radius: 9px !important; transition: background .15s, box-shadow .15s; }
+.report-button:hover { box-shadow: 0 4px 12px rgba(15, 39, 71, .2); }
+
+/* Thẻ chỉ số tổng quan (trang báo cáo bán hàng) */
+.rp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.rp-kpi { position: relative; overflow: hidden; padding: 16px 18px; border: 1px solid #e6ebf1; border-radius: var(--rp-radius); background: #fff; box-shadow: var(--rp-shadow); }
+.rp-kpi::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--rp-accent); content: ''; }
+.rp-kpi span { display: block; color: #6b7a8c; font-size: 13px; font-weight: 500; }
+.rp-kpi strong { display: block; margin-top: 6px; color: var(--navy); font-size: 22px; letter-spacing: -.01em; }
+.rp-kpi.is-money::before { background: #16a05b; }
+.rp-kpi.is-danger::before { background: #e5484d; }
+.rp-kpi.is-warm::before { background: #e58a12; }
+
+/* Bảng dữ liệu */
+.report-panel, .customer-report-panel, .exp-panel { border-radius: var(--rp-radius); border-color: #e6ebf1; box-shadow: var(--rp-shadow); }
+.report-table-detail, .customer-table, .exp-table { border-collapse: separate; border-spacing: 0; }
+.report-table-detail thead, .customer-table thead { background: transparent; }
+.report-table-detail th, .customer-table th, .exp-table th {
+    padding: 13px 16px;
+    border-bottom: 1px solid #dfe5ec;
+    background: #f1f5fa;
+    color: var(--navy);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-align: left !important;
+}
+.report-table-detail th:first-child, .customer-table th:first-child, .exp-table th:first-child { border-top-left-radius: 10px; }
+.report-table-detail th:last-child, .customer-table th:last-child, .exp-table th:last-child { border-top-right-radius: 10px; }
+.report-table-detail td, .customer-table td, .exp-table td { padding: 13px 16px; border-bottom: 1px solid #eef1f5; text-align: left !important; }
+.report-table-detail tbody:not(.report-table-summary) tr:nth-child(even), .customer-table tbody tr:nth-child(even) { background: #fafbfd; }
+.report-table-detail tbody:not(.report-table-summary) tr:hover, .customer-table tbody tr:hover, .exp-table tbody tr:hover { background: #eef5fd; }
+.report-table-detail .report-table-summary td { background: #f7faff; color: var(--navy); font-weight: 700; }
+.report-empty, .customer-empty, .exp-empty { padding: 28px 0 !important; text-align: center; }
+
+.report-table-footer, .customer-table-footer { border-top: 1px solid #eef1f5; margin-top: 4px; }
+.report-table-footer select, .report-table-footer button, .customer-table-footer select, .customer-table-footer button { border-radius: 7px; }
+.report-table-footer button:not(:disabled):hover, .customer-table-footer button:not(:disabled):hover { border-color: var(--rp-accent); color: var(--rp-accent); }
+
+/* Trang xem bản đã xuất */
+.exp-note { border-radius: 10px; }
+.exp-kpi { position: relative; padding-left: 18px; border-radius: 12px; background: #fff; }
+.exp-kpi::before { position: absolute; inset: 0 auto 0 0; width: 4px; border-radius: 12px 0 0 12px; background: var(--rp-accent); content: ''; }
+.exp-meta dd { font-weight: 600; }
+
+@media (max-width: 650px) {
+    .report-detail-heading h1, .customer-detail-heading h1, .exp-heading h1 { font-size: 22px; }
+    .rp-kpi strong { font-size: 19px; }
+}
+
+/* Danh sách báo cáo đã xuất: kẻ dòng ngăn cách giữa các báo cáo */
+.report-exported-card .report-index-list { padding: 4px 14px 10px; }
+.report-exported-item { padding: 14px 12px; border-bottom: 1px solid #e3e9f0; border-radius: 0; }
+.report-exported-item:last-of-type { border-bottom: 0; }
+.report-exported-item:hover { border-radius: 8px; }
+
+/* Danh sách báo cáo đã xuất: chia thành cột */
+.rx-head, .report-exported-info { display: grid; }
+.rx-head { grid-template-columns: minmax(0, 1fr) 38px; align-items: center; padding: 10px 12px; border-bottom: 1px solid #dfe5ec; background: #f1f5fa; border-radius: 8px; }
+.rx-grid, .report-exported-info { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, .9fr) minmax(0, 1.7fr) minmax(0, 1.8fr) minmax(0, 1.3fr); column-gap: 16px; align-items: center; }
+.rx-head .rx-grid span { color: var(--navy); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+.report-exported-item { align-items: center; }
+.report-exported-info { flex: 1; min-width: 0; }
+.rx-cell { min-width: 0; overflow: hidden; color: #35465a; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.rx-name strong { overflow: hidden; color: var(--navy); font-size: 15px; font-weight: 600; text-overflow: ellipsis; }
+.report-exported-item:hover .rx-name strong { color: #087fe8; }
+@media (max-width: 900px) {
+    .rx-head { display: none; }
+    .report-exported-info { grid-template-columns: 1fr 1fr; row-gap: 4px; }
+    .rx-name { grid-column: 1 / -1; }
+}

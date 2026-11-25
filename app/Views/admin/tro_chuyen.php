@@ -202,6 +202,7 @@
         .ar-tip { font-size:12px; }
         .ar-status { font-size:13px; }
     </style>
+<link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/tro_chuyen.css?v=' . (int) @filemtime(APP_ROOT . '/admin/tro_chuyen.css')); ?>">
 </head>
 <body>
 <div class="admin-layout">

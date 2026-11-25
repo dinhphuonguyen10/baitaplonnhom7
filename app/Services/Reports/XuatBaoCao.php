@@ -11,9 +11,9 @@ use ZipArchive;
 class XuatBaoCao
 {
     /** Xuất một báo cáo theo định dạng 'csv' hoặc 'xlsx' (kết thúc request). */
-    public function export(BaoCaoCoSo $report, string $format): void
+    public function export(BaoCaoCoSo $report, string $format, ?string $customName = null): void
     {
-        $filename = $report->exportFilename();
+        $filename = self::safeFilename($customName) ?? $report->exportFilename();
         if ($format === 'csv') {
             $this->sendCsv($filename . '.csv', $report->exportRows());
         } else {
@@ -21,11 +21,29 @@ class XuatBaoCao
         }
     }
 
+    /** Tên tệp người dùng đặt: bỏ ký tự không hợp lệ, tối đa 100 ký tự; null nếu rỗng. */
+    public static function safeFilename(?string $name): ?string
+    {
+        $name = trim((string) preg_replace('~[\\\\/:*?"<>|\p{Cc}]+~u', ' ', (string) $name));
+        $name = trim((string) preg_replace('/\s+/u', ' ', $name), " .");
+        $name = mb_substr($name, 0, 100, 'UTF-8');
+
+        return $name !== '' ? $name : null;
+    }
+
+    /** Header Content-Disposition hỗ trợ tên tệp tiếng Việt (RFC 5987). */
+    private static function disposition(string $filename): string
+    {
+        $ascii = (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $filename));
+
+        return 'attachment; filename="' . ($ascii !== '' ? $ascii : 'bao-cao') . '"; filename*=UTF-8\'\'' . rawurlencode($filename);
+    }
+
     /** Gửi tệp CSV (UTF-8 BOM, chống CSV injection) rồi kết thúc request. */
     public function sendCsv(string $filename, array $rows): void
     {
         header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Disposition: ' . self::disposition($filename));
         header('X-Content-Type-Options: nosniff');
         $output = fopen('php://output', 'w');
         if ($output === false) {
@@ -101,7 +119,7 @@ class XuatBaoCao
         }
 
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Disposition: ' . self::disposition($filename));
         header('Content-Length: ' . strlen($fileContents));
         header('X-Content-Type-Options: nosniff');
         echo $fileContents;

@@ -28,13 +28,14 @@ if ($reportView === 'list'):
             .report-saved-link { flex: 1; min-width: 0; color: #23364b; }
             .report-saved-link:hover { color: #087fe8; }
             .report-saved-link strong { display: block; overflow: hidden; font-size: 15px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+            .report-exported-card { grid-column: 1 / -1; }
+            .report-exported-info small { display: block; margin-top: 3px; color: #6b7a8c; font-size: 13px; line-height: 1.5; }
+            .report-exported-empty { margin: 0; padding: 10px 8px; color: #6b7a8c; font-size: 14px; }
             .report-saved-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
             .report-row-action { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: #8793a2; cursor: pointer; font-size: 18px; }
             .report-row-action:hover { background: #eef5fc; color: #087fe8; }
             .report-row-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
             .report-row-delete { display: inline-flex; margin: 0; }
-            .report-index-heading .report-add-button { min-height: 40px; padding: 0 15px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
-            .report-index-heading .report-add-button:hover { background: var(--navy-soft); }
             .report-notice { margin: 0 0 16px; padding: 11px 14px; border: 1px solid #cfe7d7; border-radius: 7px; background: #f0faf3; color: #28643a; }
             .report-notice.error { border-color: #f3c4c4; background: #fff2f2; color: #9c2f2f; }
             .report-modal[hidden] { display: none; }
@@ -62,6 +63,7 @@ if ($reportView === 'list'):
             .report-modal-footer button { min-width: 82px; height: 39px; padding: 0 15px; border: 1px solid #0784f9; border-radius: 7px; background: #fff; color: #0784f9; cursor: pointer; font-weight: 600; }
             .report-modal-footer button[type=submit] { background: #0784f9; color: #fff; }
             .report-modal-footer button[type=submit]:hover { background: #006fd6; }
+            .report-exported-item[hidden] { display: none; }
             .report-index-empty { display: none; grid-column: 1 / -1; padding: 24px; color: var(--muted); text-align: center; }
             .report-export-modal { position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; padding: 16px; background: rgba(15, 25, 38, .48); }
             .report-export-card { width: min(100%, 480px); overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
@@ -71,6 +73,9 @@ if ($reportView === 'list'):
             .report-export-close:hover { color: #4b5563; }
             .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 17px; line-height: 1.5; }
             .report-export-body p { margin: 0; }
+            .report-export-name-label { display: block; margin: 16px 0 6px; font-size: 14px; font-weight: 600; color: #1f2937; }
+            .report-export-name { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 15px; box-sizing: border-box; }
+            .report-export-name:focus { border-color: #0084ff; outline: none; box-shadow: 0 0 0 3px rgba(0,132,255,.15); }
             .report-export-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 0 24px 24px; }
             .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 16px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
             .report-export-footer .report-export-cancel { border: 1px solid #0084ff; background: #fff; color: #0084ff; }
@@ -82,6 +87,7 @@ if ($reportView === 'list'):
             @media (max-width: 850px) { .report-index-grid { grid-template-columns: 1fr; } }
             @media (max-width: 560px) { .report-index-heading { align-items: flex-start; flex-direction: column; } .report-index-card h2 { padding: 15px; } .report-index-list { padding-right: 12px; padding-left: 12px; } .report-modal-header { padding: 15px; } .report-modal-body { padding: 18px 15px; } .report-type-option { width: calc(50% - 7px); min-width: 130px; } }
         </style>
+    <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.css?v=' . (int) @filemtime(APP_ROOT . '/admin/bao_cao.css')); ?>">
     </head>
     <body>
     <div class="admin-layout">
@@ -97,13 +103,12 @@ if ($reportView === 'list'):
             <section class="page-content">
                 <div class="report-index-heading">
                     <h1>Danh sách báo cáo</h1>
-                    <button class="report-add-button" type="button" id="report-add">⊕ Thêm mới báo cáo</button>
                 </div>
                 <?php if (is_array($reportNotice) && ($reportNotice['message'] ?? '') !== ''): ?>
                     <p class="report-notice<?php echo ($reportNotice['type'] ?? '') === 'error' ? ' error' : ''; ?>" role="status"><?php echo $escape($reportNotice['message']); ?></p>
                 <?php endif; ?>
                 <?php if ($reportError !== ''): ?><p class="report-notice error" role="alert"><?php echo $escape($reportError); ?></p><?php endif; ?>
-                <input type="search" class="report-index-search" id="report-search" placeholder="Tìm kiếm tên báo cáo" aria-label="Tìm kiếm tên báo cáo">
+                <input type="search" class="report-index-search" id="report-search" placeholder="Tìm kiếm báo cáo đã xuất" aria-label="Tìm kiếm báo cáo đã xuất">
                 <div class="report-index-grid" id="report-list">
                     <section class="report-index-card" aria-labelledby="sales-reports-heading">
                         <h2 id="sales-reports-heading"><span class="report-index-icon" aria-hidden="true">$</span>BÁO CÁO BÁN HÀNG</h2>
@@ -159,7 +164,42 @@ if ($reportView === 'list'):
                             <?php endforeach; ?>
                         </div>
                     </section>
-                    <p class="report-index-empty" id="report-search-empty">Không tìm thấy báo cáo phù hợp.</p>
+                    <section class="report-index-card report-exported-card" aria-labelledby="exported-reports-heading">
+                        <h2 id="exported-reports-heading"><span class="report-index-icon" aria-hidden="true">⇩</span>BÁO CÁO ĐÃ XUẤT</h2>
+                        <div class="report-index-list">
+                            <?php if (empty($exportedReports)): ?>
+                                <p class="report-exported-empty">Chưa có báo cáo nào được xuất. Mở một báo cáo, chọn “Xuất báo cáo” và đặt tên để lưu vào danh sách này.</p>
+                            <?php endif; ?>
+                            <?php if (!empty($exportedReports)): ?>
+                                <div class="rx-head" aria-hidden="true">
+                                    <span class="rx-grid">
+                                        <span>Tên báo cáo</span><span>Loại</span><span>Mục báo cáo</span><span>Khoảng thời gian</span><span>Xuất lúc</span>
+                                    </span>
+                                    <span class="rx-actions-space"></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php foreach ($exportedReports as $exported): ?>
+                                <div class="report-saved-item report-exported-item">
+                                    <a class="report-saved-link report-exported-info" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?' . \App\Services\BaoCaoDaXuatService::detailQuery($exported)); ?>" title="Xem chi tiết báo cáo">
+                                        <span class="rx-cell rx-name"><strong><?php echo $escape($exported['name']); ?></strong></span>
+                                        <span class="rx-cell"><?php echo $escape($exported['type_label']); ?></span>
+                                        <span class="rx-cell"><?php echo $escape($exported['section_label'] !== '' ? $exported['section_label'] : '—'); ?></span>
+                                        <span class="rx-cell"><?php echo $escape(date('d/m/Y', strtotime($exported['from'] ?: 'now'))); ?> – <?php echo $escape(date('d/m/Y', strtotime($exported['to'] ?: 'now'))); ?></span>
+                                        <span class="rx-cell"><?php echo $escape(date('d/m/Y H:i', strtotime($exported['last_exported_at']))); ?></span>
+                                    </a>
+                                    <div class="report-saved-actions">
+                                        <form method="post" class="report-row-delete" onsubmit="return confirm('Bạn có chắc muốn xóa báo cáo đã xuất này khỏi danh sách?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo $escape($reportsCsrf); ?>">
+                                            <input type="hidden" name="action" value="delete_exported_report">
+                                            <input type="hidden" name="report_id" value="<?php echo (int) $exported['id']; ?>">
+                                            <button class="report-row-action" type="submit" aria-label="Xóa <?php echo $escape($exported['name']); ?>" title="Xóa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"></path></svg></button>
+                                        </form>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                            <p class="report-index-empty" id="report-search-empty">Không tìm thấy báo cáo đã xuất phù hợp.</p>
+                        </div>
+                    </section>
                 </div>
             </section>
         </main>
@@ -201,6 +241,7 @@ if ($reportView === 'list'):
             </div>
         </form>
     </div>
+    </div>
     <div class="report-export-modal" id="list-export-modal" style="display:none">
         <section class="report-export-card" role="dialog" aria-modal="true" aria-labelledby="list-export-heading" tabindex="-1">
             <header class="report-export-header">
@@ -209,29 +250,29 @@ if ($reportView === 'list'):
             </header>
             <div class="report-export-body">
                 <p>Bạn có muốn xuất báo cáo? Báo cáo này sẽ được xuất ra file excel</p>
+                <label class="report-export-name-label" for="list-export-name">Tên báo cáo</label>
+                <input class="report-export-name" type="text" id="list-export-name" maxlength="100" value="<?php echo $escape('Báo cáo bán hàng'); ?>" placeholder="Nhập tên báo cáo">
             </div>
             <footer class="report-export-footer">
                 <button type="button" class="report-export-cancel" id="list-export-cancel">Hủy</button>
-                <a class="report-export-confirm" id="list-export-confirm" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?view=sales&section=revenue&export=xlsx'); ?>" onclick="setTimeout(() => { document.getElementById('list-export-modal').style.display='none'; }, 200);">Xuất báo cáo</a>
+                <a class="report-export-confirm" id="list-export-confirm" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?view=sales&section=revenue&export=xlsx'); ?>" onclick="var n=document.getElementById('list-export-name').value.trim();var u=new window.URL(this.href,window.location.href);if(n){u.searchParams.set('filename',n);}else{u.searchParams.delete('filename');}this.href=u.pathname+u.search;setTimeout(() => { document.getElementById('list-export-modal').style.display='none'; }, 200);">Xuất báo cáo</a>
             </footer>
         </section>
     </div>
     <script>
+        // Ô tìm kiếm chỉ lọc danh sách "Báo cáo đã xuất"; hai thẻ báo cáo bán hàng / khách hàng luôn hiển thị.
         const reportSearch = document.getElementById('report-search');
-        const reportItems = Array.from(document.querySelectorAll('.report-index-item, .report-saved-item'));
+        const exportedItems = Array.from(document.querySelectorAll('.report-exported-item'));
         const emptyMessage = document.getElementById('report-search-empty');
         reportSearch.addEventListener('input', () => {
             const query = reportSearch.value.trim().toLocaleLowerCase('vi');
             let visibleCount = 0;
-            reportItems.forEach((item) => {
+            exportedItems.forEach((item) => {
                 const visible = item.textContent.toLocaleLowerCase('vi').includes(query);
                 item.hidden = !visible;
                 if (visible) visibleCount++;
             });
-            document.querySelectorAll('.report-index-card').forEach((card) => {
-                card.hidden = !card.querySelector('.report-index-item:not([hidden]), .report-saved-item:not([hidden])');
-            });
-            emptyMessage.style.display = visibleCount ? 'none' : 'block';
+            emptyMessage.style.display = exportedItems.length > 0 && visibleCount === 0 ? 'block' : 'none';
         });
 
         const reportModal = document.getElementById('report-modal');
@@ -260,7 +301,6 @@ if ($reportView === 'list'):
             document.body.style.overflow = 'hidden';
             reportTitle.focus();
         };
-        document.getElementById('report-add').addEventListener('click', () => openReportModal('create'));
         document.querySelectorAll('.report-edit').forEach((button) => {
             button.addEventListener('click', () => openReportModal('edit', {
                 id: button.dataset.id,
@@ -278,6 +318,7 @@ if ($reportView === 'list'):
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && !reportModal.hidden) closeReportModal();
         });
+
 
         const listExportModal = document.getElementById('list-export-modal');
         const listExportOpen = document.getElementById('list-export-open');
@@ -343,7 +384,6 @@ elseif ($reportView === 'customer'):
             .customer-table-footer select, .customer-table-footer button { min-height: 32px; border: 1px solid #dce2e9; border-radius: 5px; background: #fff; color: #526276; }
             .customer-table-footer button { min-width: 32px; cursor: pointer; }
             .customer-table-footer button:disabled { opacity: .4; cursor: default; }
-            .customer-copy-status { color: #16835d; font-size: 14px; }
             .customer-empty { padding: 18px 0; color: var(--muted); text-align: center; }
             .customer-error { margin-bottom: 16px; padding: 12px 15px; border: 1px solid #f3c4c4; border-radius: 8px; background: #fff2f2; color: #9c2f2f; }
             .customer-report-panel .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
@@ -355,6 +395,9 @@ elseif ($reportView === 'customer'):
             .report-export-close:hover { color: #4b5563; }
             .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 17px; line-height: 1.5; }
             .report-export-body p { margin: 0; }
+            .report-export-name-label { display: block; margin: 16px 0 6px; font-size: 14px; font-weight: 600; color: #1f2937; }
+            .report-export-name { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 15px; box-sizing: border-box; }
+            .report-export-name:focus { border-color: #0084ff; outline: none; box-shadow: 0 0 0 3px rgba(0,132,255,.15); }
             .report-export-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 0 24px 24px; }
             .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 16px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
             .report-export-footer .report-export-cancel { border: 1px solid #0084ff; background: #fff; color: #0084ff; }
@@ -363,6 +406,7 @@ elseif ($reportView === 'customer'):
             .report-export-footer .report-export-confirm:hover { background: #0070d8; border-color: #0070d8; }
             @media (max-width: 650px) { .customer-detail-heading { flex-wrap: wrap; } .customer-detail-actions { width: 100%; justify-content: flex-end; } .customer-filterbar > select, .customer-filterbar > input { width: 100%; } .customer-table-footer { justify-content: flex-start; flex-wrap: wrap; } }
         </style>
+    <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.css?v=' . (int) @filemtime(APP_ROOT . '/admin/bao_cao.css')); ?>">
     </head>
     <body>
     <div class="admin-layout">
@@ -381,7 +425,6 @@ elseif ($reportView === 'customer'):
                     <h1><?php echo $escape($customerTitle); ?></h1>
                     <div class="customer-detail-actions">
                         <?php if ($customerError === ''): ?><button type="button" onclick="document.getElementById('export-confirmation').style.display='grid'">⇧ Xuất báo cáo</button><?php endif; ?>
-                        <button type="button" id="copy-customer-report">▢ Sao chép</button>
                         <?php if ($currentSavedReport): ?><form method="post">
                             <input type="hidden" name="csrf_token" value="<?php echo $escape($reportsCsrf); ?>">
                             <input type="hidden" name="action" value="save_report_state">
@@ -410,14 +453,12 @@ elseif ($reportView === 'customer'):
                             <option value="last_30" <?php echo $period === 'last_30' ? 'selected' : ''; ?>>30 ngày gần nhất</option>
                             <option value="custom" <?php echo $period === 'custom' ? 'selected' : ''; ?>>Tùy chọn ngày</option>
                         </select>
-                        <span class="customer-compare-label">Dữ liệu từ <?php echo $escape($customerRange); ?></span>
                         <label class="sr-only" for="customer-from">Từ ngày</label>
                         <input type="date" name="from" id="customer-from" value="<?php echo $escape($startDate); ?>">
                         <label class="sr-only" for="customer-to">Đến ngày</label>
                         <input type="date" name="to" id="customer-to" value="<?php echo $escape($endDate); ?>">
                         <button type="submit" class="report-button">Áp dụng</button>
                     </form>
-                <span class="customer-copy-status" id="customer-copy-status" role="status"></span>
                 <section class="customer-report-panel customer-table-panel">
                     <div class="customer-table-toolbar">
                         <strong><?php echo $escape($customerTitle); ?></strong>
@@ -458,10 +499,12 @@ elseif ($reportView === 'customer'):
                 </header>
                 <div class="report-export-body">
                     <p>Bạn có muốn xuất báo cáo? Báo cáo này sẽ được xuất ra file excel</p>
+                    <label class="report-export-name-label" for="customer-export-name">Tên báo cáo</label>
+                    <input class="report-export-name" type="text" id="customer-export-name" maxlength="100" value="<?php echo $escape($customerTitle); ?>" placeholder="Nhập tên báo cáo">
                 </div>
                 <footer class="report-export-footer">
                     <button type="button" class="report-export-cancel" onclick="document.getElementById('export-confirmation').style.display='none'">Hủy</button>
-                    <a class="report-export-confirm" id="customer-export-xlsx" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?' . $customerExportQueryXlsx); ?>" onclick="setTimeout(() => { document.getElementById('export-confirmation').style.display='none'; }, 200);">Xuất báo cáo</a>
+                    <a class="report-export-confirm" id="customer-export-xlsx" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?' . $customerExportQueryXlsx); ?>" onclick="var n=document.getElementById('customer-export-name').value.trim();var u=new window.URL(this.href,window.location.href);if(n){u.searchParams.set('filename',n);}else{u.searchParams.delete('filename');}this.href=u.pathname+u.search;setTimeout(() => { document.getElementById('export-confirmation').style.display='none'; }, 200);">Xuất báo cáo</a>
                 </footer>
             </section>
         </div>
@@ -533,22 +576,147 @@ elseif ($reportView === 'customer'):
             next.addEventListener('click', () => { page++; renderCustomerPage(); });
             renderCustomerPage();
         }
-        document.getElementById('copy-customer-report').addEventListener('click', async () => {
-            const table = document.getElementById('customer-data-table');
-            const status = document.getElementById('customer-copy-status');
-            if (!table) {
-                status.textContent = 'Không có dữ liệu để sao chép.';
-                return;
-            }
-            const text = Array.from(table.rows).map((row) => Array.from(row.cells).map((cell) => cell.textContent.trim()).join('\t')).join('\n');
-            try {
-                await navigator.clipboard.writeText(text);
-                status.textContent = 'Đã sao chép báo cáo.';
-            } catch (error) {
-                status.textContent = 'Không thể sao chép. Vui lòng kiểm tra quyền clipboard của trình duyệt.';
-            }
-        });
     </script>
+    </body>
+    </html>
+    <?php
+elseif ($reportView === 'exported'):
+    $exportedSnapshot = $exportedEntry['snapshot'];
+    $fmtDate = static function (string $d, string $format = 'd/m/Y'): string {
+        $t = strtotime($d);
+
+        return $t ? date($format, $t) : $d;
+    };
+    ?>
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title><?php echo $escape($exportedEntry['name']); ?> - Báo cáo đã xuất</title>
+        <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/style.css'); ?>">
+        <style>
+            .exp-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+            .exp-heading h1 { margin: 0; font-size: 26px; color: var(--navy); }
+            .exp-back { display: inline-grid; width: 40px; height: 40px; flex: 0 0 40px; place-items: center; border: 1px solid #dce2e9; border-radius: 7px; background: #fff; color: #718198; font-size: 22px; text-decoration: none; }
+            .exp-back:hover { color: #0784f9; }
+            .exp-note { margin: 0 0 18px; padding: 10px 14px; border: 1px solid #cfe0f5; border-radius: 8px; background: #f2f8ff; color: #1d4f91; font-size: 14px; }
+            .exp-warn { border-color: #f3dcb6; background: #fff8ec; color: #8a5a10; }
+            .exp-panel { margin-bottom: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow); }
+            .exp-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 0; }
+            .exp-meta div { min-width: 0; }
+            .exp-meta dt { margin: 0 0 3px; color: #6b7a8c; font-size: 13px; }
+            .exp-meta dd { margin: 0; color: var(--navy); font-weight: 600; overflow-wrap: anywhere; }
+            .exp-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+            .exp-kpi { padding: 12px 14px; border: 1px solid #e5e9ef; border-radius: 8px; background: #fafbfc; }
+            .exp-kpi span { display: block; color: #6b7a8c; font-size: 13px; }
+            .exp-kpi strong { display: block; margin-top: 4px; color: var(--navy); font-size: 18px; }
+            .exp-table-wrap { overflow-x: auto; }
+            .exp-table { width: 100%; border-collapse: collapse; }
+            .exp-table th, .exp-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; color: var(--navy); }
+            .exp-table th { background: #fafbfc; font-size: 13px; font-weight: 700; white-space: nowrap; }
+            .exp-export-btn { margin-left: auto; min-height: 40px; padding: 0 16px; border: 1px solid #0784f9; border-radius: 7px; background: #fff; color: #0784f9; font: 600 15px inherit; cursor: pointer; }
+            .exp-export-btn:hover { background: #f0f7ff; }
+            .exp-modal { position: fixed; inset: 0; z-index: 99999; place-items: center; padding: 16px; background: rgba(15, 25, 38, .48); }
+            .exp-modal-card { width: min(100%, 480px); padding: 20px 24px 24px; border-radius: 8px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
+            .exp-modal-card header { display: flex; align-items: center; justify-content: space-between; }
+            .exp-modal-card h2 { margin: 0; font-size: 22px; color: #111827; }
+            .exp-modal-close { border: 0; background: transparent; color: #9ca3af; font-size: 27px; line-height: 1; cursor: pointer; }
+            .exp-modal-card p { margin: 12px 0 0; color: #1f2937; font-size: 16px; }
+            .exp-modal-card label { display: block; margin: 16px 0 6px; font-size: 14px; font-weight: 600; color: #1f2937; }
+            .exp-modal-card input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 15px; box-sizing: border-box; }
+            .exp-modal-card footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+            .exp-modal-card footer button, .exp-modal-card footer a { display: inline-flex; height: 38px; min-width: 82px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; border: 1px solid #0084ff; font-size: 16px; text-decoration: none; cursor: pointer; box-sizing: border-box; }
+            .exp-cancel { background: #fff; color: #0084ff; }
+            .exp-confirm { background: #0084ff; color: #fff; }
+            .exp-empty { margin: 0; padding: 18px 0; text-align: center; color: #6b7a8c; }
+        </style>
+    <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.css?v=' . (int) @filemtime(APP_ROOT . '/admin/bao_cao.css')); ?>">
+    </head>
+    <body>
+    <div class="admin-layout">
+        <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
+        <main class="main-content">
+            <header class="topbar">
+                <div class="breadcrumb">Trang chủ <span>/</span> <a href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>">Báo cáo</a> <span>/</span> <strong><?php echo $escape($exportedEntry['name']); ?></strong></div>
+                <div class="admin-profile">
+                    <div class="avatar">QL</div>
+                    <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small>Quản lý</small></div>
+                </div>
+            </header>
+            <section class="page-content">
+                <div class="exp-heading">
+                    <a class="exp-back" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>" aria-label="Quay lại danh sách báo cáo">←</a>
+                    <h1><?php echo $escape($exportedEntry['name']); ?></h1>
+                    <?php if ($exportedSnapshot !== null): ?>
+                        <button type="button" class="exp-export-btn" onclick="document.getElementById('exp-export-modal').style.display='grid'">⇧ Xuất lại báo cáo</button>
+                    <?php endif; ?>
+                </div>
+                <?php if ($exportedSnapshot === null): ?>
+                    <p class="exp-note exp-warn">Báo cáo này được xuất trước khi hệ thống lưu lại dữ liệu nên không có bản lưu để hiển thị. Hãy xuất lại báo cáo từ danh sách báo cáo để lưu dữ liệu.</p>
+                <?php else: ?>
+                    <p class="exp-note">Đây là dữ liệu tại thời điểm xuất (<?php echo $escape($fmtDate((string) $exportedEntry['created_at'], 'd/m/Y H:i')); ?>), không thay đổi theo dữ liệu hiện tại của cửa hàng.</p>
+                    <div class="exp-panel">
+                        <dl class="exp-meta">
+                            <div><dt>Loại báo cáo</dt><dd><?php echo $escape($exportedEntry['type_label']); ?></dd></div>
+                            <div><dt>Báo cáo gốc</dt><dd><?php echo $escape($exportedSnapshot['title'] ?? ''); ?></dd></div>
+                            <div><dt>Khoảng thời gian</dt><dd><?php echo $escape($fmtDate((string) ($exportedSnapshot['from'] ?? ''))); ?> – <?php echo $escape($fmtDate((string) ($exportedSnapshot['to'] ?? ''))); ?></dd></div>
+                            <?php if (isset($exportedSnapshot['category'])): ?><div><dt>Danh mục</dt><dd><?php echo $escape($exportedSnapshot['category']); ?></dd></div><?php endif; ?>
+                            <div><dt>Xuất lúc</dt><dd><?php echo $escape($fmtDate((string) $exportedEntry['created_at'], 'd/m/Y H:i')); ?></dd></div>
+                            <div><dt>Người xuất</dt><dd><?php echo $escape($exportedEntry['exported_by'] ?: '—'); ?></dd></div>
+                        </dl>
+                    </div>
+                    <?php if (!empty($exportedSnapshot['summary'])): ?>
+                        <div class="exp-panel">
+                            <div class="exp-summary">
+                                <?php foreach ($exportedSnapshot['summary'] as [$kpiLabel, $kpiValue]): ?>
+                                    <div class="exp-kpi"><span><?php echo $escape($kpiLabel); ?></span><strong><?php echo $escape($kpiValue); ?></strong></div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    <div class="exp-panel">
+                        <?php if (empty($exportedSnapshot['rows'])): ?>
+                            <p class="exp-empty">Báo cáo này không có dữ liệu chi tiết tại thời điểm xuất.</p>
+                        <?php else: ?>
+                            <div class="exp-table-wrap">
+                                <table class="exp-table">
+                                    <thead><tr><?php foreach ($exportedSnapshot['headers'] ?? [] as $header): ?><th><?php echo $escape($header); ?></th><?php endforeach; ?></tr></thead>
+                                    <tbody>
+                                        <?php foreach ($exportedSnapshot['rows'] as $row): ?>
+                                            <tr><?php foreach ($row as $cell): ?><td><?php echo $escape($cell); ?></td><?php endforeach; ?></tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </section>
+        </main>
+    </div>
+    <?php if ($exportedSnapshot !== null): ?>
+        <div class="exp-modal" id="exp-export-modal" style="display:none">
+            <section class="exp-modal-card" role="dialog" aria-modal="true" aria-labelledby="exp-export-title">
+                <header><h2 id="exp-export-title">Xuất lại báo cáo</h2>
+                    <button type="button" class="exp-modal-close" aria-label="Đóng" onclick="document.getElementById('exp-export-modal').style.display='none'">×</button></header>
+                <p>Tệp Excel sẽ chứa đúng dữ liệu đã lưu tại thời điểm xuất trước đó.</p>
+                <label for="exp-export-name">Tên báo cáo</label>
+                <input type="text" id="exp-export-name" maxlength="100" value="<?php echo $escape($exportedEntry['name']); ?>" placeholder="Nhập tên báo cáo">
+                <footer>
+                    <button type="button" class="exp-cancel" onclick="document.getElementById('exp-export-modal').style.display='none'">Hủy</button>
+                    <a class="exp-confirm" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?' . http_build_query(['view' => 'exported', 'id' => (int) $exportedEntry['id'], 'export' => 'xlsx'])); ?>" onclick="var n=document.getElementById('exp-export-name').value.trim();var u=new window.URL(this.href,window.location.href);if(n){u.searchParams.set('filename',n);}else{u.searchParams.delete('filename');}this.href=u.pathname+u.search;setTimeout(() => { document.getElementById('exp-export-modal').style.display='none'; }, 200);">Xuất báo cáo</a>
+                </footer>
+            </section>
+        </div>
+        <script>
+            (function () {
+                var modal = document.getElementById('exp-export-modal');
+                modal.addEventListener('click', function (e) { if (e.target === modal) modal.style.display = 'none'; });
+                document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.style.display = 'none'; });
+            })();
+        </script>
+    <?php endif; ?>
     </body>
     </html>
     <?php
@@ -622,7 +790,6 @@ else:
         .report-table-footer select, .report-table-footer button { min-height: 32px; border: 1px solid #dce2e9; border-radius: 5px; background: #fff; color: #526276; }
         .report-table-footer button { min-width: 32px; cursor: pointer; }
         .report-table-footer button:disabled { opacity: .4; cursor: default; }
-        .report-copy-status { color: #16835d; font-size: 14px; }
         .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
         .report-export-modal { position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; padding: 16px; background: rgba(15, 25, 38, .48); }
         .report-export-card { width: min(100%, 480px); overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.2); }
@@ -632,6 +799,9 @@ else:
         .report-export-close:hover { color: #4b5563; }
         .report-export-body { padding: 10px 24px 28px; color: #1f2937; font-size: 17px; line-height: 1.5; }
         .report-export-body p { margin: 0; }
+        .report-export-name-label { display: block; margin: 16px 0 6px; font-size: 14px; font-weight: 600; color: #1f2937; }
+        .report-export-name { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 15px; box-sizing: border-box; }
+        .report-export-name:focus { border-color: #0084ff; outline: none; box-shadow: 0 0 0 3px rgba(0,132,255,.15); }
         .report-export-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 0 24px 24px; }
         .report-export-footer button, .report-export-footer a { display: inline-flex; min-width: 82px; height: 38px; align-items: center; justify-content: center; padding: 0 20px; border-radius: 6px; font-size: 16px; font-weight: 500; text-decoration: none; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }
         .report-export-footer .report-export-cancel { border: 1px solid #0084ff; background: #fff; color: #0084ff; }
@@ -653,6 +823,7 @@ else:
             .report-table-footer { justify-content: flex-start; flex-wrap: wrap; }
         }
     </style>
+<link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.css?v=' . (int) @filemtime(APP_ROOT . '/admin/bao_cao.css')); ?>">
 </head>
 <body>
 <div class="admin-layout">
@@ -673,7 +844,6 @@ else:
                     <?php if ($reportError === ''): ?>
                         <button type="button" onclick="document.getElementById('export-confirmation').style.display='grid'">⇧ Xuất báo cáo</button>
                     <?php endif; ?>
-                    <button type="button" id="copy-report">▢ Sao chép</button>
                     <?php if ($currentSavedReport): ?><form method="post">
                         <input type="hidden" name="csrf_token" value="<?php echo $escape($reportsCsrf); ?>">
                         <input type="hidden" name="action" value="save_report_state">
@@ -724,10 +894,9 @@ else:
                 <button class="report-button" type="submit">Áp dụng</button>
                 <a class="report-button report-button-secondary" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?' . http_build_query(array_filter(['view' => 'sales', 'section' => $salesSection, 'report_id' => $savedReportId]))); ?>">Đặt lại</a>
             </form>
-            <span class="report-copy-status" id="copy-status" role="status"></span>
             <section class="report-panel report-table-panel" id="<?php echo $escape($salesSectionTargets[$salesSection]); ?>">
                 <?php if ($detailRows === []): ?>
-                    <p class="report-empty">Không có dữ liệu trong khoảng thời gian này.</p>
+                    <p class="report-empty"><?php echo $salesSection === 'low_stock' ? 'Hiện không có sản phẩm nào sắp hết hàng (tồn kho từ 1 đến ' . \App\Services\Reports\BaoCaoDoanhThu::LOW_STOCK_THRESHOLD . ').' : 'Không có dữ liệu trong khoảng thời gian này.'; ?></p>
                 <?php else: ?>
                     <div class="report-table-wrap">
                         <table class="report-table report-table-detail" id="report-data-table">
@@ -772,10 +941,12 @@ else:
             </header>
             <div class="report-export-body">
                 <p>Bạn có muốn xuất báo cáo? Báo cáo này sẽ được xuất ra file excel</p>
+                <label class="report-export-name-label" for="sales-export-name">Tên báo cáo</label>
+                <input class="report-export-name" type="text" id="sales-export-name" maxlength="100" value="<?php echo $escape($salesTitle); ?>" placeholder="Nhập tên báo cáo">
             </div>
             <footer class="report-export-footer">
                 <button type="button" class="report-export-cancel" onclick="document.getElementById('export-confirmation').style.display='none'">Hủy</button>
-                <a class="report-export-confirm" id="sales-export-xlsx" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?' . $exportQueryXlsx); ?>" onclick="setTimeout(() => { document.getElementById('export-confirmation').style.display='none'; }, 200);">Xuất báo cáo</a>
+                <a class="report-export-confirm" id="sales-export-xlsx" href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php?' . $exportQueryXlsx); ?>" onclick="var n=document.getElementById('sales-export-name').value.trim();var u=new window.URL(this.href,window.location.href);if(n){u.searchParams.set('filename',n);}else{u.searchParams.delete('filename');}this.href=u.pathname+u.search;setTimeout(() => { document.getElementById('export-confirmation').style.display='none'; }, 200);">Xuất báo cáo</a>
             </footer>
         </section>
     </div>
@@ -856,21 +1027,6 @@ else:
         renderPage();
     }
 
-    document.getElementById('copy-report').addEventListener('click', async () => {
-        const table = document.getElementById('report-data-table');
-        const status = document.getElementById('copy-status');
-        if (!table) {
-            status.textContent = 'Không có dữ liệu để sao chép.';
-            return;
-        }
-        const text = Array.from(table.rows).map((row) => Array.from(row.cells).map((cell) => cell.textContent.trim()).join('\t')).join('\n');
-        try {
-            await navigator.clipboard.writeText(text);
-            status.textContent = 'Đã sao chép báo cáo.';
-        } catch (error) {
-            status.textContent = 'Không thể sao chép. Vui lòng kiểm tra quyền clipboard của trình duyệt.';
-        }
-    });
 </script>
 </body>
 </html>

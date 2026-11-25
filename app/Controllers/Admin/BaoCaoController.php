@@ -14,6 +14,7 @@ use App\Services\Reports\XuatBaoCao;
 use App\Services\Reports\KhoangThoiGianBaoCao;
 use App\Services\Reports\BaoCaoDoanhThu;
 use App\Services\BaoCaoDaLuuService;
+use App\Services\BaoCaoDaXuatService;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -32,11 +33,14 @@ class BaoCaoController extends BaseAdminController
 
     private XuatBaoCao $exporter;
 
-    public function __construct(?Database $db = null, ?BaoCaoDaLuuService $savedReports = null, ?XuatBaoCao $exporter = null)
+    private BaoCaoDaXuatService $exportedReports;
+
+    public function __construct(?Database $db = null, ?BaoCaoDaLuuService $savedReports = null, ?XuatBaoCao $exporter = null, ?BaoCaoDaXuatService $exportedReports = null)
     {
         parent::__construct($db);
         $this->savedReports = $savedReports ?? new BaoCaoDaLuuService($this->db);
         $this->exporter = $exporter ?? new XuatBaoCao();
+        $this->exportedReports = $exportedReports ?? new BaoCaoDaXuatService($this->db);
     }
 
     /** Xử lý yêu cầu và trả về mảng biến cho view (hoặc chuyển hướng / gửi tệp xuất). */
@@ -55,9 +59,17 @@ class BaoCaoController extends BaseAdminController
             $reportError = $e->getMessage();
         }
 
+        $exportedReportsAvailable = true;
+        try {
+            $this->exportedReports->ensureStorage();
+        } catch (RuntimeException $e) {
+            $exportedReportsAvailable = false;
+            $reportError = $reportError ?: $e->getMessage();
+        }
+
         $reportsCsrf = $this->fixedLengthCsrfToken('reports_csrf');
 
-        if (Request::isPost() && $savedReportsAvailable) {
+        if (Request::isPost() && $savedReportsAvailable && $exportedReportsAvailable) {
             $reportNotice = $this->handlePost($reportsCsrf, $adminUsername, $reportNotice);
         }
 
@@ -66,7 +78,7 @@ class BaoCaoController extends BaseAdminController
         $exportFormat = strtolower((string) ($query['export'] ?? ''));
         $isExport = in_array($exportFormat, ['xlsx', 'csv'], true);
         $reportView = (string) ($query['view'] ?? ($isExport ? 'sales' : 'list'));
-        if (!in_array($reportView, ['list', 'sales', 'customer'], true)) {
+        if (!in_array($reportView, ['list', 'sales', 'customer', 'exported'], true)) {
             $reportView = $isExport ? 'sales' : 'list';
         }
         if ($isExport && $reportView === 'list') {
@@ -112,7 +124,42 @@ class BaoCaoController extends BaseAdminController
         ]);
 
         if ($reportView === 'list') {
-            return array_merge($common, $this->listData($savedReports));
+            $exportedReports = [];
+            if ($exportedReportsAvailable) {
+                try {
+                    $exportedReports = $this->exportedReports->listEntries();
+                } catch (RuntimeException $e) {
+                    $common['reportError'] = $common['reportError'] ?: $e->getMessage();
+                }
+            }
+
+            return array_merge($common, $this->listData($savedReports), ['exportedReports' => $exportedReports]);
+        }
+
+        if ($reportView === 'exported') {
+            $exportedEntry = $exportedReportsAvailable
+                ? $this->exportedReports->findWithSnapshot((int) ($query['id'] ?? 0))
+                : null;
+            if ($exportedEntry === null) {
+                Session::set('reports_notice', ['type' => 'error', 'message' => 'Không tìm thấy báo cáo đã xuất.']);
+                Response::redirect(Url::base() . '/admin/bao_cao.php');
+            }
+
+            // Xuất lại tệp từ bản đã lưu (đúng dữ liệu tại thời điểm xuất trước đó).
+            if ($isExport && $exportedEntry['snapshot'] !== null) {
+                $customName = Request::query('filename');
+                $fileName = XuatBaoCao::safeFilename(is_string($customName) ? $customName : null)
+                    ?? XuatBaoCao::safeFilename((string) $exportedEntry['name'])
+                    ?? 'bao-cao';
+                $rows = BaoCaoDaXuatService::exportRowsFromSnapshot($exportedEntry);
+                if ($exportFormat === 'csv') {
+                    $this->exporter->sendCsv($fileName . '.csv', $rows);
+                } else {
+                    $this->exporter->sendExcel($fileName . '.xlsx', $rows);
+                }
+            }
+
+            return array_merge($common, ['exportedEntry' => $exportedEntry]);
         }
 
         if ($reportView === 'customer') {
@@ -149,14 +196,18 @@ class BaoCaoController extends BaseAdminController
                 );
                 Session::set('reports_notice', ['type' => 'success', 'message' => 'Đã lưu cấu hình báo cáo.']);
                 Response::redirect(Url::base() . '/admin/bao_cao.php?' . http_build_query($config));
-            } elseif (in_array($action, ['create_saved_report', 'update_saved_report'], true)) {
+            } elseif ($action === 'update_saved_report') {
                 $message = $this->savedReports->saveTitle(
-                    $action === 'create_saved_report',
+                    false,
                     Request::post('title', ''),
                     Request::post('report_type', ''),
                     Request::post('report_id'),
                     $adminUsername
                 );
+                Session::set('reports_notice', ['type' => 'success', 'message' => $message]);
+                Response::redirect(Url::base() . '/admin/bao_cao.php');
+            } elseif ($action === 'delete_exported_report') {
+                $message = $this->exportedReports->delete(Request::post('report_id'));
                 Session::set('reports_notice', ['type' => 'success', 'message' => $message]);
                 Response::redirect(Url::base() . '/admin/bao_cao.php');
             } elseif ($action === 'delete_saved_report') {
@@ -203,7 +254,13 @@ class BaoCaoController extends BaseAdminController
 
         $report = new BaoCaoKhachHang($range, (string) ($query['customer_report'] ?? 'new'), $activeReportTitle, $this->db);
         $report->load();
-        $this->exportIfRequested($report, $isExport, $exportFormat);
+        $this->exportIfRequested($report, $isExport, $exportFormat, 'customer', [
+            'view' => 'customer',
+            'customer_report' => $report->type(),
+            'period' => 'custom',
+            'from' => $range->startDate(),
+            'to' => $range->endDate(),
+        ]);
 
         $exportParams = [
             'view' => 'customer',
@@ -249,7 +306,14 @@ class BaoCaoController extends BaseAdminController
             $this->db
         );
         $report->load();
-        $this->exportIfRequested($report, $isExport, $exportFormat);
+        $this->exportIfRequested($report, $isExport, $exportFormat, 'sales', [
+            'view' => 'sales',
+            'section' => $report->section(),
+            'period' => 'custom',
+            'from' => $range->startDate(),
+            'to' => $range->endDate(),
+            'category_id' => $report->categoryId(),
+        ]);
 
         $exportParams = [
             'view' => 'sales',
@@ -283,11 +347,50 @@ class BaoCaoController extends BaseAdminController
     }
 
     /** Xuất tệp nếu có yêu cầu export và báo cáo không lỗi (kết thúc request). */
-    private function exportIfRequested(BaoCaoCoSo $report, bool $isExport, string $exportFormat): void
+    private function exportIfRequested(BaoCaoCoSo $report, bool $isExport, string $exportFormat, string $reportType, array $config): void
     {
         if ($isExport && !$report->hasError()) {
-            $this->exporter->export($report, $exportFormat);
+            $customName = Request::query('filename');
+            $customName = is_string($customName) ? $customName : null;
+            // Ghi vào danh sách "Báo cáo đã xuất" kèm dữ liệu tại thời điểm xuất.
+            $this->exportedReports->recordExport(
+                XuatBaoCao::safeFilename($customName) ?? $report->title(),
+                $reportType,
+                $config,
+                $exportFormat,
+                Auth::adminUsername(),
+                $this->snapshotOf($report, $config)
+            );
+            $this->exporter->export($report, $exportFormat, $customName);
         }
+    }
+
+    /** Dữ liệu báo cáo tại thời điểm xuất (hiển thị lại đúng như lúc xuất, không tính lại từ dữ liệu hiện tại). */
+    private function snapshotOf(BaoCaoCoSo $report, array $config): array
+    {
+        $snapshot = [
+            'title' => $report->title(),
+            'from' => (string) ($config['from'] ?? ''),
+            'to' => (string) ($config['to'] ?? ''),
+            'headers' => $report->detailHeaders(),
+            'rows' => $report->detailRows(),
+            'summary' => [],
+            'exported_at' => date('Y-m-d H:i:s'),
+        ];
+        if ($report instanceof BaoCaoDoanhThu) {
+            $summary = $report->summary();
+            $snapshot['category'] = $report->categoryId() > 0 ? (string) ($report->categories()[$report->categoryId()] ?? '') : 'Tất cả danh mục';
+            $snapshot['summary'] = [
+                ['Doanh thu đã giao', number_format((float) $summary['revenue'], 0, ',', '.') . ' đ'],
+                ['Tổng đơn hàng', number_format((int) $summary['total_orders'])],
+                ['Đơn hàng đã giao', number_format((int) $summary['completed_orders'])],
+                ['Đơn hàng đã hủy', number_format((int) $summary['cancelled_orders'])],
+                ['Khách hàng mới', number_format((int) $summary['new_customers'])],
+                ['Sản phẩm đã bán', number_format((int) $summary['items_sold'])],
+            ];
+        }
+
+        return $snapshot;
     }
 
     /** Token CSRF 64 ký tự hex lưu trong phiên; tạo lại nếu thiếu hoặc sai định dạng. */

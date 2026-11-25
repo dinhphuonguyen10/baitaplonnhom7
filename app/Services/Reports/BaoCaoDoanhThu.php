@@ -9,25 +9,29 @@ use Throwable;
 
 /**
  * Lớp BaoCaoDoanhThu - báo cáo bán hàng (kế thừa BaoCaoCoSo).
- * Gồm tổng quan chỉ số và 4 mục chi tiết: doanh thu theo thời gian, theo danh mục,
- * sản phẩm bán chạy, đơn hàng theo trạng thái. Có thể lọc theo danh mục sản phẩm.
+ * Gồm tổng quan chỉ số và 3 mục chi tiết: doanh thu theo thời gian, sản phẩm bán chạy,
+ * đơn hàng đã hủy, sản phẩm sắp hết hàng (tồn kho hiện tại, không phụ thuộc khoảng thời gian).
+ * Có thể lọc theo danh mục sản phẩm.
  */
 class BaoCaoDoanhThu extends BaoCaoCoSo
 {
     public const SECTIONS = [
         'revenue' => 'Doanh thu theo thời gian',
-        'category' => 'Doanh thu theo danh mục',
         'products' => 'Sản phẩm bán chạy',
-        'orders' => 'Đơn hàng theo trạng thái',
+        'cancelled' => 'Đơn hàng đã hủy',
+        'low_stock' => 'Sản phẩm sắp hết hàng',
     ];
 
     /** id phần tử HTML của bảng tương ứng mỗi mục. */
     public const SECTION_TARGETS = [
         'revenue' => 'sales-revenue-table',
-        'category' => 'sales-category-table',
         'products' => 'sales-top-products',
-        'orders' => 'sales-order-status',
+        'cancelled' => 'sales-cancelled-orders',
+        'low_stock' => 'sales-low-stock',
     ];
+
+    /** Sản phẩm có tồn kho từ 1 đến ngưỡng này được coi là sắp hết (cùng ngưỡng nhãn "Sắp hết" ở trang sản phẩm). */
+    public const LOW_STOCK_THRESHOLD = 10;
 
     private const DELIVERED = "('Đã giao hàng', 'Đã giao', 'Hoàn thành')";
 
@@ -57,17 +61,9 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
 
     private array $topProducts = [];
 
-    private array $categoryRevenue = [];
+    private array $lowStockProducts = [];
 
-    private array $statusCounts = [
-        'Chờ xác nhận' => 0,
-        'Đã xác nhận' => 0,
-        'Đang chuẩn bị hàng' => 0,
-        'Đang giao hàng' => 0,
-        'Đã giao hàng' => 0,
-        'Hoàn thành' => 0,
-        'Đã hủy' => 0,
-    ];
+    private array $cancelledOrders = [];
 
     private DanhMuc $categoryModel;
 
@@ -135,8 +131,8 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
         $this->loadSummary();
         $this->loadTrend();
         $this->loadTopProducts();
-        $this->loadCategoryRevenue();
-        $this->loadStatusCounts();
+        $this->loadLowStock();
+        $this->loadCancelledOrders();
     }
 
     /** Truy vấn báo cáo với 2 tham số ngày (+ tham số bổ sung); lỗi chỉ ghi nhận nếu chưa có lỗi trước đó. */
@@ -311,53 +307,58 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
         ) ?? [];
     }
 
-    private function loadCategoryRevenue(): void
+    /** Đơn hàng đã hủy trong khoảng thời gian (theo ngày tạo đơn), có thể lọc theo danh mục; mới nhất trước. */
+    private function loadCancelledOrders(): void
     {
-        $params = $this->dateParams();
+        [$condition, $conditionParams] = $this->categoryCondition();
+        $this->cancelledOrders = $this->query(
+            "SELECT o.id, o.full_name, o.phone, o.total_price, o.created_at, o.cancelled_at, o.cancellation_reason
+               FROM orders o
+              WHERE o.created_at >= ? AND o.created_at < ?
+                AND o.status IN " . self::CANCELLED . "{$condition}
+              ORDER BY o.created_at DESC, o.id DESC",
+            array_merge($this->dateParams(), $conditionParams)
+        ) ?? [];
+    }
+
+    /** @return array<int, array<int, string>> các dòng bảng chi tiết (đã định dạng) của mục đơn hàng đã hủy */
+    private function cancelledRows(): array
+    {
+        $rows = [];
+        foreach ($this->cancelledOrders as $order) {
+            $reason = trim((string) ($order['cancellation_reason'] ?? ''));
+            $rows[] = [
+                '#' . (int) $order['id'],
+                (string) $order['full_name'],
+                (string) $order['phone'],
+                self::money($order['total_price']),
+                date('d/m/Y H:i', strtotime((string) $order['created_at'])),
+                !empty($order['cancelled_at']) ? date('d/m/Y H:i', strtotime((string) $order['cancelled_at'])) : '',
+                $reason !== '' ? $reason : 'Không ghi lý do',
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** Sản phẩm đang kinh doanh có tồn kho 1..ngưỡng (có thể lọc theo danh mục), ít hàng nhất trước. */
+    private function loadLowStock(): void
+    {
+        $params = [self::LOW_STOCK_THRESHOLD];
         $categoryFilter = '';
         if ($this->categoryId > 0) {
             $categoryFilter = ' AND p.category_id = ?';
             $params[] = $this->categoryId;
         }
-        $this->categoryRevenue = $this->query(
-            "SELECT c.name AS category_name,
-                              COALESCE(SUM(oi.quantity * oi.price), 0) AS revenue,
-                              COALESCE(SUM(oi.quantity), 0) AS items_sold
-                       FROM orders o
-                       INNER JOIN order_items oi ON oi.order_id = o.id
-                       INNER JOIN products p ON p.id = oi.product_id
-                       INNER JOIN categories c ON c.id = p.category_id
-                       WHERE o.created_at >= ? AND o.created_at < ?
-                         AND o.status IN " . self::DELIVERED . $categoryFilter . "
-                       GROUP BY c.id, c.name
-                       ORDER BY revenue DESC, items_sold DESC, c.name ASC",
+        $this->lowStockProducts = $this->query(
+            "SELECT p.sku, p.name, COALESCE(c.name, '') AS category_name, p.stock
+               FROM products p
+               LEFT JOIN categories c ON c.id = p.category_id
+              WHERE p.is_deleted = 0 AND p.status = 'active'
+                AND p.stock > 0 AND p.stock <= ?{$categoryFilter}
+              ORDER BY p.stock ASC, p.name ASC",
             $params
         ) ?? [];
-    }
-
-    private function loadStatusCounts(): void
-    {
-        [$condition, $conditionParams] = $this->categoryCondition();
-        $rows = $this->query(
-            "SELECT CASE
-                WHEN o.status IN ('Đang xử lý') THEN 'Đã xác nhận'
-                WHEN o.status IN ('Chuẩn bị đơn hàng', 'Đang chuẩn bị') THEN 'Đang chuẩn bị hàng'
-                WHEN o.status IN ('Đang vận chuyển', 'Đang giao') THEN 'Đang giao hàng'
-                WHEN o.status IN ('Đã giao') THEN 'Đã giao hàng'
-                WHEN o.status IN ('Canceled', 'cancelled', 'huy') THEN 'Đã hủy'
-                ELSE o.status
-            END AS report_status,
-            COUNT(*) AS order_count
-     FROM orders o
-     WHERE o.created_at >= ? AND o.created_at < ?{$condition}
-     GROUP BY report_status",
-            array_merge($this->dateParams(), $conditionParams)
-        );
-        foreach ($rows ?? [] as $row) {
-            if (isset($this->statusCounts[$row['report_status']])) {
-                $this->statusCounts[$row['report_status']] += (int) $row['order_count'];
-            }
-        }
     }
 
     public function title(): string
@@ -370,12 +371,12 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
         switch ($this->section) {
             case 'revenue':
                 return ['Ngày', 'Số đơn hàng', 'Sản phẩm đã bán', 'Doanh thu'];
-            case 'category':
-                return ['Danh mục', 'Sản phẩm đã bán', 'Doanh thu'];
-            case 'products':
-                return ['Sản phẩm', 'Số lượng đã bán', 'Doanh thu sản phẩm'];
+            case 'cancelled':
+                return ['Mã đơn', 'Khách hàng', 'Số điện thoại', 'Giá trị đơn', 'Ngày đặt', 'Ngày hủy', 'Lý do hủy'];
+            case 'low_stock':
+                return ['Mã SKU', 'Sản phẩm', 'Danh mục', 'Tồn kho'];
             default:
-                return ['Trạng thái đơn hàng', 'Số lượng đơn'];
+                return ['Sản phẩm', 'Số lượng đã bán', 'Doanh thu sản phẩm'];
         }
     }
 
@@ -391,25 +392,24 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
                     self::money($point['revenue']),
                 ];
             }
-        } elseif ($this->section === 'category') {
-            foreach ($this->categoryRevenue as $category) {
+        } elseif ($this->section === 'cancelled') {
+            $detailRows = $this->cancelledRows();
+        } elseif ($this->section === 'low_stock') {
+            foreach ($this->lowStockProducts as $product) {
                 $detailRows[] = [
-                    $category['category_name'],
-                    number_format((int) $category['items_sold']),
-                    self::money($category['revenue']),
+                    (string) $product['sku'],
+                    (string) $product['name'],
+                    (string) $product['category_name'],
+                    number_format((int) $product['stock']),
                 ];
             }
-        } elseif ($this->section === 'products') {
+        } else {
             foreach ($this->topProducts as $product) {
                 $detailRows[] = [
                     $product['product_name'],
                     number_format((int) $product['quantity_sold']),
                     self::money($product['product_revenue']),
                 ];
-            }
-        } else {
-            foreach ($this->statusCounts as $status => $count) {
-                $detailRows[] = [$status, number_format($count)];
             }
         }
 
@@ -454,25 +454,35 @@ class BaoCaoDoanhThu extends BaoCaoCoSo
                     (float) $point['revenue'],
                 ];
             }
-        } elseif ($this->section === 'category') {
-            foreach ($this->categoryRevenue as $category) {
+        } elseif ($this->section === 'cancelled') {
+            foreach ($this->cancelledOrders as $order) {
+                $reason = trim((string) ($order['cancellation_reason'] ?? ''));
                 $excelRows[] = [
-                    (string) $category['category_name'],
-                    (int) $category['items_sold'],
-                    (float) $category['revenue'],
+                    '#' . (int) $order['id'],
+                    (string) $order['full_name'],
+                    (string) $order['phone'],
+                    (float) $order['total_price'],
+                    date('d/m/Y H:i', strtotime((string) $order['created_at'])),
+                    !empty($order['cancelled_at']) ? date('d/m/Y H:i', strtotime((string) $order['cancelled_at'])) : '',
+                    $reason !== '' ? $reason : 'Không ghi lý do',
                 ];
             }
-        } elseif ($this->section === 'products') {
+        } elseif ($this->section === 'low_stock') {
+            foreach ($this->lowStockProducts as $product) {
+                $excelRows[] = [
+                    (string) $product['sku'],
+                    (string) $product['name'],
+                    (string) $product['category_name'],
+                    (int) $product['stock'],
+                ];
+            }
+        } else {
             foreach ($this->topProducts as $product) {
                 $excelRows[] = [
                     (string) $product['product_name'],
                     (int) $product['quantity_sold'],
                     (float) $product['product_revenue'],
                 ];
-            }
-        } else {
-            foreach ($this->statusCounts as $status => $count) {
-                $excelRows[] = [$status, (int) $count];
             }
         }
 
