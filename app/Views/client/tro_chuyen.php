@@ -287,7 +287,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     }
     async function loadMessages() {
         const nearBottom = messagesBox.scrollHeight - messagesBox.scrollTop - messagesBox.clientHeight < 90;
-        const data = await request(`${api}/customer_get_messages.php`);
+        const data = await request(`${api}/khach_lay_tin_nhan.php`);
         data.messages.forEach(renderMessage);
         if (nearBottom) messagesBox.scrollTop = messagesBox.scrollHeight;
     }
@@ -301,7 +301,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         fileInput.disabled = true;
         note.textContent = '';
         try {
-            const data = await request(`${api}/customer_send_message.php`, {
+            const data = await request(`${api}/khach_gui_tin_nhan.php`, {
                 method:'POST',
                 headers:{'Content-Type':'application/json'},
                 body:JSON.stringify({message, product_id:sharedProduct ? Number(sharedProduct.id) : null})
