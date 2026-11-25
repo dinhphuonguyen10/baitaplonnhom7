@@ -244,7 +244,7 @@
                 </label>
                 <label class="pw-wrap">Mật khẩu ban đầu
                     <div class="pw-wrap-inner">
-                        <input type="password" name="password" placeholder="Ví dụ: Abc@1234" minlength="8" required id="create-password">
+                        <input type="password" name="password" placeholder="Ví dụ: Abc@1234" minlength="8" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}" title="Tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234)." required id="create-password">
                         <button type="button" class="pw-toggle-btn" onclick="togglePw('create-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
                     </div>
                 </label>
@@ -334,7 +334,7 @@
                 <div class="modal-field">
                     <label for="modal-new-password">Mật khẩu mới:</label>
                     <div style="position:relative; display:flex; align-items:center;">
-                        <input type="password" name="new_password" id="modal-new-password" placeholder="Nhập mật khẩu mới (ví dụ: Abc@1234)" minlength="8" required style="padding-right: 42px; width: 100%;">
+                        <input type="password" name="new_password" id="modal-new-password" placeholder="Nhập mật khẩu mới (ví dụ: Abc@1234)" minlength="8" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}" title="Tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234)." required style="padding-right: 42px; width: 100%;">
                         <button type="button" class="pw-toggle-btn" onclick="togglePw('modal-new-password', this)" aria-label="Hiện/Ẩn mật khẩu" style="margin:0;" data-visible="0"></button>
                     </div>
                     <small style="color: #667085; font-size: 0.8rem;">* Tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234). Nhấn biểu tượng mắt để xem trước.</small>
