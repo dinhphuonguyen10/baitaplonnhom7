@@ -29,6 +29,12 @@ class HoSoController extends BaseClientController
         $this->service = $service ?? new HoSoKhachHangService();
     }
 
+    /** Giữ URL viết liền cũ và chuyển về URL hồ sơ chuẩn. */
+    public function legacyAlias(): void
+    {
+        Response::redirect(Url::to('/client/ho_so.php'));
+    }
+
     /** Action: hiển thị / xử lý trang hồ sơ. */
     public function index(): void
     {

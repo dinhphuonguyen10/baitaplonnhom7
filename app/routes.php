@@ -32,6 +32,7 @@ return [
     '/client/htch.php' => [Client\HeThongCuaHangController::class, 'index'],
     '/client/thong-tin.php' => [Client\ThongTinController::class, 'index'],
     '/client/quen_mat_khau.php' => [Client\QuenMatKhauController::class, 'index'],
+    '/client/hoso.php' => [Client\HoSoController::class, 'legacyAlias'],
     '/client/ho_so.php' => [Client\HoSoController::class, 'index'],
     '/client/quan_ly_danh_muc.php' => [Admin\ChuyenHuongCuController::class, 'clientCategories'],
 
