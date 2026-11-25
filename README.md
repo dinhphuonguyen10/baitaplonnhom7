@@ -224,6 +224,6 @@ Tên đăng nhập : nhanvien_demo
 Mật khẩu : EcrinStaff@2026
 Vai trò : Nhân viên
 Tài khoản quản lí ( manager)
-Tên đăng nhập:
-Mật khẩu :admin_demo	Admin!9481c10b0054
+Tên đăng nhập : admin
+Mật khẩu : do quản trị viên thiết lập (không lưu mật khẩu rõ trong repository)
 Tài khoản khách hàng : Khach!4b3d93491143
