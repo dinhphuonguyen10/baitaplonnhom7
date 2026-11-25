@@ -202,6 +202,29 @@ section, main {
     color: var(--gold);
 }
 
+/* Icon hồ sơ khách hàng (hình người) cạnh lời chào */
+.profile-link {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    line-height: 0;
+}
+
+.profile-icon {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s;
+}
+
+.profile-link:hover .profile-icon {
+    transform: scale(1.1);
+}
+
 .auth-cart-wrapper {
     display: flex;
     align-items: center;
