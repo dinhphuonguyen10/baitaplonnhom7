@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Core\DatabaseException;
+use App\Helpers\KiemTraTaiKhoan;
 use App\Models\QuanTriVien;
 use InvalidArgumentException;
 
@@ -36,8 +37,9 @@ class TaiKhoanNhanVienService
         if ($username === '' || strlen($username) < 3 || strlen($username) > 100) {
             throw new InvalidArgumentException('Tên đăng nhập phải từ 3 đến 100 ký tự.');
         }
-        if (strlen($password) < 8) {
-            throw new InvalidArgumentException('Mật khẩu phải có tối thiểu 8 ký tự.');
+        // Cùng quy tắc mật khẩu với khách hàng (đăng ký / đổi mật khẩu)
+        if (!KiemTraTaiKhoan::isStrongPassword($password)) {
+            throw new InvalidArgumentException('Mật khẩu phải có tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).');
         }
         if ($this->admins->usernameExists($username)) {
             throw new InvalidArgumentException('Tên đăng nhập đã được sử dụng.');
@@ -60,8 +62,8 @@ class TaiKhoanNhanVienService
         if ($targetId <= 0) {
             throw new InvalidArgumentException('Vui lòng chọn tài khoản cần đổi mật khẩu.');
         }
-        if (strlen($newPassword) < 8) {
-            throw new InvalidArgumentException('Mật khẩu mới phải có tối thiểu 8 ký tự.');
+        if (!KiemTraTaiKhoan::isStrongPassword($newPassword)) {
+            throw new InvalidArgumentException('Mật khẩu mới phải có tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).');
         }
 
         $target = $this->admins->findBasicById($targetId);

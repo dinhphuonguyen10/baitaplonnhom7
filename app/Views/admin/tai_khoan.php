@@ -13,6 +13,7 @@
         .prototype-panel h2 { margin-top: 0; font-size: 1.25rem; }
         .prototype-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: 18px; }
         .prototype-form label { display: grid; min-width: 0; gap: 6px; font-weight: 700; font-size: 0.9rem; }
+        .prototype-form .pw-rule-hint { grid-column: 1 / -1; margin-top: -6px; color: #667085; font-size: 0.8rem; }
         .prototype-form input, .prototype-form select { width: 100%; padding: 9px 12px; border: 1px solid #d5dbe2; border-radius: 7px; font: inherit; }
         .prototype-form button { padding: 9px 16px; border: 0; border-radius: 7px; background: var(--admin-navy, #0f2747); color: #fff; font-weight: bold; cursor: pointer; }
         .prototype-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -243,7 +244,7 @@
                 </label>
                 <label class="pw-wrap">Mật khẩu ban đầu
                     <div class="pw-wrap-inner">
-                        <input type="password" name="password" placeholder="Tối thiểu 8 ký tự" minlength="8" required id="create-password">
+                        <input type="password" name="password" placeholder="Ví dụ: Abc@1234" minlength="8" required id="create-password">
                         <button type="button" class="pw-toggle-btn" onclick="togglePw('create-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
                     </div>
                 </label>
@@ -254,6 +255,8 @@
                     </select>
                 </label>
                 <button type="submit">+ Tạo tài khoản</button>
+                <?php /* Gợi ý nằm ở hàng riêng bên dưới để không làm lệch hàng với các ô nhập */ ?>
+                <small class="pw-rule-hint">* Mật khẩu: tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).</small>
             </form>
         </section>
 
@@ -331,10 +334,10 @@
                 <div class="modal-field">
                     <label for="modal-new-password">Mật khẩu mới:</label>
                     <div style="position:relative; display:flex; align-items:center;">
-                        <input type="password" name="new_password" id="modal-new-password" placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)" minlength="8" required style="padding-right: 42px; width: 100%;">
+                        <input type="password" name="new_password" id="modal-new-password" placeholder="Nhập mật khẩu mới (ví dụ: Abc@1234)" minlength="8" required style="padding-right: 42px; width: 100%;">
                         <button type="button" class="pw-toggle-btn" onclick="togglePw('modal-new-password', this)" aria-label="Hiện/Ẩn mật khẩu" style="margin:0;" data-visible="0"></button>
                     </div>
-                    <small style="color: #667085; font-size: 0.8rem;">* Nhập mật khẩu mới cho nhân viên. Nhấn biểu tượng mắt để xem trước.</small>
+                    <small style="color: #667085; font-size: 0.8rem;">* Tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234). Nhấn biểu tượng mắt để xem trước.</small>
                 </div>
 
                 <div class="modal-actions">
