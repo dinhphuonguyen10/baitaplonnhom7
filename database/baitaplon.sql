@@ -61,7 +61,7 @@ CREATE TABLE `admins` (
 
 LOCK TABLES `admins` WRITE;
 /*!40000 ALTER TABLE `admins` DISABLE KEYS */;
-INSERT INTO `admins` VALUES (1,'admin','$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi','manager','2026-11-13 11:09:03');
+INSERT INTO `admins` VALUES (1,'admin','$2y$10$ZobAq2KaPa8MIwRZi0c/Fesj0Ws.AOISPBRgmbOWJB/GOXOByj36q','manager','2026-11-13 11:09:03');
 /*!40000 ALTER TABLE `admins` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -546,8 +546,12 @@ UNLOCK TABLES;
 CREATE TABLE `users` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `username` varchar(100) NOT NULL,
+  `full_name` varchar(150) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `phone` varchar(20) DEFAULT NULL,
+  `birth_date` date DEFAULT NULL,
+  `anniversary_date` date DEFAULT NULL,
+  `avatar` varchar(255) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_users_username` (`username`),
@@ -561,7 +565,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'vuyen5325@gmail.com','$2y$10$nSsTL49wEXRiVNcclJuyEeazZ1xfqaTC1WjwQgdWA35DTsxk/9nrm','0563658095','2026-11-19 11:55:26'),(2,'nguyenmai','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345671','2026-11-19 17:13:17'),(3,'tranlong','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345672','2026-11-19 17:13:17'),(4,'leanh','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345673','2026-11-19 17:13:17'),(5,'hoangyen','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345674','2026-11-19 17:13:17'),(6,'phamvu','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345675','2026-11-19 17:13:17'),(7,'doquyen','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345676','2026-11-19 17:13:17'),(8,'bichtram','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345677','2026-11-19 17:13:17'),(9,'minhtriet','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345678','2026-11-19 17:13:17');
+INSERT INTO `users` (`id`, `username`, `password`, `phone`, `created_at`) VALUES (1,'vuyen5325@gmail.com','$2y$10$nSsTL49wEXRiVNcclJuyEeazZ1xfqaTC1WjwQgdWA35DTsxk/9nrm','0563658095','2026-11-19 11:55:26'),(2,'nguyenmai','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345671','2026-11-19 17:13:17'),(3,'tranlong','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345672','2026-11-19 17:13:17'),(4,'leanh','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345673','2026-11-19 17:13:17'),(5,'hoangyen','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345674','2026-11-19 17:13:17'),(6,'phamvu','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345675','2026-11-19 17:13:17'),(7,'doquyen','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345676','2026-11-19 17:13:17'),(8,'bichtram','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345677','2026-11-19 17:13:17'),(9,'minhtriet','$2y$10$yWDPc1Bwyh7apV8CJZoIMuMlIJcGoMGreiRUsNb1JyB7wkfF5ZmRm','0912345678','2026-11-19 17:13:17');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
