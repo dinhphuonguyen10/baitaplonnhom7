@@ -45,11 +45,10 @@ use App\Core\View;
                     <a class="auth-btn" href="<?php echo View::e($appBaseUrl . '/admin/index.php'); ?>">Quản trị</a> |
                     <a class="auth-btn" href="<?php echo View::e($appBaseUrl . '/admin/logout.php'); ?>">Đăng xuất</a>
                 <?php elseif ($accountRole === 'customer'): ?>
-                    <span style="font-weight: bold; color: var(--navy);">Xin chào, <?php echo View::e($accountUsername); ?></span> |
-                    <a class="auth-btn profile-link" href="<?php echo View::e($appBaseUrl . '/client/ho_so.php'); ?>" aria-label="Hồ sơ của tôi" title="Hồ sơ của tôi">
+                    <a class="auth-btn profile-link" href="<?php echo View::e($appBaseUrl . '/client/ho_so.php'); ?>" title="Hồ sơ của tôi">
+                        <span>Xin chào, <?php echo View::e($accountUsername); ?></span>
                         <svg class="profile-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg>
-                    </a> |
-                    <span class="auth-btn logout-btn" style="cursor: pointer;">Đăng xuất</span>
+                    </a>
                 <?php else: ?>
                     <span class="auth-btn register-trigger" style="cursor: pointer;">Đăng ký</span> /
                     <span class="auth-btn login-trigger" style="cursor: pointer;">Đăng nhập</span>

@@ -2517,7 +2517,12 @@ function initAuth() {
                     renderCart();
                     applyUserRole();
                     alert('Đã đăng xuất thành công!');
-                    window.location.reload(); // Load lại trang để cập nhật trạng thái sạch
+                    if (window.location.pathname.toLowerCase().endsWith('/client/ho_so.php')) {
+                        // Trang hồ sơ cần đăng nhập: sau khi đăng xuất thì về trang chủ
+                        window.location.assign(appUrl('/index.php'));
+                    } else {
+                        window.location.reload(); // Load lại trang để cập nhật trạng thái sạch
+                    }
                 }
             } catch (error) {
                 console.error(error);
@@ -2574,9 +2579,7 @@ function applyUserRole() {
             if (user && user.role === 'customer') {
                 if (authContainer) {
                     authContainer.innerHTML = `
-                        <span style="font-weight: bold; color: var(--navy);">Xin chào, ${user.username}</span> |
-                        <a class="auth-btn profile-link" href="${window.APP_BASE_URL || ''}/client/ho_so.php" aria-label="Hồ sơ của tôi" title="Hồ sơ của tôi"><svg class="profile-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg></a> |
-                        <span class="auth-btn logout-btn" style="cursor: pointer;">Đăng xuất</span>
+                        <a class="auth-btn profile-link" href="${window.APP_BASE_URL || ''}/client/ho_so.php" title="Hồ sơ của tôi"><span>Xin chào, ${escapeHtml(user.username)}</span> <svg class="profile-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg></a>
                     `;
                 }
                 return;

@@ -18,12 +18,15 @@ include VIEW_PATH . '/layouts/header.php';
     .profile-form input { padding: 11px 14px; border: 1px solid #cbd4df; border-radius: 10px; font: inherit; }
     .profile-form input:focus { outline: none; border-color: var(--navy); }
     .profile-form small { color: #777; font-weight: 400; }
-    .profile-form button { justify-self: start; padding: 11px 22px; border: 0; border-radius: 10px; background: var(--navy); color: #fff; font: 600 14px inherit; cursor: pointer; }
+    .profile-form button[type="submit"] { justify-self: start; padding: 11px 22px; border: 0; border-radius: 10px; background: var(--navy); color: #fff; font: 600 14px inherit; cursor: pointer; }
     .profile-alert { padding: 11px 14px; border-radius: 10px; margin-bottom: 14px; font-size: 14px; }
     .profile-alert.success { background: #ecfdf3; color: #027a48; border: 1px solid #a6f4c5; }
     .profile-alert.error { background: #fef3f2; color: #b42318; border: 1px solid #fecdca; }
     .profile-links { display: flex; gap: 16px; flex-wrap: wrap; }
     .profile-links a { color: var(--navy); font-weight: 600; }
+    .profile-logout { margin-top: 18px; padding-top: 18px; border-top: 1px solid #eee; }
+    .profile-logout button { padding: 11px 22px; border: 1px solid #b42318; border-radius: 10px; background: #fff; color: #b42318; font: 600 14px inherit; cursor: pointer; transition: background .2s, color .2s; }
+    .profile-logout button:hover { background: #b42318; color: #fff; }
     @media (max-width: 560px) { .profile-info { grid-template-columns: 1fr; } .profile-info dd { margin-bottom: 8px; } }
 </style>
 
@@ -78,16 +81,25 @@ include VIEW_PATH . '/layouts/header.php';
             <input type="hidden" name="csrf_token" value="<?php echo View::e($csrfToken); ?>">
             <label>
                 Mật khẩu hiện tại
-                <input type="password" name="current_password" autocomplete="current-password" required>
+                <div class="pw-wrap">
+                    <input type="password" id="profile-current-password" name="current_password" autocomplete="current-password" required>
+                    <button type="button" class="pw-toggle-btn" onclick="togglePw('profile-current-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
+                </div>
             </label>
             <label>
                 Mật khẩu mới
-                <input type="password" name="new_password" autocomplete="new-password" minlength="8" required>
+                <div class="pw-wrap">
+                    <input type="password" id="profile-new-password" name="new_password" autocomplete="new-password" minlength="8" required>
+                    <button type="button" class="pw-toggle-btn" onclick="togglePw('profile-new-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
+                </div>
                 <small>Tối thiểu 8 ký tự, gồm chữ thường, chữ in hoa, số và ký tự đặc biệt (ví dụ: Abc@1234).</small>
             </label>
             <label>
                 Xác nhận mật khẩu mới
-                <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+                <div class="pw-wrap">
+                    <input type="password" id="profile-confirm-password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+                    <button type="button" class="pw-toggle-btn" onclick="togglePw('profile-confirm-password', this)" aria-label="Hiện/Ẩn mật khẩu" data-visible="0"></button>
+                </div>
             </label>
             <button type="submit">Đổi mật khẩu</button>
         </form>
@@ -97,6 +109,10 @@ include VIEW_PATH . '/layouts/header.php';
         <div class="profile-links">
             <a href="<?php echo View::e($appBaseUrl . '/client/tracuudh.php'); ?>">Đơn hàng của tôi</a>
             <a href="<?php echo View::e($appBaseUrl . '/client/wishlist.php'); ?>">Sản phẩm yêu thích</a>
+        </div>
+        <div class="profile-logout">
+            <?php /* Nút có class logout-btn: assets/script.js xử lý đăng xuất khách hàng */ ?>
+            <button type="button" class="logout-btn">Đăng xuất</button>
         </div>
     </section>
 </main>
