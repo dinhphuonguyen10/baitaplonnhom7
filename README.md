@@ -55,30 +55,37 @@ Baitaplon/
 │   ├── quà/                               # Ảnh sản phẩm danh mục Set quà tặng
 │   └── vòng tay/                          # Ảnh sản phẩm vòng tay
 │
+├── app/                                   # Mã nguồn hướng đối tượng (namespace App\)
+│   ├── bootstrap.php                      # Autoloader PSR-4 + khởi động session
+│   ├── routes.php                         # Bảng định tuyến: URL -> Controller@action
+│   ├── Core/                              # Router, Controller, View, Database, Session, Auth, Url, Request, Response
+│   ├── Models/                            # (M) BaseModel + mỗi bảng một Model (Product, Order, ...)
+│   ├── Views/                             # (V) Giao diện HTML
+│   │   ├── layouts/                       #     header, footer, auth_modals, admin_sidebar
+│   │   ├── client/                        #     Trang cửa hàng (home, product, cart, checkout, ...)
+│   │   └── admin/                         #     Trang quản trị (dashboard, products, orders, reports, ...)
+│   ├── Controllers/{Client,Admin,Api}/    # (C) Controller cho từng trang và API
+│   ├── Services/                          # Nghiệp vụ: đặt hàng, thanh toán, chat, báo cáo, ...
+│   ├── Database/                          # SchemaManager (tự đồng bộ CSDL), seeder cho scripts
+│   ├── Helpers/, Exceptions/, Content/    # Lớp định dạng hiển thị, ngoại lệ, nội dung tĩnh
+│
 ├── config/
-│   ├── db.php                             # Tạo kết nối MySQL dùng chung cho PHP
+│   ├── database.php                       # Thông số kết nối MySQL
 │   ├── payment.example.php                # Mẫu cấu hình tài khoản VietQR
 │   └── payment.local.php                  # Cấu hình riêng, không đưa vào Git
 │
 ├── database/
 │   ├── baitaplon.sql                      # Tạo các bảng và dữ liệu ban đầu
-│
-├── include/                               # Thành phần PHP dùng chung
-│   ├── payment_qr_helper.php              # Tạo payload VietQR cho đơn hàng
-│   ├── header.php                         # Header/menu cửa hàng
-│   ├── footer.php                         # Footer cửa hàng
-│   ├── auth_modals.php                    # Modal đăng nhập/đăng ký dùng chung
-│   ├── admin_guard.php                    # Chặn truy cập trang quản trị khi chưa đăng nhập
-│   ├── admin_roles.php                    # Hàm kiểm tra vai trò nhân viên/quản lý
-│   └── admin_navigation.php               #  Menu điều hướng quản trị
 ```
+
+Các file `.php` trong `index.php`, `client/`, `admin/`, `api/` chỉ là **điểm vào** (giữ nguyên URL), mỗi file 2 dòng gọi `Router::dispatch()`.
 
 ## Quy ước đặt file
 
 
-- Trang khách hàng đặt trong `client/`; trang quản trị đặt trong `admin/`.
-- API đặt trong thư mục con phù hợp của `api/` (ví dụ `api/orders/`).
-- Thành phần giao diện dùng chung đặt trong `include/`.
+- Điểm vào trang khách hàng đặt trong `client/`, trang quản trị trong `admin/`, API trong `api/<nhóm>/`; mỗi điểm vào phải được khai báo trong `app/routes.php`.
+- HTML đặt trong `app/Views/`; layout dùng chung đặt trong `app/Views/layouts/`.
+- Logic xử lý đặt trong Controller/Service, câu SQL đặt trong Model; View không truy vấn dữ liệu.
 - CSS, JavaScript và hình ảnh đặt trong `assets/`.
 - Cấu trúc database và dữ liệu khởi tạo đặt trong `database/`.
 - Đặt tên file PHP theo chức năng, dùng chữ thường và dấu gạch dưới, ví dụ `tracuudh.php`, `place_order.php`.
@@ -95,22 +102,70 @@ Trang quản lý đơn hàng phía Admin đọc trực tiếp đơn hàng và ch
 Giỏ hàng được lưu theo tài khoản/khách trong trình duyệt. Trang đặt hàng tải danh sách tỉnh/thành và xã/phường từ `provinces.open-api.vn`; chỉ yêu cầu dữ liệu địa giới, không gửi thông tin người đặt hàng đến dịch vụ này. API đặt hàng tự bổ sung cột email cho bảng `orders` nếu cơ sở dữ liệu cũ chưa có cột đó.
 
 
+## Kiến trúc MVC hướng đối tượng
+
+
+Luồng xử lý một request theo mô hình MVC truyền thống:
+
+```text
+Trình duyệt ──> client/cart.php (điểm vào) ──> Router (app/routes.php)
+                                                   │
+                                                   ▼
+                              Controller (Client\CartPageController::index)
+                               │  gọi Model / Service lấy dữ liệu
+                               ▼
+                              $this->render('client/cart', $data)
+                               │
+                               ▼
+                              View (app/Views/client/cart.php + layouts) ──> HTML trả về
+```
+
+- **Model** (`app/Models/`) – mỗi bảng một lớp kế thừa `BaseModel` (CRUD chung: `find`, `all`, `where`, `create`, `update`, `delete`). Mọi câu SQL nằm trong Model hoặc Service.
+- **View** (`app/Views/`) – chỉ chứa HTML và lệnh hiển thị (`echo`, `if`, `foreach`, `View::e()`); không truy vấn CSDL, không gọi Controller. Layout dùng chung nằm ở `app/Views/layouts/`.
+- **Controller** (`app/Controllers/`) – nhận request, gọi Model/Service, rồi `render()` View hoặc trả JSON. Phân cấp kế thừa:
+  - `App\Core\Controller` (trừu tượng: `render`, `json`, `redirect`)
+    - `Client\BaseClientController` – tự thêm dữ liệu layout cửa hàng (menu, tài khoản, logo) khi render
+    - `Admin\BaseAdminController` – bắt buộc đăng nhập quản trị / quyền quản lý, CSRF, dữ liệu sidebar
+    - `Api\*Controller` – mỗi endpoint một action, trả JSON
+- **Router** (`app/Core/Router.php` + `app/routes.php`) – ánh xạ đường dẫn tới `Controller@action`.
+- **Service** (`app/Services/`) – nghiệp vụ dùng lại giữa nhiều Controller (VD: `OrderService`, `PaymentService`, `VietQrService`, `ChatService`). Báo cáo dùng kế thừa: `AbstractReport` → `SalesReport`, `CustomerReport`.
+
+Mỗi điểm vào chỉ gồm 2 dòng, ví dụ `client/cart.php`:
+
+```php
+require_once __DIR__ . '/../app/bootstrap.php';
+App\Core\Router::dispatch();
+```
+
+Khai báo route và action tương ứng:
+
+```php
+// app/routes.php
+'/client/cart.php' => [Client\CartPageController::class, 'index'],
+
+// app/Controllers/Client/CartPageController.php
+public function index(): void
+{
+    $this->render('client/cart', $this->indexData());
+}
+```
+
+Thêm trang mới: tạo file điểm vào 2 dòng, khai báo route, viết action trong Controller và tạo View trong `app/Views/`.
+
+Truy vấn CSDL qua Model hoặc trực tiếp `Database`:
+
+```php
+$db = App\Core\Database::getInstance();
+$product = $db->fetchOne('SELECT * FROM products WHERE id = ?', [$id]);
+```
+
+
 ## Cấu hình PHP và database
 
 
-- `config/db.php` là nơi duy nhất tạo kết nối MySQL cho ứng dụng.
-- Kết nối hiện được cung cấp qua biến `$conn` (MySQLi) và đặt charset `utf8mb4`.
-- Từ file nằm trong thư mục con, nạp cấu hình bằng đường dẫn dựa trên `__DIR__`, không dựa vào thư mục chạy hiện thời. Ví dụ trong `api/orders/place_order.php`:
-
-
-  ```php
-  require_once __DIR__ . '/../../config/db.php';
-  ```
-
-
-- Dùng `require_once` để tránh nạp lặp cấu hình. Không tự tạo kết nối MySQL thứ hai trong trang hoặc API.
-- Cấu hình local XAMPP có thể khác môi trường triển khai. Không đưa mật khẩu, khóa hoặc thông tin máy chủ production vào repository; nếu đổi cách quản lý cấu hình thì cả nhóm thống nhất trước và cập nhật hướng dẫn chạy web.
-- API tự đặt header và định dạng phản hồi theo chức năng (ví dụ JSON); không thêm logic giao diện vào `config/db.php`.
+- Thông số kết nối nằm trong `config/database.php`; `App\Core\Database` là nơi duy nhất tạo kết nối MySQL (charset `utf8mb4`). Không tự tạo kết nối MySQL thứ hai trong trang hoặc API.
+- Khi kết nối lần đầu, `App\Database\SchemaManager` tự đồng bộ cấu trúc (bảng, cột, VIEW, FUNCTION, TRIGGER) cho database tạo từ bản SQL cũ.
+- Cấu hình local XAMPP có thể khác môi trường triển khai. Không đưa mật khẩu, khóa hoặc thông tin máy chủ production vào repository.
 
 ## Cấu hình thanh toán VietQR
 
@@ -132,9 +187,9 @@ Giỏ hàng được lưu theo tài khoản/khách trong trình duyệt. Trang �
 ## File dùng chung
 
 
-- `include/header.php`, `include/footer.php`: khung giao diện khách hàng.
-- `include/admin_guard.php`, `include/admin_roles.php`: kiểm tra đăng nhập và quyền truy cập quản trị.
-- `include/admin_navigation.php`: điều hướng khu vực quản trị.
+- `app/Views/layouts/header.php`, `footer.php`, `auth_modals.php`: khung giao diện khách hàng (dữ liệu do `BaseClientController` cung cấp).
+- `App\Core\Auth` (`requireAdmin()`, `requireManager()`) và `App\Controllers\Admin\BaseAdminController`: kiểm tra đăng nhập và quyền truy cập quản trị.
+- `app/Views/layouts/admin_sidebar.php`: điều hướng khu vực quản trị (menu khai báo trong `BaseAdminController::SIDE_MENU`).
 - Trước khi sửa file dùng chung, kiểm tra các trang đang nạp file đó để tránh làm lỗi nhiều chức năng cùng lúc.
 
 
@@ -144,7 +199,7 @@ Giỏ hàng được lưu theo tài khoản/khách trong trình duyệt. Trang �
 1. Đặt dự án trong thư mục web của XAMPP, ví dụ `C:\xampp\htdocs\Baitaplon`.
 2. Bật Apache và MySQL trong XAMPP.
 3. Tạo database theo `database/baitaplon.sql` trong phpMyAdmin. File này cũng khởi tạo sản phẩm mẫu theo danh mục, sử dụng ảnh có sẵn trong `assets/`.
-4. Kiểm tra cấu hình kết nối local trong `config/db.php`. Ứng dụng tự đồng bộ trường giới hạn lượt sửa và các bảng ảnh/phản hồi đánh giá nếu database chưa có.
+4. Kiểm tra cấu hình kết nối local trong `config/database.php`. Ứng dụng tự đồng bộ trường giới hạn lượt sửa và các bảng ảnh/phản hồi đánh giá nếu database chưa có.
 5. Mở `http://localhost/Baitaplon/`.
 
 

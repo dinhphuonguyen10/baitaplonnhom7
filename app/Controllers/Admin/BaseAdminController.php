@@ -1,0 +1,105 @@
+<?php
+
+namespace App\Controllers\Admin;
+
+use App\Core\Auth;
+use App\Core\Database;
+use App\Core\Session;
+use App\Core\Url;
+use App\Core\View;
+
+/**
+ * Lớp trừu tượng BaseAdminController - lớp cha cho các controller trang quản trị.
+ *  - Constructor bắt buộc đăng nhập khu vực quản trị (Auth::requireAdmin)
+ *  - Lớp con đặt $requireManager = true để chỉ cho phép quản lý (manager/admin)
+ *  - Cung cấp tiện ích CSRF và dữ liệu chung cho layout (sidebar/topbar)
+ */
+abstract class BaseAdminController extends \App\Core\Controller
+{
+    /** Menu sidebar quản trị: [icon, nhãn, đường dẫn, tên file, chỉ dành cho quản lý]. */
+    public const SIDE_MENU = [
+        ['icon' => '▦', 'label' => 'Tổng quan',                    'href' => '/admin/index.php',     'file' => 'index.php'],
+        ['icon' => '◇', 'label' => 'Quản lý sản phẩm',             'href' => '/admin/products.php',  'file' => 'products.php'],
+        ['icon' => '☆', 'label' => 'Quản lý đánh giá',             'href' => '/admin/reviews.php',   'file' => 'reviews.php'],
+        ['icon' => '▧', 'label' => 'Quản lý danh mục',             'href' => '/admin/categories.php','file' => 'categories.php'],
+        ['icon' => '♙', 'label' => 'Quản lý tài khoản', 'href' => '/admin/users.php',     'file' => 'users.php', 'manager_only' => true],
+        ['icon' => '▤', 'label' => 'Đơn hàng & Thanh toán',         'href' => '/admin/orders.php',    'file' => 'orders.php'],
+        ['icon' => '☏', 'label' => 'Quản lý chat',                 'href' => '/admin/chat.php',      'file' => 'chat.php'],
+        ['icon' => '▣', 'label' => 'Quản lý banner',               'href' => '/admin/banners.php',   'file' => 'banners.php', 'manager_only' => true],
+        ['icon' => '▥', 'label' => 'Báo cáo và thống kê',          'href' => '/admin/reports.php',   'file' => 'reports.php', 'manager_only' => true],
+        ['icon' => '⌖', 'label' => 'Cửa hàng',                     'href' => '/admin/stores.php',    'file' => 'stores.php', 'manager_only' => true],
+        ['icon' => '⌂', 'label' => 'Về cửa hàng chính',           'href' => '/index.php',           'file' => 'storefront-home'],
+    ];
+
+    /** Đặt true ở lớp con nếu trang chỉ dành cho quản lý. */
+    protected bool $requireManager = false;
+
+    protected Database $db;
+
+    public function __construct(?Database $db = null)
+    {
+        if ($this->requireManager) {
+            Auth::requireManager();
+        } else {
+            Auth::requireAdmin();
+        }
+
+        $this->db = $db ?? Database::getInstance();
+    }
+
+    /** Lấy (hoặc tạo) CSRF token theo tên khóa phiên. */
+    protected function csrfToken(string $name = 'csrf_token'): string
+    {
+        return Session::csrfToken($name);
+    }
+
+    /** Kiểm tra CSRF token gửi lên (mặc định trường POST csrf_token). */
+    protected function verifyCsrf(?string $token, string $name = 'csrf_token'): bool
+    {
+        return Session::verifyCsrf($token, $name);
+    }
+
+    /**
+     * Dữ liệu chung cho layout quản trị: $isManager, $roleLabel, $adminUsername, $appBaseUrl, $escape.
+     */
+    protected function layoutData(string $currentPage = ''): array
+    {
+        $isManager = Auth::isManager();
+
+        return [
+            'isManager' => $isManager,
+            'roleLabel' => $isManager ? 'Quản lý' : 'Nhân viên',
+            'adminUsername' => Auth::adminUsername(),
+            'appBaseUrl' => Url::base(),
+            'escape' => static fn($value): string => View::e($value),
+            'adminCurrentPage' => $currentPage !== '' ? $currentPage : Url::currentPage(),
+        ];
+    }
+
+    /**
+     * Bổ sung dữ liệu cho sidebar quản trị (app/Views/layouts/admin_sidebar.php) khi render View.
+     */
+    protected function shareLayoutData(array $data): array
+    {
+        $isManager = Auth::isManager();
+        $data += [
+            'appBaseUrl' => Url::base(),
+            'escape' => static fn($value): string => View::e($value),
+        ];
+        $data['isManager'] = $isManager;
+        $data['roleLabel'] = $isManager ? 'Quản lý' : 'Nhân viên';
+        $data['currentScript'] = $data['adminCurrentPage'] ?? Url::currentPage();
+        $data['sideMenu'] = array_values(array_filter(
+            self::SIDE_MENU,
+            static fn(array $item): bool => empty($item['manager_only']) || $isManager
+        ));
+
+        return $data;
+    }
+
+    /** Chuyển hướng tới đường dẫn trong ứng dụng và kết thúc request. */
+    protected function redirectTo(string $path, int $status = 302): void
+    {
+        \App\Core\Response::redirect(Url::to($path), $status);
+    }
+}

@@ -1,8 +1,4 @@
 <?php
-// Tác dụng: Điều hướng người dùng cấp quản lý về bảng điều khiển tổng quan
-require_once __DIR__ . '/../../include/admin_guard.php';
-requireManagerRole();
-
-$role = $_SESSION['admin_role'] ?? $_SESSION['role'] ?? 'manager';
-header('Location: ' . adminRoleHomeUrl($role));
-exit;
+// Điểm vào: định tuyến tới Controller qua App\Core\Router (xem app/routes.php)
+require_once __DIR__ . '/../../app/bootstrap.php';
+App\Core\Router::dispatch();
