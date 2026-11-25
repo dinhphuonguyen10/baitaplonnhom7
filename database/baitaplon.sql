@@ -14,27 +14,6 @@ SET @OLD_SQL_NOTES = @@SQL_NOTES;
 SET SQL_NOTES = 0;
 SET @saved_cs_client = @@character_set_client;
 
-DROP VIEW IF EXISTS `view_top_rated_products`;
-DROP VIEW IF EXISTS `view_product_details`;
-
-DROP TABLE IF EXISTS `wishlists`;
-DROP TABLE IF EXISTS `review_replies`;
-DROP TABLE IF EXISTS `review_images`;
-DROP TABLE IF EXISTS `reviews`;
-DROP TABLE IF EXISTS `cart_items`;
-DROP TABLE IF EXISTS `carts`;
-DROP TABLE IF EXISTS `order_items`;
-DROP TABLE IF EXISTS `orders`;
-DROP TABLE IF EXISTS `addresses`;
-DROP TABLE IF EXISTS `products`;
-DROP TABLE IF EXISTS `categories`;
-DROP TABLE IF EXISTS `chat_messages`;
-DROP TABLE IF EXISTS `banners`;
-DROP TABLE IF EXISTS `stores`;
-DROP TABLE IF EXISTS `web_config`;
-DROP TABLE IF EXISTS `admins`;
-DROP TABLE IF EXISTS `users`;
-
 CREATE TABLE `addresses` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int(10) unsigned NOT NULL,

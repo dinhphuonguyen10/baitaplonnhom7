@@ -75,7 +75,8 @@ try {
         "UPDATE orders
          SET payment_method = 'COD',
              payment_status = 'Chưa thanh toán',
-             payment_deadline_at = NULL
+             payment_deadline_at = NULL,
+             expires_at = DATE_ADD(NOW(), INTERVAL 24 HOUR)
          WHERE id = ? AND user_id = ?
            AND payment_method = 'BANK_QR'
            AND payment_status = 'Thanh toán thất bại'
@@ -95,7 +96,7 @@ try {
 
     $conn->commit();
     $transactionStarted = false;
-    respond('success', 'Đã đổi đơn hàng sang thanh toán khi nhận hàng.');
+    respond('success', 'Đã đổi đơn hàng sang thanh toán khi nhận hàng.', 200);
 } catch (Throwable $e) {
     if ($transactionStarted) {
         $conn->rollback();

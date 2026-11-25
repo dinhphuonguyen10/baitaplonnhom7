@@ -26,7 +26,7 @@ $statusGroups = [
     'cancelled'  => ['Đã hủy', 'Canceled', 'cancelled', 'huy'],
 ];
 $statusFilter = isset($_GET['status']) && is_string($_GET['status']) ? trim($_GET['status']) : 'all';
-if ($statusFilter !== 'all' && !isset($statusGroups[$statusFilter])) {
+if ($statusFilter !== 'all' && $statusFilter !== 'payment_pending' && !isset($statusGroups[$statusFilter])) {
     $respond(400, ['status' => 'error', 'message' => 'Bộ lọc trạng thái không hợp lệ.']);
 }
 
@@ -71,7 +71,22 @@ $bind = static function (mysqli_stmt $stmt, string $types, array &$params): void
 };
 
 try {
-    $countStmt = $conn->prepare("SELECT status, COUNT(*) AS total FROM orders o WHERE {$baseSql} GROUP BY status");
+    ensureOrderPaymentDeadlineSchema($conn);
+    $countStmt = $conn->prepare(
+        "SELECT status, COUNT(*) AS total,
+                SUM(
+                    CASE
+                        WHEN payment_method = 'BANK_QR'
+                         AND payment_status = 'Thanh toán thất bại'
+                         AND payment_deadline_at > NOW()
+                         AND status IN ('Chờ xác nhận', 'Pending')
+                        THEN 1 ELSE 0
+                    END
+                ) AS payment_pending
+         FROM orders o
+         WHERE {$baseSql}
+         GROUP BY status"
+    );
     $bind($countStmt, $baseTypes, $baseParams);
     $countStmt->execute();
     $counts = [
@@ -80,6 +95,7 @@ try {
         'shipping' => 0,
         'delivered' => 0,
         'cancelled' => 0,
+        'payment_pending' => 0,
     ];
     $statusToGroup = [];
     foreach ($statusGroups as $group => $statuses) {
@@ -91,6 +107,7 @@ try {
     while ($countRow = $countResult->fetch_assoc()) {
         $statusCount = (int) $countRow['total'];
         $counts['all'] += $statusCount;
+        $counts['payment_pending'] += (int) $countRow['payment_pending'];
         $group = $statusToGroup[$countRow['status']] ?? null;
         if ($group !== null) {
             $counts[$group] += $statusCount;
@@ -101,7 +118,12 @@ try {
     $where = $baseWhere;
     $types = $baseTypes;
     $params = $baseParams;
-    if ($statusFilter !== 'all') {
+    if ($statusFilter === 'payment_pending') {
+        $where[] = "o.payment_method = 'BANK_QR'
+            AND o.payment_status = 'Thanh toán thất bại'
+            AND o.payment_deadline_at > NOW()
+            AND o.status IN ('Chờ xác nhận', 'Pending')";
+    } elseif ($statusFilter !== 'all') {
         $statuses = $statusGroups[$statusFilter];
         $where[] = 'o.status IN (' . implode(',', array_fill(0, count($statuses), '?')) . ')';
         $types .= str_repeat('s', count($statuses));
@@ -121,7 +143,10 @@ try {
     $orderStmt = $conn->prepare(
         "SELECT o.id, o.full_name, o.phone, o.email, o.address, o.total_price,
                 o.shipping_fee, o.discount_amount, o.status, o.payment_status,
-                o.payment_method, o.created_at, o.cancelled_at, o.cancellation_reason
+                o.payment_method, o.payment_deadline_at,
+                UNIX_TIMESTAMP(o.payment_deadline_at) AS payment_deadline,
+                UNIX_TIMESTAMP(o.expires_at) AS inventory_expires_at,
+                o.created_at, o.cancelled_at, o.cancellation_reason
          FROM orders o
          WHERE {$whereSql}
          ORDER BY o.created_at DESC, o.id DESC

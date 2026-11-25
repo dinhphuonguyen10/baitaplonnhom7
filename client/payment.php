@@ -15,12 +15,6 @@ if (
     exit;
 }
 
-$paymentConfig = getVietQrPaymentConfig();
-if ($paymentConfig === null) {
-    http_response_code(503);
-    exit('Chưa cấu hình tài khoản VietQR. Vui lòng liên hệ cửa hàng.');
-}
-
 $userId = (int) $_SESSION['user_id'];
 $orderId = filter_input(INPUT_GET, 'order_id', FILTER_VALIDATE_INT);
 
@@ -56,19 +50,38 @@ $stmt->execute();
 $order = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-if (!$order || $order['payment_method'] !== 'BANK_QR') {
+if (!$order) {
     $conn->close();
     http_response_code(404);
-    exit('Không tìm thấy đơn hàng thanh toán QR.');
+    exit('Không tìm thấy đơn hàng.');
 }
 
-if (in_array($order['status'], ['Đã hủy', 'Canceled'], true)) {
+if (!in_array($order['payment_method'], ['BANK_QR', 'COD'], true)) {
+    $conn->close();
+    http_response_code(404);
+    exit('Đơn hàng không có phương thức thanh toán hợp lệ.');
+}
+
+$isCodOrder = $order['payment_method'] === 'COD';
+if (!$isCodOrder) {
+    $paymentConfig = getVietQrPaymentConfig();
+    if ($paymentConfig === null) {
+        $conn->close();
+        http_response_code(503);
+        exit('Chưa cấu hình tài khoản VietQR. Vui lòng liên hệ cửa hàng.');
+    }
+}
+
+if (in_array($order['status'], ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true)) {
+    $conn->close();
     exit('Đơn hàng đã bị hủy, không thể thanh toán.');
 }
 if (
+    !$isCodOrder &&
     (int) $order['is_expired'] === 1
     && in_array($order['status'], ['Chờ xác nhận', 'Pending'], true)
 ) {
+    $conn->close();
     exit('Đơn hàng đã hết thời gian thanh toán. Vui lòng đặt lại đơn hàng.');
 }
 
@@ -97,11 +110,13 @@ $isPaid = $order['payment_status'] === 'Đã thanh toán';
 $isAwaitingConfirmation = $order['payment_status'] === 'Chờ xác nhận thanh toán';
 $isCanceled = in_array($order['status'], ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true);
 $isFailed = $order['payment_status'] === 'Thanh toán thất bại';
+$isRetryRequest = isset($_GET['retry']) && $_GET['retry'] === '1';
+$showFailedNotice = $isFailed && !$isRetryRequest;
 $isPaymentDeadlineExpired = $isFailed
     && $order['payment_deadline'] !== null
     && (int) $order['payment_deadline'] <= time();
-$isOrderSuccess = !$isCanceled && ($isPaid || $isAwaitingConfirmation);
-$showPaymentQr = !$isPaid && !$isAwaitingConfirmation && !$isCanceled && !$isPaymentDeadlineExpired;
+$isOrderSuccess = !$isCanceled && ($isPaid || $isAwaitingConfirmation || $isCodOrder);
+$showPaymentQr = !$isCodOrder && !$isPaid && !$isAwaitingConfirmation && !$isCanceled && !$isPaymentDeadlineExpired;
 $orderItems = [];
 if ($isOrderSuccess) {
     try {
@@ -173,7 +188,7 @@ function e($value) {
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0">
 
-    <title>Thanh toán QR - ÉCRIN JEWELRY</title>
+    <title><?= $isCodOrder ? 'Đặt hàng thành công' : 'Thanh toán QR' ?> - ÉCRIN JEWELRY</title>
 
     <link rel="stylesheet"
           href="<?= e($appBaseUrl) ?>/assets/style.css">
@@ -433,16 +448,6 @@ function e($value) {
             color: #983d35;
         }
 
-        .demo-awaiting-confirmation {
-            max-width: 520px;
-            padding: 34px;
-            border: 1px solid #d6e8dc;
-            border-radius: 18px;
-            background: linear-gradient(145deg, #f3fbf5, #fff);
-            color: #526b80;
-            box-shadow: 0 16px 42px rgba(16, 42, 67, .08);
-        }
-
         .demo-awaiting-icon {
             display: grid;
             place-items: center;
@@ -454,17 +459,6 @@ function e($value) {
             color: #26714c;
             font-size: 28px;
             font-weight: 800;
-        }
-
-        .demo-awaiting-confirmation h2 {
-            margin: 0 0 12px;
-            color: #102a43;
-            font-size: 24px;
-        }
-
-        .demo-awaiting-confirmation p {
-            margin: 0 0 22px;
-            line-height: 1.7;
         }
 
         .demo-payment-failed-state {
@@ -492,6 +486,44 @@ function e($value) {
         .demo-payment-failed-state .demo-awaiting-icon {
             background: #f9e4e0;
             color: #983d35;
+        }
+
+        .demo-payment-failed-state .failed-amount {
+            margin: 0 0 10px;
+            color: #102a43;
+            font-size: clamp(30px, 8vw, 46px);
+            font-weight: 800;
+        }
+
+        .demo-payment-failed-state .failed-method {
+            margin-bottom: 18px;
+            color: #68798a;
+        }
+
+        .demo-payment-failed-state .failed-note {
+            margin-bottom: 24px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: #fff1ef;
+            color: #983d35;
+            text-align: left;
+        }
+
+        .demo-payment-actions a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 205px;
+            min-height: 48px;
+            padding: 13px 18px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            font-weight: 750;
+            text-decoration: none;
+        }
+
+        .demo-payment-failed-state .demo-payment-actions a {
+            width: 100%;
         }
 
         .demo-payment-actions {
@@ -538,18 +570,6 @@ function e($value) {
         .demo-payment-actions button:disabled {
             opacity: .6;
             cursor: wait;
-        }
-
-        .demo-awaiting-confirmation .demo-payment-failure {
-            margin-top: 18px;
-            border: 1px solid #e8c7c2;
-            border-radius: 9px;
-            padding: 11px 15px;
-            background: #fff8f6;
-            color: #983d35;
-            font: inherit;
-            font-weight: 700;
-            cursor: pointer;
         }
 
         .demo-actions {
@@ -665,7 +685,9 @@ function e($value) {
                     <strong><?= e($amount) ?> đ</strong>
                 </div>
                 <p class="checkout-receipt-payment">
-                    <?php if ($isPaid): ?>
+                    <?php if ($isCodOrder): ?>
+                        Thanh toán khi nhận hàng
+                    <?php elseif ($isPaid): ?>
                         Chuyển khoản qua VietQR — cửa hàng đã xác nhận thanh toán
                     <?php else: ?>
                         Chuyển khoản qua VietQR — chờ cửa hàng đối soát
@@ -737,20 +759,20 @@ function e($value) {
                     <a class="demo-back" href="<?= e($appBaseUrl) ?>/client/tracuudh.php">Tra cứu đơn hàng</a>
                 </div>
             <?php else: ?>
-                <?php if ($isFailed): ?>
+                <?php if ($showFailedNotice): ?>
                 <section class="demo-payment-failed-state" id="payment-failed-state" role="status" aria-live="polite">
                     <span class="demo-awaiting-icon" aria-hidden="true">!</span>
-                    <h2>Thanh toán chưa thành công</h2>
-                    <p>Đơn hàng <strong>#<?= e((string) $order['id']) ?></strong> vẫn được giữ. Bạn có thể quay lại thanh toán trong vòng 30 phút hoặc đổi sang thanh toán khi nhận hàng.</p>
+                    <h2>Thanh toán thất bại</h2>
+                    <p class="failed-amount"><?= e($amount) ?>đ</p>
+                    <p class="failed-method">Chuyển khoản qua <?= e($paymentConfig['bank_name']) ?> · Đơn hàng #<?= e((string) $order['id']) ?></p>
+                    <div class="failed-note">Giao dịch chưa được ghi nhận. Bạn có thể thử thanh toán lại hoặc chọn phương thức khác trong mục Đơn hàng của tôi.</div>
                     <div class="demo-payment-actions">
-                        <button class="demo-payment-success" id="retry-vietqr-payment" type="button">
-                            Quay lại thanh toán
-                        </button>
+                        <a class="demo-payment-success" href="<?= e($appBaseUrl) ?>/client/tracuudh.php?status=payment_pending&amp;order_id=<?= e((string) $order['id']) ?>">Đồng ý</a>
                     </div>
                 </section>
                 <?php endif; ?>
 
-                <div id="payment-qr-view" <?php echo $isFailed ? 'hidden' : ''; ?>>
+                <div id="payment-qr-view" <?php echo $showFailedNotice ? 'hidden' : ''; ?>>
                 <div class="demo-payment-intro">
                     <h2>Quét mã bằng ứng dụng ngân hàng</h2>
                     <p>Kiểm tra đúng người nhận, số tiền và nội dung chuyển khoản trước khi xác nhận giao dịch.</p>
@@ -779,7 +801,7 @@ function e($value) {
                 <div id="payment-result" class="demo-payment-status" role="status" aria-live="polite" hidden></div>
                 </div>
 
-                <?php if ($isFailed): ?>
+                <?php if ($isFailed && $isRetryRequest): ?>
                 <div id="payment-failure-window" class="demo-payment-status is-error">
                     <strong>Thời hạn thanh toán</strong>
                     Còn <span id="payment-deadline-countdown">30:00</span> để thanh toán. Hết thời hạn, đơn hàng sẽ tự động bị hủy.
@@ -789,11 +811,6 @@ function e($value) {
                 </div>
                 <?php endif; ?>
 
-                <section class="demo-awaiting-confirmation" id="payment-cod-confirmed" role="status" aria-live="polite" hidden>
-                    <span class="demo-awaiting-icon" aria-hidden="true">✓</span>
-                    <h2>Đã đổi sang thanh toán khi nhận hàng</h2>
-                    <p>Đơn hàng <strong>#<?= e((string) $order['id']) ?></strong> vẫn được giữ nguyên. Bạn sẽ thanh toán khi nhận hàng.</p>
-                </section>
             <?php endif; ?>
 
             <div class="demo-actions" id="payment-navigation-actions" <?php echo $showPaymentQr ? 'hidden' : ''; ?>>
@@ -822,6 +839,8 @@ const PAYMENT_REPORT_API =
     <?= json_encode($appBaseUrl . '/api/payment/report_vietqr.php') ?>;
 const PAYMENT_CHANGE_API =
     <?= json_encode($appBaseUrl . '/api/payment/change_vietqr_method.php') ?>;
+const PAYMENT_RECEIPT_URL =
+    <?= json_encode($appBaseUrl . '/client/payment.php') ?>;
 let paymentQrToken = <?= json_encode($qrAttempt['token'] ?? '') ?>;
 let paymentQrPayload = <?= json_encode($qrAttempt['payload'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 let paymentQrExpiresAt = Date.now() + <?= max(0, ((int) ($qrAttempt['expires_at'] ?? time()) - time())) ?> * 1000;
@@ -921,6 +940,12 @@ async function reportVietQrPayment(result) {
             throw new Error(data.message || 'Không thể gửi trạng thái thanh toán.');
         }
 
+        if (result === 'failed') {
+            const returnUrl = new URL(window.location.href);
+            returnUrl.searchParams.delete('retry');
+            window.location.replace(returnUrl.toString());
+            return;
+        }
         window.location.reload();
     } catch (error) {
         setPaymentMessage('Không thể gửi trạng thái', error.message, true);
@@ -950,22 +975,9 @@ async function changeVietQrPaymentMethod() {
             throw new Error(data.message || 'Không thể đổi phương thức thanh toán.');
         }
 
-        document.getElementById('payment-method-label').textContent = 'Thanh toán khi nhận hàng';
-        document.getElementById('payment-account-holder-row').hidden = true;
-        document.getElementById('payment-account-number-row').hidden = true;
-        const qrView = document.getElementById('payment-qr-view');
-        if (qrView) qrView.hidden = true;
-        const failedView = document.getElementById('payment-failed-state');
-        if (failedView) failedView.hidden = true;
-        const paymentIntro = document.querySelector('.demo-payment-intro');
-        if (paymentIntro) paymentIntro.hidden = true;
-        document.querySelector('.demo-transfer').hidden = true;
-        document.getElementById('payment-actions').hidden = true;
-        document.getElementById('payment-result').hidden = true;
-        const failureWindow = document.getElementById('payment-failure-window');
-        if (failureWindow) failureWindow.hidden = true;
-        document.getElementById('payment-cod-confirmed').hidden = false;
-        document.getElementById('payment-navigation-actions').hidden = false;
+        window.location.assign(
+            `${PAYMENT_RECEIPT_URL}?order_id=${encodeURIComponent(PAYMENT_ORDER_ID)}`
+        );
     } catch (error) {
         setPaymentMessage('Không thể đổi phương thức', error.message, true);
         button.disabled = false;
@@ -1012,13 +1024,6 @@ if (paymentQrPayload) {
     const changeMethodButton = document.getElementById('change-payment-method');
     if (changeMethodButton) {
         changeMethodButton.addEventListener('click', changeVietQrPaymentMethod);
-    }
-    const retryPaymentButton = document.getElementById('retry-vietqr-payment');
-    if (retryPaymentButton) {
-        retryPaymentButton.addEventListener('click', () => {
-            document.getElementById('payment-failed-state').hidden = true;
-            document.getElementById('payment-qr-view').hidden = false;
-        });
     }
 }
 </script>

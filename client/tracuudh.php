@@ -18,6 +18,9 @@ if (!$isCustomerLoggedIn) {
 if (!isset($_SESSION['order_cancel_csrf']) || !is_string($_SESSION['order_cancel_csrf'])) {
     $_SESSION['order_cancel_csrf'] = bin2hex(random_bytes(32));
 }
+if (!isset($_SESSION['payment_csrf']) || !is_string($_SESSION['payment_csrf'])) {
+    $_SESSION['payment_csrf'] = bin2hex(random_bytes(32));
+}
 ?>
 
 <style>
@@ -322,6 +325,11 @@ if (!isset($_SESSION['order_cancel_csrf']) || !is_string($_SESSION['order_cancel
     color: #e65100;
 }
 
+.status-payment-pending {
+    background: #fff4df;
+    color: #9a6416;
+}
+
 .status-shipping {
     background: #e3f2fd;
     color: #1565c0;
@@ -436,6 +444,67 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     font-size: 1.15rem;
     font-weight: 800;
     color: var(--gold, #c4a45a);
+}
+
+.order-payment-pending {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 18px 14px;
+    padding: 14px 16px;
+    border: 1px solid #eee2c9;
+    border-radius: 12px;
+    background: #fffaf0;
+}
+
+.order-payment-pending-copy {
+    color: #5d5140;
+    line-height: 1.5;
+}
+
+.order-payment-pending-copy strong {
+    display: block;
+    color: #8b5a12;
+}
+
+.order-payment-pending-copy p {
+    margin: 3px 0 0;
+    font-size: .82rem;
+}
+
+.order-payment-pending-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.order-payment-pending-actions a,
+.order-payment-pending-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 14px;
+    border: 1px solid var(--navy, #0b2033);
+    border-radius: 9px;
+    background: var(--navy, #0b2033);
+    color: #fff;
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.order-payment-pending-actions .btn-order-change-payment {
+    background: #fff;
+    color: var(--navy, #0b2033);
+}
+
+.order-payment-pending-actions button:disabled {
+    opacity: .6;
+    cursor: wait;
 }
 
 .order-card-actions {
@@ -742,6 +811,17 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
         padding: 12px 14px;
     }
 
+    .order-payment-pending {
+        margin: 0 12px 12px;
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .order-payment-pending-actions a,
+    .order-payment-pending-actions button {
+        flex: 1;
+    }
+
     .order-product-row {
         padding: 12px 14px;
     }
@@ -810,6 +890,9 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
             <button class="orders-tab active" role="tab" data-status="all" aria-selected="true">
                 Tất cả <span class="tab-badge" id="badge-all">0</span>
             </button>
+            <button class="orders-tab" role="tab" data-status="payment_pending" aria-selected="false">
+                Chờ thanh toán <span class="tab-badge" id="badge-payment-pending">0</span>
+            </button>
             <button class="orders-tab" role="tab" data-status="processing" aria-selected="false">
                 Chờ xử lý <span class="tab-badge" id="badge-processing">0</span>
             </button>
@@ -847,10 +930,16 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     const BASE = window.APP_BASE_URL || '';
     const ORDERS_PER_PAGE = 5;
     const ORDER_CANCEL_CSRF = <?php echo json_encode($_SESSION['order_cancel_csrf'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
-    let currentTab = 'all';
+    const PAYMENT_CHANGE_CSRF = <?php echo json_encode($_SESSION['payment_csrf'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+    const initialParams = new URLSearchParams(window.location.search);
+    const availableTabs = Array.from(document.querySelectorAll('.orders-tab')).map(tab => tab.dataset.status);
+    let currentTab = availableTabs.includes(initialParams.get('status'))
+        ? initialParams.get('status')
+        : 'all';
     let currentPage = 1;
     let ordersCache = {};
     let searchTimer = null;
+    let orderExpiryRefreshTimer = null;
     let latestRequestId = 0;
 
     const cancelledStatuses = ['Đã hủy', 'Canceled', 'cancelled', 'huy'];
@@ -922,6 +1011,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     // ===== UPDATE BADGES =====
     function updateBadges(counts) {
         document.getElementById('badge-all').textContent = counts.all || 0;
+        document.getElementById('badge-payment-pending').textContent = counts.payment_pending || 0;
         document.getElementById('badge-processing').textContent = counts.processing || 0;
         document.getElementById('badge-shipping').textContent = counts.shipping || 0;
         document.getElementById('badge-delivered').textContent = counts.delivered || 0;
@@ -932,6 +1022,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     function renderEmpty(container) {
         const msgs = {
             all: { icon: '📦', title: 'Chưa có đơn hàng nào', desc: 'Hãy khám phá sản phẩm và đặt đơn hàng đầu tiên nhé!' },
+            payment_pending: { icon: '💳', title: 'Không có đơn hàng chờ thanh toán', desc: 'Đơn QR cần thanh toán lại sẽ hiển thị ở đây.' },
             processing: { icon: '⏳', title: 'Không có đơn hàng chờ xử lý', desc: 'Đơn hàng đang chờ xử lý sẽ hiển thị ở đây.' },
             shipping: { icon: '🚚', title: 'Không có đơn hàng đang giao', desc: 'Các đơn hàng đang vận chuyển sẽ hiển thị ở đây.' },
             delivered: { icon: '✅', title: 'Chưa có đơn hàng đã giao', desc: 'Đơn hàng đã giao sẽ hiển thị ở đây.' },
@@ -955,6 +1046,12 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     function renderOrderCard(order) {
         const canCancel = ['Chờ xác nhận', 'Pending'].includes(order.status);
         const isDelivered = ['Đã giao hàng', 'Đã giao', 'Hoàn thành'].includes(order.status);
+        const orderId = Number(order.id);
+        const paymentDeadline = Number(order.payment_deadline) || 0;
+        const isPaymentPending = order.payment_method === 'BANK_QR'
+            && order.payment_status === 'Thanh toán thất bại'
+            && ['Chờ xác nhận', 'Pending'].includes(order.status)
+            && paymentDeadline > Math.floor(Date.now() / 1000);
 
         let productsHtml = '';
         const items = order.items || [];
@@ -990,6 +1087,21 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
 
         const totalFormatted = formatMoney(order.total_price);
         const dateFormatted = formatDate(order.created_at);
+        const statusLabel = isPaymentPending ? 'Chờ thanh toán' : getStatusLabel(order.status);
+        const statusClass = isPaymentPending ? 'status-payment-pending' : getStatusBadgeClass(order.status);
+        const paymentStatusLabel = isPaymentPending ? 'Chờ thanh toán' : (order.payment_status || 'Chưa thanh toán');
+        const paymentPendingHtml = isPaymentPending ? `
+            <div class="order-payment-pending">
+                <div class="order-payment-pending-copy">
+                    <strong>Thanh toán trong <span data-payment-deadline="${paymentDeadline}">Đang tính thời gian...</span></strong>
+                    <p>Đơn hàng được giữ trong thời hạn này. Bạn có thể thanh toán lại hoặc đổi phương thức.</p>
+                </div>
+                <div class="order-payment-pending-actions">
+                    <a href="${BASE}/client/payment.php?order_id=${encodeURIComponent(orderId)}&amp;retry=1">Thanh toán lại</a>
+                    <button class="btn-order-change-payment" type="button" onclick="changeOrderPaymentMethod(${orderId})">Đổi phương thức</button>
+                </div>
+            </div>
+        ` : '';
 
         return `
             <div class="order-card" data-order-id="${order.id}">
@@ -998,12 +1110,13 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
                         <span class="shop-icon">🏪</span>
                         Đơn hàng #${order.id} &nbsp;|&nbsp; <span style="font-weight:400;color:#888;font-size:.82rem;">${dateFormatted}</span>
                     </div>
-                    <span class="order-status-badge ${getStatusBadgeClass(order.status)}">
-                        ${escHtml(getStatusLabel(order.status))}
+                    <span class="order-status-badge ${statusClass}">
+                        ${escHtml(statusLabel)}
                     </span>
                 </div>
 
                 ${productsHtml}
+                ${paymentPendingHtml}
 
                 <div class="order-card-bottom">
                     <div>
@@ -1011,7 +1124,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
                             <span class="total-label">${items.length} sản phẩm &nbsp;•&nbsp; Tổng:</span>
                             <span class="total-amount">${totalFormatted}</span>
                         </div>
-                        <div class="total-label">Thanh toán: ${escHtml(order.payment_method || 'COD')} — ${escHtml(order.payment_status || 'Chưa thanh toán')}</div>
+                        <div class="total-label">Thanh toán: ${escHtml(order.payment_method || 'COD')} — ${escHtml(paymentStatusLabel)}</div>
                         <div class="total-label">Phí vận chuyển: ${formatMoney(order.shipping_fee)} · Giảm giá: −${formatMoney(order.discount_amount)}</div>
                     </div>
                     <div class="order-card-actions">
@@ -1050,6 +1163,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
             const data = await fetchOrders(status, page);
             if (requestId !== latestRequestId) return;
             const orders = data.orders || [];
+            scheduleQrExpiryRefresh(orders);
             updateBadges(data.counts || {});
 
             orders.forEach(o => { ordersCache[o.id] = o; });
@@ -1061,6 +1175,7 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
 
             currentPage = data.pagination.page;
             container.innerHTML = orders.map(renderOrderCard).join('');
+            updatePaymentPendingCountdowns();
             renderPagination(container, data.pagination.total_pages);
 
         } catch (err) {
@@ -1073,6 +1188,57 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
                     <button onclick="loadAndRender('${currentTab}', ${currentPage})" style="margin-top:12px;background:var(--navy);color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer;">Thử lại</button>
                 </div>
             `;
+        }
+    }
+
+    function scheduleQrExpiryRefresh(orders) {
+        if (orderExpiryRefreshTimer !== null) {
+            window.clearTimeout(orderExpiryRefreshTimer);
+            orderExpiryRefreshTimer = null;
+        }
+
+        const now = Math.floor(Date.now() / 1000);
+        const nextExpiry = orders.reduce((earliest, order) => {
+            if (
+                order.payment_method !== 'BANK_QR'
+                || !['Chờ xác nhận', 'Pending'].includes(order.status)
+                || !['Chưa thanh toán', 'Thanh toán thất bại'].includes(order.payment_status)
+            ) {
+                return earliest;
+            }
+
+            const expiresAt = Number(order.payment_deadline)
+                || Number(order.inventory_expires_at)
+                || 0;
+            return expiresAt > now && (earliest === 0 || expiresAt < earliest)
+                ? expiresAt
+                : earliest;
+        }, 0);
+
+        if (nextExpiry > 0) {
+            orderExpiryRefreshTimer = window.setTimeout(() => {
+                orderExpiryRefreshTimer = null;
+                loadAndRender(currentTab, currentPage);
+            }, Math.max(0, (nextExpiry - now) * 1000 + 250));
+        }
+    }
+
+    function updatePaymentPendingCountdowns() {
+        let shouldReload = false;
+        document.querySelectorAll('[data-payment-deadline]').forEach(countdown => {
+            const deadline = Number(countdown.dataset.paymentDeadline);
+            const remaining = Math.max(0, deadline - Math.floor(Date.now() / 1000));
+            const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
+            const seconds = String(remaining % 60).padStart(2, '0');
+            countdown.textContent = remaining > 0 ? `${hours}:${minutes}:${seconds}` : 'Đã hết hạn';
+            if (remaining === 0 && countdown.dataset.expired !== 'true') {
+                countdown.dataset.expired = 'true';
+                shouldReload = true;
+            }
+        });
+        if (shouldReload && currentTab === 'payment_pending') {
+            loadAndRender(currentTab, currentPage);
         }
     }
 
@@ -1151,6 +1317,31 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
         } catch (e) {
             console.error(e);
             alert('Lỗi kết nối khi hủy đơn');
+        }
+    };
+
+    window.changeOrderPaymentMethod = async function(orderId) {
+        if (!confirm(`Đổi đơn hàng #${orderId} sang thanh toán khi nhận hàng?`)) return;
+        const button = document.querySelector(`.btn-order-change-payment[onclick="changeOrderPaymentMethod(${Number(orderId)})"]`);
+        if (button) button.disabled = true;
+
+        try {
+            const response = await fetch(`${BASE}/api/payment/change_vietqr_method.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_id: orderId, csrf_token: PAYMENT_CHANGE_CSRF })
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') {
+                throw new Error(data.message || 'Không thể đổi phương thức thanh toán.');
+            }
+            window.location.assign(
+                `${BASE}/client/payment.php?order_id=${encodeURIComponent(orderId)}`
+            );
+        } catch (error) {
+            console.error('Đổi phương thức thanh toán thất bại:', error);
+            alert(error.message || 'Không thể đổi phương thức thanh toán.');
+            if (button) button.disabled = false;
         }
     };
 
@@ -1295,7 +1486,17 @@ a.order-reviewed-label:hover { color: #fff; background: #278553; border-color: #
     });
 
     // ===== INITIAL LOAD =====
-    loadAndRender('all', 1);
+    const requestedOrderId = initialParams.get('order_id') || initialParams.get('q');
+    if (requestedOrderId && /^\d{1,10}$/.test(requestedOrderId)) {
+        document.getElementById('order-search').value = requestedOrderId;
+    }
+    document.querySelectorAll('.orders-tab').forEach(tab => {
+        const selected = tab.dataset.status === currentTab;
+        tab.classList.toggle('active', selected);
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+    loadAndRender(currentTab, 1);
+    window.setInterval(updatePaymentPendingCountdowns, 1000);
 
 })();
 </script>

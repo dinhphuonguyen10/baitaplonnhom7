@@ -149,23 +149,27 @@ try {
     if (!$stock_stmt) {
         throw new RuntimeException('Không thể chuẩn bị cập nhật tồn kho.');
     }
-    $user_id = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
+    $user_id = null;
     $address_id = null;
 
-    // Session cũ có thể còn giữ ID tài khoản đã bị xóa hoặc sau khi đổi database.
-    // Khi đó không được ghi ID không tồn tại vào orders vì sẽ vi phạm khóa ngoại.
-    if ($user_id !== null) {
+    if (($_SESSION['role'] ?? '') === 'customer') {
+        $sessionUserId = filter_var($_SESSION['user_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($sessionUserId === false || $sessionUserId < 1) {
+            throw new DomainException('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại trước khi đặt hàng.');
+        }
+
         $user_stmt = $conn->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
         if (!$user_stmt) {
             throw new RuntimeException('Không thể kiểm tra tài khoản đặt hàng.');
         }
-        $user_stmt->bind_param('i', $user_id);
+        $user_stmt->bind_param('i', $sessionUserId);
         $user_stmt->execute();
         $valid_user = $user_stmt->get_result()->fetch_assoc();
         $user_stmt->close();
         if (!$valid_user) {
-            $user_id = null;
+            throw new DomainException('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại trước khi đặt hàng.');
         }
+        $user_id = (int) $valid_user['id'];
     }
 
     if ($requested_address_id !== null && $user_id === null) {

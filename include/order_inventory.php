@@ -96,9 +96,8 @@ function expireOrderInventoryReservations(mysqli $conn, int $limit = 100): int
              FROM orders
              WHERE inventory_status = 'reserved'
                AND status = 'Chờ xác nhận'
-               AND payment_status <> 'Đã thanh toán'
-               AND expires_at IS NOT NULL
-               AND expires_at <= NOW()
+               AND payment_status IN ('Chưa thanh toán', 'Thanh toán thất bại')
+               AND COALESCE(payment_deadline_at, expires_at) <= NOW()
              ORDER BY expires_at, id
              LIMIT ?
              FOR UPDATE"
@@ -123,8 +122,8 @@ function expireOrderInventoryReservations(mysqli $conn, int $limit = 100): int
              WHERE id = ?
                AND inventory_status = 'released'
                AND status = 'Chờ xác nhận'
-               AND payment_status <> 'Đã thanh toán'
-               AND expires_at <= NOW()"
+               AND payment_status IN ('Chưa thanh toán', 'Thanh toán thất bại')
+               AND COALESCE(payment_deadline_at, expires_at) <= NOW()"
         );
         $historyStmt = $conn->prepare(
             "INSERT INTO order_status_history

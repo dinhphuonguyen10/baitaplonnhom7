@@ -262,7 +262,7 @@ function initScrollToTop() {
     });
 }
 
-// ==================== ADD TO CART ====================
+// ==================== THÊM VÀO GIỎ HÀNG ====================
 let cart = [];
 let cartAvailabilityState = 'unchecked';
 const DIRECT_CHECKOUT_KEY = 'direct_checkout_product';
@@ -2532,6 +2532,9 @@ async function checkSession() {
     try {
         const response = await fetch(appUrl('/api/auth/check_session.php'));
         const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Không thể kiểm tra phiên đăng nhập.');
+        }
         if (data.status === 'success' && data.role === 'customer') {
             const user = { username: data.username, role: data.role };
             currentCustomerUsername = data.username;

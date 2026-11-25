@@ -2,27 +2,54 @@
 require_once __DIR__ . '/../include/session.php';
 require_once __DIR__ . '/../include/payment_qr_helper.php';
 $qrPaymentConfig = getVietQrPaymentConfig();
-$customerUsername = ($_SESSION['role'] ?? '') === 'customer' && isset($_SESSION['user_id'], $_SESSION['username'])
-    ? (string) $_SESSION['username']
-    : null;
+$customerUsername = null;
 $checkoutAddresses = [];
-if ($customerUsername !== null) {
+if (($_SESSION['role'] ?? '') === 'customer') {
     require_once __DIR__ . '/../config/db.php';
-    $addressesStmt = $conn->prepare(
-        'SELECT id, recipient_name, address, phone, is_default, latitude, longitude
-         FROM addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC'
-    );
-    if (!$addressesStmt) {
-        throw new RuntimeException('Không thể tải địa chỉ nhận hàng.');
+    $checkoutUserId = filter_var($_SESSION['user_id'] ?? null, FILTER_VALIDATE_INT);
+    $userStmt = $conn->prepare('SELECT id, username FROM users WHERE id = ? LIMIT 1');
+    if (!$userStmt) {
+        throw new RuntimeException('Không thể xác thực tài khoản đặt hàng.');
     }
-    $checkoutUserId = (int) $_SESSION['user_id'];
-    $addressesStmt->bind_param('i', $checkoutUserId);
-    $addressesStmt->execute();
-    $addressesResult = $addressesStmt->get_result();
-    while ($addressRow = $addressesResult->fetch_assoc()) {
-        $checkoutAddresses[] = $addressRow;
+
+    if ($checkoutUserId !== false && $checkoutUserId > 0) {
+        $userStmt->bind_param('i', $checkoutUserId);
+        if (!$userStmt->execute()) {
+            $userStmt->close();
+            throw new RuntimeException('Không thể xác thực tài khoản đặt hàng.');
+        }
+        $checkoutUser = $userStmt->get_result()->fetch_assoc();
+    } else {
+        $checkoutUser = null;
     }
-    $addressesStmt->close();
+    $userStmt->close();
+
+    if ($checkoutUser) {
+        $checkoutUserId = (int) $checkoutUser['id'];
+        $_SESSION['user_id'] = $checkoutUserId;
+        $_SESSION['username'] = (string) $checkoutUser['username'];
+        $customerUsername = (string) $checkoutUser['username'];
+
+        $addressesStmt = $conn->prepare(
+            'SELECT id, recipient_name, address, phone, is_default, latitude, longitude
+             FROM addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC'
+        );
+        if (!$addressesStmt) {
+            throw new RuntimeException('Không thể tải địa chỉ nhận hàng.');
+        }
+        $addressesStmt->bind_param('i', $checkoutUserId);
+        if (!$addressesStmt->execute()) {
+            $addressesStmt->close();
+            throw new RuntimeException('Không thể tải địa chỉ nhận hàng.');
+        }
+        $addressesResult = $addressesStmt->get_result();
+        while ($addressRow = $addressesResult->fetch_assoc()) {
+            $checkoutAddresses[] = $addressRow;
+        }
+        $addressesStmt->close();
+    } else {
+        unset($_SESSION['user_id'], $_SESSION['username'], $_SESSION['role']);
+    }
     $conn->close();
 }
 $pageTitle = "Đặt hàng - ÉCRIN JEWELRY";
