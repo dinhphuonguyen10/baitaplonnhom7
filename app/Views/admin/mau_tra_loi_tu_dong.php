@@ -18,7 +18,7 @@
         .ar-add-btn {
             display:inline-flex; align-items:center; gap:8px;
             padding:10px 20px; border:0; border-radius:10px; cursor:pointer;
-            background:linear-gradient(135deg,#1D3461,#2A5298); color:#fff;
+            background:var(--navy); color:#fff;
             font-size:13px; font-weight:600; white-space:nowrap;
             box-shadow:0 2px 8px rgba(16,35,56,.18);
             transition:transform .15s, filter .15s;
@@ -195,14 +195,10 @@
                     <p>Thiết lập các mẫu tin nhắn tự động gửi đến khách hàng theo từng sự kiện.</p>
                 </div>
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                    <a href="<?php echo $escape($appBaseUrl . '/admin/tro_chuyen.php'); ?>" class="ar-add-btn" style="background:linear-gradient(135deg,#4B3B6B,#7B5EA7);">
+                    <a href="<?php echo $escape($appBaseUrl . '/admin/tro_chuyen.php'); ?>" class="ar-add-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                         Quay lại Chat
                     </a>
-                    <button class="ar-add-btn" id="btn-add-tpl">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        Thêm mẫu mới
-                    </button>
                 </div>
             </div>
 
@@ -241,7 +237,7 @@
                     </thead>
                     <tbody id="ar-tbody">
                         <?php if (empty($config['templates'])): ?>
-                        <tr><td colspan="6" class="ar-empty">Chưa có mẫu tin nhắn nào. Nhấn "Thêm mẫu mới" để bắt đầu.</td></tr>
+                        <tr><td colspan="6" class="ar-empty">Chưa có mẫu tin nhắn nào.</td></tr>
                         <?php else: ?>
                         <?php foreach ($templateRows as $idx => $row): [$tpl, $type, $color, $isActive, $updatedAt] = [$row['tpl'], $row['type'], $row['color'], $row['isActive'], $row['updatedAt']]; ?>
                         <tr data-idx="<?php echo $idx; ?>"
@@ -445,10 +441,6 @@
             const idx = parseInt(btn.dataset.idx, 10);
             openModal(templates[idx], idx);
         });
-    });
-
-    document.getElementById('btn-add-tpl').addEventListener('click', () => {
-        openModal({ title:'', type:'Chào mừng', trigger_label:'', message:'', status:'inactive' }, null);
     });
 
     // ── Close modal ───────────────────────────────────────────────

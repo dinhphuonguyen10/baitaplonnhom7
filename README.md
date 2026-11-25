@@ -193,6 +193,11 @@ $product = $db->fetchOne('SELECT * FROM products WHERE id = ?', [$id]);
 
   Khi website đang hoạt động, trang thanh toán, danh sách đơn của khách và trang quản trị cũng tự xử lý các đơn đã hết hạn. Cột thời hạn được bổ sung tự động cho database hiện có; database mới cũng khai báo cột này trong `database/baitaplon.sql`.
 
+## Tin nhắn tự động trong chat
+
+- Mẫu nằm trong `config/auto_responses.json`, chỉnh tại trang quản trị "Mẫu trả lời tự động" (3 mẫu cố định: bật/tắt và sửa nội dung, không thêm mẫu mới).
+- Tự gửi theo sự kiện: `new_message` (tin chữ đầu tiên của khách trong ngày), `order_thankyou` (đặt hàng thành công), `review_thankyou` (gửi đánh giá mới).
+
 ## File dùng chung
 
 

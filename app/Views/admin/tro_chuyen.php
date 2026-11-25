@@ -78,9 +78,14 @@
         .chat-attach:hover { background:#F3F4F6; color:var(--navy); }
         .chat-attach:disabled { opacity:.55; cursor:wait; }
         .chat-compose-hint { color:#98A2AF; font-size:10px; }
+        .chat-preview { display:flex; align-items:center; gap:10px; margin-bottom:6px; padding:6px 8px; border:1px solid #E3E7EC; border-radius:10px; background:#F8F9FB; }
+        .chat-preview[hidden] { display:none; }
+        .chat-preview img { width:48px; height:48px; border-radius:8px; object-fit:cover; }
+        .chat-preview span { flex:1; min-width:0; overflow:hidden; color:#4B5563; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+        .chat-preview button { width:26px; height:26px; padding:0; border:0; border-radius:50%; background:#E5E7EB; color:#374151; font-size:16px; line-height:1; cursor:pointer; }
         .chat-send { display:grid; width:38px; height:38px; flex:0 0 38px; padding:0; place-items:center; border:0; border-radius:50%; background:var(--navy); color:#fff; cursor:pointer; box-shadow:0 2px 6px rgba(16,35,56,.16); transition:background .18s ease,transform .18s ease; }
         .chat-send svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
-        .chat-send:hover { background:var(--navy-mid); transform:translateY(-1px); }
+        .chat-send:hover { background:var(--navy-soft); transform:translateY(-1px); }
 .auto-button {
   background: linear-gradient(135deg, #6A5ACD, #8A2BE2);
   border: none;
@@ -96,7 +101,7 @@
   background: linear-gradient(135deg, #7B68EE, #9370DB);
   transform: translateY(-1px);
 }
-        .chat-send:disabled { opacity:.55; cursor:wait; }
+        .chat-send:disabled { background:var(--navy); cursor:wait; }
         .chat-notice { min-height:16px; margin:0 0 5px; color:#A34B42; font-size:11px; }
         .chat-notice:empty { display:none; }
         .chat-loading { padding:22px; color:var(--muted); font-size:13px; text-align:center; }
@@ -108,7 +113,7 @@
         .chat-action-btn {
             display:inline-flex; align-items:center; gap:7px;
             padding:9px 16px; border:0; border-radius:10px;
-            background:linear-gradient(135deg,#1D3461,#2A5298);
+            background:var(--navy);
             color:#fff; font-size:13px; font-weight:600; cursor:pointer;
             box-shadow:0 2px 8px rgba(16,35,56,.18);
             transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;
@@ -118,7 +123,7 @@
         .chat-action-btn:hover { transform:translateY(-2px); box-shadow:0 4px 14px rgba(16,35,56,.25); filter:brightness(1.08); }
         .chat-action-btn:active { transform:translateY(0); }
         .chat-action-btn--secondary {
-            background:linear-gradient(135deg,#4B3B6B,#7B5EA7);
+            background:var(--navy);
         }
         .auto-badge {
             display:inline-block; padding:2px 10px; border-radius:20px;
@@ -233,6 +238,11 @@
                     <div class="chat-messages" id="chat-messages" hidden aria-live="polite"></div>
                     <form class="chat-compose" id="chat-form">
                         <p class="chat-notice" id="chat-notice" role="status"></p>
+                        <div class="chat-preview" id="chat-preview" hidden>
+                            <img id="chat-preview-img" alt="Ảnh sắp gửi">
+                            <span id="chat-preview-name"></span>
+                            <button type="button" id="chat-preview-remove" aria-label="Bỏ ảnh">×</button>
+                        </div>
                         <div class="chat-compose-entry">
                             <button class="chat-attach" id="chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 100 MB" disabled>
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m20.5 15-5-5L5 20"></path></svg>
@@ -270,7 +280,20 @@
     let selectedId = null;
     let latestMessageId = 0;
     let sending = false;
-    let uploading = false;
+    let pendingFile = null;
+    let previewUrl = null;
+    const preview = document.getElementById('chat-preview');
+    const previewImg = document.getElementById('chat-preview-img');
+    const previewName = document.getElementById('chat-preview-name');
+    const previewRemove = document.getElementById('chat-preview-remove');
+    function clearPending() {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+        pendingFile = null;
+        fileInput.value = '';
+        previewImg.removeAttribute('src');
+        preview.hidden = true;
+    }
 
     const escapeText = value => String(value ?? '');
     const formatBytes = value => {
@@ -490,10 +513,11 @@
         emptyState.hidden = true;
         messagesBox.hidden = false;
         messagesBox.replaceChildren();
-        textarea.disabled = uploading || sending;
-        sendButton.disabled = uploading || sending;
-        attachButton.disabled = uploading || sending;
-        fileInput.disabled = uploading || sending;
+        clearPending();
+        textarea.disabled = sending;
+        sendButton.disabled = sending;
+        attachButton.disabled = sending;
+        fileInput.disabled = sending;
         notice.textContent = '';
         renderConversations();
         try {
@@ -533,73 +557,70 @@
     document.getElementById('chat-form').addEventListener('submit', async event => {
         event.preventDefault();
         const message = textarea.value.trim();
-        if (!selectedId || !message || sending || uploading) return;
+        if (!selectedId || (!message && !pendingFile) || sending) return;
         const targetUserId = selectedId;
         sending = true;
         sendButton.disabled = true;
         attachButton.disabled = true;
         fileInput.disabled = true;
+        previewRemove.disabled = true;
         notice.textContent = '';
         try {
-            const data = await request(api, {
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({action:'send', user_id:selectedId, message})
-            });
-            if (selectedId === targetUserId) {
-                appendMessage(data.message);
-                messagesBox.scrollTop = messagesBox.scrollHeight;
-                textarea.value = '';
+            if (pendingFile) {
+                notice.textContent = `Đang gửi ${pendingFile.name}...`;
+                const formData = new FormData();
+                formData.append('file', pendingFile);
+                formData.append('user_id', String(targetUserId));
+                const uploaded = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', body:formData});
+                clearPending();
+                notice.textContent = '';
+                if (selectedId === targetUserId) {
+                    appendMessage(uploaded.message);
+                    messagesBox.scrollTop = messagesBox.scrollHeight;
+                }
             }
-            await refreshConversations();
+            if (message) {
+                const data = await request(api, {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({action:'send', user_id:targetUserId, message})
+                });
+                if (selectedId === targetUserId) {
+                    appendMessage(data.message);
+                    messagesBox.scrollTop = messagesBox.scrollHeight;
+                    textarea.value = '';
+                }
+            }
+            refreshConversations();
         } catch (error) {
             notice.textContent = error.message;
         } finally {
             sending = false;
-            sendButton.disabled = !selectedId || uploading;
-            attachButton.disabled = !selectedId || uploading;
-            fileInput.disabled = !selectedId || uploading;
-            textarea.disabled = !selectedId || uploading;
-        }
-    });
-    fileInput.addEventListener('change', async () => {
-        const file = fileInput.files?.[0];
-        if (!file || !selectedId || uploading) return;
-        if (file.size < 1 || file.size > 100 * 1024 * 1024) {
-            notice.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 100 MB.';
-            fileInput.value = '';
-            attachButton.disabled = false;
-            return;
-        }
-        const targetUserId = selectedId;
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('user_id', String(targetUserId));
-        uploading = true;
-        notice.textContent = `Đang gửi ${file.name}...`;
-        sendButton.disabled = true;
-        attachButton.disabled = true;
-        fileInput.disabled = true;
-        textarea.disabled = true;
-        try {
-            const data = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', body:formData});
-            if (selectedId === targetUserId) {
-                appendMessage(data.message);
-                messagesBox.scrollTop = messagesBox.scrollHeight;
-            }
-            notice.textContent = '';
-            await refreshConversations();
-        } catch (error) {
-            notice.textContent = error.message;
-        } finally {
-            uploading = false;
-            fileInput.value = '';
+            sendButton.disabled = !selectedId;
             attachButton.disabled = !selectedId;
             fileInput.disabled = !selectedId;
             textarea.disabled = !selectedId;
-            sendButton.disabled = !selectedId;
+            previewRemove.disabled = false;
         }
     });
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        if (!file || !selectedId) return;
+        if (file.size < 1 || file.size > 100 * 1024 * 1024) {
+            notice.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 100 MB.';
+            clearPending();
+            return;
+        }
+        clearPending();
+        notice.textContent = '';
+        pendingFile = file;
+        previewUrl = URL.createObjectURL(file);
+        previewImg.src = previewUrl;
+        previewName.textContent = `${escapeText(file.name)} · ${formatBytes(file.size)}`;
+        preview.hidden = false;
+        textarea.focus();
+    });
+    previewRemove.addEventListener('click', clearPending);
     attachButton.addEventListener('click', () => {
         if (!attachButton.disabled) fileInput.click();
     });

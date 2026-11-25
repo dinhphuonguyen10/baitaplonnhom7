@@ -37,30 +37,6 @@
             "status": "active",
             "updated_at": "2026-11-23 17:31:48",
             "activated_at": "2026-11-23 17:31:48"
-        },
-        {
-            "id": "unread_reply_nudge",
-            "title": "Tin nhắn nhủ",
-            "type": "Tương tác",
-            "type_color": "#FA8C16",
-            "trigger_label": "Khách hàng chưa xem tin nhắn phản hồi của trang",
-            "trigger": "customer_unread_page_reply",
-            "message": "Chào bạn! Bên ÉCRIN Jewelry đã phản hồi tin nhắn của bạn. Khi thuận tiện, bạn hãy mở cuộc trò chuyện để xem thông tin nhé.",
-            "status": "active",
-            "updated_at": "2026-11-23 17:35:36",
-            "activated_at": "2026-11-23 17:35:36"
-        },
-        {
-            "id": "unanswered_reply_nudge",
-            "title": "Tin gợi nhắc",
-            "type": "Tương tác",
-            "type_color": "#FA8C16",
-            "trigger_label": "Khách hàng đã xem tin nhắn nhưng chưa trả lời",
-            "trigger": "customer_seen_but_unanswered",
-            "message": "Chào bạn! ÉCRIN Jewelry vẫn sẵn sàng hỗ trợ nếu bạn còn câu hỏi. Bạn cứ nhắn lại cho chúng tôi nhé.",
-            "status": "active",
-            "updated_at": "2026-11-23 17:35:36",
-            "activated_at": "2026-11-23 17:35:36"
         }
     ]
 }

@@ -63,10 +63,15 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     .support-chat-attach:disabled { opacity:.55; cursor:wait; }
     .support-chat-note { min-height:17px; margin:0; color:#A34B42; font-size:12px; }
     .support-chat-note:empty { display:none; }
+    .support-chat-preview { display:flex; align-items:center; gap:10px; padding:6px 8px; border:1px solid #E3E7EC; border-radius:10px; background:#F8F9FB; }
+    .support-chat-preview[hidden] { display:none; }
+    .support-chat-preview img { width:48px; height:48px; border-radius:8px; object-fit:cover; }
+    .support-chat-preview span { flex:1; min-width:0; overflow:hidden; color:#4B5563; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+    .support-chat-preview button { width:26px; height:26px; padding:0; border:0; border-radius:50%; background:#E5E7EB; color:#374151; font-size:16px; line-height:1; cursor:pointer; }
     .support-chat-submit { display:grid; width:38px; height:38px; flex:0 0 38px; padding:0; place-items:center; border:0; border-radius:50%; background:var(--navy); color:#fff; cursor:pointer; box-shadow:0 2px 6px rgba(16,35,56,.16); transition:background .18s ease,transform .18s ease; }
     .support-chat-submit svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
-    .support-chat-submit:hover { background:var(--navy-mid); transform:translateY(-1px); }
-    .support-chat-submit:disabled { opacity:.55; cursor:wait; transform:none; }
+    .support-chat-submit:hover { background:#172f45; transform:translateY(-1px); }
+    .support-chat-submit:disabled { background:var(--navy); cursor:wait; transform:none; }
     .support-chat-login { display:grid; flex:1; align-content:center; justify-items:center; padding:35px; text-align:center; }
     .support-chat-login-icon { display:grid; width:62px; height:62px; margin-bottom:16px; place-items:center; border-radius:50%; background:#F5F0E5; color:#9B835D; font-size:25px; }
     .support-chat-login h3 { margin:0; color:var(--navy); font:500 24px 'Roboto',Arial,sans-serif; }
@@ -115,6 +120,11 @@ include VIEW_PATH . '/layouts/dau_trang.php';
                 </div>
                 <form class="support-chat-compose" id="customer-chat-form">
                     <p class="support-chat-note" id="customer-chat-note" role="status"></p>
+                    <div class="support-chat-preview" id="customer-chat-preview" hidden>
+                        <img id="customer-chat-preview-img" alt="Ảnh sắp gửi">
+                        <span id="customer-chat-preview-name"></span>
+                        <button type="button" id="customer-chat-preview-remove" aria-label="Bỏ ảnh">×</button>
+                    </div>
                     <div class="support-chat-compose-entry">
                         <button class="support-chat-attach" id="customer-chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 100 MB">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m20.5 15-5-5L5 20"></path></svg>
@@ -153,11 +163,14 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     const attachButton = document.getElementById('customer-chat-attach');
     const fileInput = document.getElementById('customer-chat-file');
     const note = document.getElementById('customer-chat-note');
+    const preview = document.getElementById('customer-chat-preview');
+    const previewImg = document.getElementById('customer-chat-preview-img');
+    const previewName = document.getElementById('customer-chat-preview-name');
+    const previewRemove = document.getElementById('customer-chat-preview-remove');
     const api = `${base}/api/chat`;
     let sharedProduct = <?php echo json_encode($chatProduct, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     let latestId = 0;
     let sending = false;
-    let uploading = false;
 
     if (sharedProduct && !input.value.trim()) {
         const productUrl = new URL(`${base}/client/san_pham.php?id=${encodeURIComponent(sharedProduct.id)}`, window.location.origin).href;
@@ -291,71 +304,81 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         data.messages.forEach(renderMessage);
         if (nearBottom) messagesBox.scrollTop = messagesBox.scrollHeight;
     }
+    let pendingFile = null;
+    let previewUrl = null;
+    function clearPending() {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+        pendingFile = null;
+        fileInput.value = '';
+        previewImg.removeAttribute('src');
+        preview.hidden = true;
+    }
+    function setBusy(busy) {
+        sendButton.disabled = busy;
+        attachButton.disabled = busy;
+        fileInput.disabled = busy;
+        input.disabled = busy;
+        previewRemove.disabled = busy;
+    }
     form.addEventListener('submit', async event => {
         event.preventDefault();
         const message = input.value.trim();
-        if (!message || sending || uploading) return;
+        if ((!message && !pendingFile) || sending) return;
         sending = true;
-        sendButton.disabled = true;
-        attachButton.disabled = true;
-        fileInput.disabled = true;
+        setBusy(true);
         note.textContent = '';
         try {
-            const data = await request(`${api}/khach_gui_tin_nhan.php`, {
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({message, product_id:sharedProduct ? Number(sharedProduct.id) : null})
-            });
-            renderMessage(data.message);
+            if (pendingFile) {
+                note.textContent = `Đang gửi ${pendingFile.name}...`;
+                const formData = new FormData();
+                formData.append('file', pendingFile);
+                formData.append('viewer', 'customer');
+                const uploaded = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', body:formData});
+                renderMessage(uploaded.message);
+                clearPending();
+                note.textContent = '';
+            }
+            if (message) {
+                const data = await request(`${api}/khach_gui_tin_nhan.php`, {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({message, product_id:sharedProduct ? Number(sharedProduct.id) : null})
+                });
+                renderMessage(data.message);
+                input.value = '';
+                sharedProduct = null;
+            }
             messagesBox.scrollTop = messagesBox.scrollHeight;
-            input.value = '';
-            sharedProduct = null;
         } catch (error) {
             note.textContent = error.message;
         } finally {
             sending = false;
-            sendButton.disabled = false;
-            attachButton.disabled = uploading;
-            fileInput.disabled = uploading;
+            setBusy(false);
+            input.focus();
         }
     });
     attachButton.addEventListener('click', () => {
         if (!attachButton.disabled) fileInput.click();
     });
-    fileInput.addEventListener('change', async () => {
+    fileInput.addEventListener('change', () => {
         const file = fileInput.files?.[0];
-        if (!file || uploading) return;
+        if (!file) return;
         if (file.size < 1 || file.size > 100 * 1024 * 1024) {
             note.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 100 MB.';
-            fileInput.value = '';
-            attachButton.disabled = false;
+            clearPending();
             return;
         }
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('viewer', 'customer');
-        uploading = true;
-        note.textContent = `Đang gửi ${file.name}...`;
-        sendButton.disabled = true;
-        attachButton.disabled = true;
-        fileInput.disabled = true;
-        input.disabled = true;
-        try {
-            const data = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', body:formData});
-            renderMessage(data.message);
-            messagesBox.scrollTop = messagesBox.scrollHeight;
-            note.textContent = '';
-        } catch (error) {
-            note.textContent = error.message;
-        } finally {
-            uploading = false;
-            fileInput.value = '';
-            fileInput.disabled = false;
-            input.disabled = false;
-            sendButton.disabled = false;
-            attachButton.disabled = false;
-        }
+        clearPending();
+        note.textContent = '';
+        pendingFile = file;
+        previewUrl = URL.createObjectURL(file);
+        previewImg.src = previewUrl;
+        previewName.textContent = `${file.name} · ${formatBytes(file.size)}`;
+        preview.hidden = false;
+        input.focus();
     });
+    previewRemove.addEventListener('click', clearPending);
     input.addEventListener('keydown', event => {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
