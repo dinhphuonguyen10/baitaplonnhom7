@@ -183,8 +183,8 @@ class ProductAdminService
                 $product['image'] = $this->resolveProductImage($imageFile, $imageInput, (string) $oldProduct['image']);
             }
 
-            // Giữ nguyên bản gốc: cột price_sale được ghi bằng giá bán hiệu lực hiện tại của sản phẩm.
-            $this->products->updateWithPricing($productId, $product, $this->requireEffectivePrice($productId));
+            // price_sale lưu giá bán mới (giá khuyến mãi nếu có, ngược lại là giá gốc).
+            $this->products->updateWithPricing($productId, $product, $product['sale_price']);
 
             $oldSaleCents = self::parseMoneyCents((string) $oldProduct['price_sale']);
             $oldRegularCents = self::parseMoneyCents((string) $oldProduct['price_original']);
