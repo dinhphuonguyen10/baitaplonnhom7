@@ -145,7 +145,8 @@ class DanhGia extends BaseModel
         $sql = "SELECT r.id, r.rating, r.comment, r.created_at,
                r.product_id, p.name AS product_name, p.image AS product_image,
                r.user_id, u.username, rr.reply AS admin_reply,
-               rr.admin_username AS reply_admin, rr.replied_at
+               rr.admin_username AS reply_admin, rr.replied_at,
+               (" . self::VERIFIED_PURCHASE_SQL . ") AS verified
         FROM reviews r
         INNER JOIN users u ON u.id = r.user_id
         INNER JOIN products p ON p.id = r.product_id
@@ -158,11 +159,11 @@ class DanhGia extends BaseModel
         return $this->db->fetchAll($sql, $params, $params === [] ? null : $types);
     }
 
-    /** Số lượng đánh giá theo từng mức sao: [rating => total] (mọi đánh giá). */
+    /** Số lượng đánh giá đã xác minh theo từng mức sao: [rating => total] (khớp với trang sản phẩm). */
     public function countByRatingForAdmin(): array
     {
         $counts = [];
-        foreach ($this->db->fetchAll('SELECT rating, COUNT(*) AS total FROM reviews GROUP BY rating') as $row) {
+        foreach ($this->db->fetchAll('SELECT r.rating, COUNT(*) AS total FROM reviews r WHERE ' . self::VERIFIED_PURCHASE_SQL . ' GROUP BY r.rating') as $row) {
             $counts[(int) $row['rating']] = (int) $row['total'];
         }
 

@@ -14,8 +14,8 @@ use Throwable;
  */
 class TepDinhKemService
 {
-    /** Dung lượng tối đa của một tệp: 100 MB. */
-    public const MAX_SIZE = 104857600;
+    /** Dung lượng tối đa của một tệp: 10 MB. */
+    public const MAX_SIZE = 10485760;
 
     private const ALLOWED_TYPES = [
         'jpg' => ['mime' => ['image/jpeg'], 'type' => 'image'],
@@ -94,7 +94,7 @@ class TepDinhKemService
         }
         $fileSize = filesize($temporaryPath);
         if ($fileSize === false || $fileSize < 1 || $fileSize > self::MAX_SIZE) {
-            throw new TroChuyenException('Ảnh phải có dung lượng từ 1 byte đến 100 MB.', 400);
+            throw new TroChuyenException('Ảnh phải có dung lượng tối đa 10 MB.', 400);
         }
 
         $originalName = $this->sanitizeName($upload['name']);

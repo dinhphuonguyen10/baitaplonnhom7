@@ -51,6 +51,16 @@ class QuanLyDanhGiaService
         }
 
         try {
+            $exists = $this->reviews->find($reviewId) !== null;
+        } catch (Throwable $e) {
+            error_log('Admin review lookup failed: ' . $e->getMessage());
+            throw new RuntimeException('Không thể gửi phản hồi lúc này.', 0, $e);
+        }
+        if (!$exists) {
+            throw new InvalidArgumentException('Không tìm thấy đánh giá để phản hồi.');
+        }
+
+        try {
             $this->replies->upsertForReview($reviewId, $adminName, $reply);
         } catch (Throwable $e) {
             error_log('Admin review reply failed: ' . $e->getMessage());
@@ -79,7 +89,7 @@ class QuanLyDanhGiaService
 
         try {
             foreach ($this->reviews->findForAdmin($productFilter, $ratingFilter, $search) as $row) {
-                $row['verified'] = $this->reviews->customerPurchasedProduct((int) $row['user_id'], (int) $row['product_id']);
+                $row['verified'] = (bool) $row['verified'];
                 $reviews[] = $row;
             }
         } catch (Throwable $exception) {

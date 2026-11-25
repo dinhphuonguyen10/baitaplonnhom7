@@ -45,7 +45,7 @@ class TinNhan extends BaseModel
     public function allChatViewForUser(int $userId): array
     {
         return $this->db->fetchAll(
-            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.user_id = ? ORDER BY cm.created_at ASC',
+            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.user_id = ? ORDER BY cm.created_at ASC, cm.id ASC',
             [$userId],
             'i'
         );
@@ -114,14 +114,38 @@ class TinNhan extends BaseModel
         );
     }
 
-    /** Số tin khách hàng đã gửi trong ngày hôm nay. */
+    /** Số tin nhắn văn bản khách hàng đã gửi trong ngày hôm nay (không tính ảnh). */
     public function countCustomerMessagesToday(int $userId): int
     {
         return (int) $this->db->fetchValue(
-            "SELECT COUNT(*) AS cnt FROM chat_messages WHERE user_id = ? AND sender = 'customer' AND DATE(created_at) = CURDATE()",
+            "SELECT COUNT(*) AS cnt FROM chat_messages WHERE user_id = ? AND sender = 'customer' AND message_type = 'text' AND DATE(created_at) = CURDATE()",
             [$userId],
             'i'
         );
+    }
+
+    /** Đã có tin của $botName gửi cho khách sau tin văn bản đầu tiên của khách trong hôm nay hay chưa. */
+    public function hasBotReplyAfterFirstCustomerMessageToday(int $userId, string $botName): bool
+    {
+        return (int) $this->db->fetchValue(
+            "SELECT COUNT(*) FROM chat_messages
+             WHERE user_id = ? AND sender = 'admin' AND username = ?
+               AND id > (SELECT MIN(id) FROM chat_messages
+                         WHERE user_id = ? AND sender = 'customer' AND message_type = 'text' AND DATE(created_at) = CURDATE())",
+            [$userId, $botName, $userId],
+            'isi'
+        ) > 0;
+    }
+
+    /** Lấy khóa tên $name (tối đa $timeout giây); false nếu không lấy được. */
+    public function acquireLock(string $name, int $timeout = 3): bool
+    {
+        return (int) $this->db->fetchValue('SELECT GET_LOCK(?, ?)', [$name, $timeout], 'si') === 1;
+    }
+
+    public function releaseLock(string $name): void
+    {
+        $this->db->fetchValue('SELECT RELEASE_LOCK(?)', [$name], 's');
     }
 
     /**
@@ -157,7 +181,7 @@ class TinNhan extends BaseModel
     public function allCustomerChatViewForUser(int $userId): array
     {
         return $this->db->fetchAll(
-            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm ' . self::ACTIVE_PRODUCT_JOIN . ' WHERE cm.user_id = ? ORDER BY cm.created_at ASC',
+            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm ' . self::ACTIVE_PRODUCT_JOIN . ' WHERE cm.user_id = ? ORDER BY cm.created_at ASC, cm.id ASC',
             [$userId],
             'i'
         );

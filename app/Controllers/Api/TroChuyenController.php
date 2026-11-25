@@ -159,11 +159,23 @@ class TroChuyenController extends \App\Core\Controller
 
         $messageData = $this->chat()->customerSend($userId, $username, $message, $productId);
         if ($messageData === false) {
-            $this->customerJson(['status' => 'error', 'message' => 'Không thể gửi tin nhắn. Vui lòng thử lại sau.']);
+            $this->customerJson(['status' => 'error', 'message' => 'Không thể gửi tin nhắn. Vui lòng thử lại sau.'], 500);
         }
 
         // Trả kết quả cho khách trước, sau đó gửi tin chăm sóc đầu ngày (nếu là tin đầu tiên).
-        echo json_encode(['status' => 'success', 'message' => $messageData], self::CUSTOMER_JSON_FLAGS);
+        $body = (string) json_encode(['status' => 'success', 'message' => $messageData], self::CUSTOMER_JSON_FLAGS);
+        ignore_user_abort(true);
+        header('Content-Length: ' . strlen($body));
+        header('Connection: close');
+        echo $body;
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } else {
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            flush();
+        }
         $this->chat()->sendDailyGreetingIfFirstMessage($userId);
         exit;
     }

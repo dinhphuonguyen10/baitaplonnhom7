@@ -102,9 +102,12 @@ class TroChuyenService
      */
     public function adminAutoReply($type, $userId, string $adminUsername): ?array
     {
-        $userId = filter_var($userId, FILTER_VALIDATE_INT);
-        if (!$type || !$userId) {
+        $userId = self::positiveInt($userId);
+        if (!$type || $userId === null) {
             throw new TroChuyenException('Tham số không hợp lệ.', 400);
+        }
+        if ($this->customerUsername($userId) === null) {
+            throw new TroChuyenException('Không tìm thấy khách hàng này.', 404);
         }
 
         $messageText = $this->autoResponses->legacyMessage((string) $type);
@@ -231,17 +234,34 @@ class TroChuyenService
         return $this->messages->findCustomerChatView($messageId);
     }
 
-    /** Gửi tin chăm sóc một lần mỗi ngày, khi đây là tin nhắn đầu tiên của khách trong ngày. */
+    /**
+     * Gửi tin chăm sóc một lần mỗi ngày, sau tin nhắn văn bản đầu tiên của khách trong ngày.
+     * Dùng khóa theo khách để hai tin gửi đồng thời không bị chào hai lần hoặc bị bỏ sót.
+     */
     public function sendDailyGreetingIfFirstMessage(int $userId): void
     {
+        $lockName = 'chat_greeting_' . $userId;
+        $locked = false;
         try {
-            $count = $this->messages->countCustomerMessagesToday($userId);
-        } catch (Throwable $e) {
-            return;
-        }
-
-        if ($count === 1) {
+            $locked = $this->messages->acquireLock($lockName);
+            if (!$locked) {
+                return;
+            }
+            if ($this->messages->countCustomerMessagesToday($userId) < 1
+                || $this->messages->hasBotReplyAfterFirstCustomerMessageToday($userId, TuDongTraLoiService::BOT_NAME)) {
+                return;
+            }
             $this->autoReply->send($userId, 'new_message');
+        } catch (Throwable $e) {
+            error_log('Daily greeting failed: ' . $e->getMessage());
+        } finally {
+            if ($locked) {
+                try {
+                    $this->messages->releaseLock($lockName);
+                } catch (Throwable $e) {
+                    // Khóa tự giải phóng khi kết nối đóng.
+                }
+            }
         }
     }
 }

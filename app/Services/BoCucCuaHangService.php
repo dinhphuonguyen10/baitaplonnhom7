@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Core\Auth;
-use App\Core\Session;
 use App\Core\Url;
 use App\Models\YeuThich;
 
@@ -48,9 +47,9 @@ class BoCucCuaHangService
     {
         $appBaseUrl = Url::base();
         $customerUsername = Auth::customerUsername();
-        $adminUsernameForClient = Auth::isAdmin() && Session::has('admin_username')
-            ? (string) Session::get('admin_username')
-            : null;
+        // Phiên quản trị tách riêng với phiên khách hàng: header cửa hàng chỉ phản ánh tài khoản khách hàng,
+        // nên sau khi khách đăng xuất sẽ hiện lại nút Đăng ký / Đăng nhập dù trình duyệt còn phiên admin.
+        $adminUsernameForClient = null;
         $isCustomerLoggedIn = $customerUsername !== null && $customerUsername !== '';
 
         $navCategories = $this->catalog->navigationCategories();

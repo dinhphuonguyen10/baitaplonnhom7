@@ -96,6 +96,10 @@ class DanhGiaSanPhamController extends BaseClientController
     private function redirectWithMessage(int $productId, string $type, string $message): void
     {
         Session::set(self::FLASH_KEY, ['type' => $type, 'message' => $message]);
+        if ($productId <= 0) {
+            Response::redirect('../index.php');
+        }
+
         Response::redirect('san_pham.php?id=' . $productId . '#product-reviews');
     }
 

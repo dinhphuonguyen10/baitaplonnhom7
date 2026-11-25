@@ -209,6 +209,13 @@ class DanhGiaService
             throw new DomainException('Đánh giá đã được chỉnh sửa hoặc không còn khả dụng.');
         }
 
+        // Nội dung đã thay đổi nên phản hồi cũ của cửa hàng không còn phù hợp.
+        try {
+            $this->db->execute('DELETE FROM review_replies WHERE review_id = ?', [(int) $submittedReviewId], 'i');
+        } catch (Throwable $exception) {
+            error_log('Không thể xóa phản hồi cũ của đánh giá: ' . $exception->getMessage());
+        }
+
         return 'Đã cập nhật đánh giá. Bạn không thể sửa lại lần nữa.';
     }
 
@@ -238,9 +245,6 @@ class DanhGiaService
                 $this->images->createForReview($reviewId, $imagePath, $sortOrder);
             }
             $this->db->commit();
-
-            // Chỉ gửi cảm ơn sau khi một đánh giá mới được lưu thành công.
-            (new TuDongTraLoiService($this->db))->send($userId, 'review_thankyou');
         } catch (Throwable $exception) {
             $this->db->rollback();
             $this->removeStoredImages($storedImagePaths);
@@ -250,6 +254,13 @@ class DanhGiaService
 
             error_log('Không thể lưu đánh giá sản phẩm: ' . $exception->getMessage());
             throw new DomainException('Chưa thể gửi đánh giá lúc này. Vui lòng thử lại sau.');
+        }
+
+        // Chỉ gửi cảm ơn sau khi đánh giá đã lưu thành công; lỗi ở đây không được ảnh hưởng đánh giá.
+        try {
+            (new TuDongTraLoiService($this->db))->send($userId, 'review_thankyou');
+        } catch (Throwable $exception) {
+            error_log('Không thể gửi tin cảm ơn đánh giá: ' . $exception->getMessage());
         }
     }
 
