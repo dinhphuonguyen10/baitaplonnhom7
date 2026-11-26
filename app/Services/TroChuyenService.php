@@ -116,6 +116,7 @@ class TroChuyenService
         }
 
         try {
+            $messageText = $this->autoReply->personalize($messageText, (int) $userId);
             $messageId = $this->messages->createTextMessage((int) $userId, $adminUsername, 'admin', $messageText);
         } catch (Throwable $e) {
             throw new TroChuyenException('Không thể gửi tin tự động.', 500);

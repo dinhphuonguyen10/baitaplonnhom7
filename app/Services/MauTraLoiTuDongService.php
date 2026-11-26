@@ -68,7 +68,7 @@ class MauTraLoiTuDongService
             throw new InvalidArgumentException('Vui lòng nhập tiêu đề và nội dung tin nhắn thứ nhất.');
         }
 
-        $now = date('Y-m-d H:i:s');
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s');
         $template['title'] = mb_substr($title, 0, 100, 'UTF-8');
         $template['trigger_label'] = mb_substr($trigger, 0, 200, 'UTF-8');
         $template['message'] = $message;

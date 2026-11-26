@@ -113,58 +113,6 @@
         /* ── Empty state ─────────────────────────────────── */
         .ar-empty { padding:48px; text-align:center; color:#9CA3AF; font-size:14px; }
 
-        /* ── Edit modal ─────────────────────────────────── */
-        .ar-overlay {
-            position:fixed; inset:0; background:rgba(13,24,38,.5); z-index:900;
-            display:flex; align-items:center; justify-content:center;
-            opacity:0; pointer-events:none; transition:opacity .22s ease;
-        }
-        .ar-overlay.is-open { opacity:1; pointer-events:all; }
-        .ar-modal {
-            width:min(620px,95vw); max-height:90vh; overflow-y:auto;
-            background:#fff; border-radius:18px; box-shadow:0 24px 64px rgba(13,24,38,.22);
-            padding:36px 36px 28px;
-            transform:translateY(28px) scale(.97);
-            transition:transform .22s ease;
-        }
-        .ar-overlay.is-open .ar-modal { transform:none; }
-        .ar-modal-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
-        .ar-modal-head h2 { font-size:18px; color:#1D3461; margin:0 0 4px; }
-        .ar-modal-head p  { margin:0; font-size:12px; color:#9CA3AF; }
-        .ar-modal-close {
-            width:32px; height:32px; border:0; border-radius:50%; background:#F3F4F6;
-            color:#6B7A90; font-size:18px; cursor:pointer; display:grid; place-items:center;
-            flex:0 0 32px; transition:background .15s;
-        }
-        .ar-modal-close:hover { background:#E5E7EB; color:#1D3461; }
-        .ar-modal-field { margin-bottom:20px; }
-        .ar-modal-field label {
-            display:block; font-size:12px; font-weight:700; color:#4B5563;
-            text-transform:uppercase; letter-spacing:.04em; margin-bottom:7px;
-        }
-        .ar-modal-field input[type=text],
-        .ar-modal-field textarea {
-            width:100%; box-sizing:border-box; padding:11px 14px;
-            border:1.5px solid #E2E6EC; border-radius:10px;
-            font:14px 'Roboto', Arial, sans-serif; color:#1E293B;
-            outline:0; transition:border-color .15s; resize:vertical;
-        }
-        .ar-modal-field input[type=text]:focus,
-        .ar-modal-field textarea:focus { border-color:#C4A45A; box-shadow:0 0 0 3px rgba(196,164,90,.12); }
-        .ar-modal-field textarea { min-height:120px; line-height:1.6; }
-        .ar-modal-hint { font-size:11px; color:#9CA3AF; margin-top:5px; }
-        .ar-modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
-        .ar-modal-status { font-size:12px; margin-right:auto; padding:6px 0; }
-        .ar-modal-status.ok  { color:#237804; }
-        .ar-modal-status.err { color:#A34B42; }
-        .ar-btn {
-            padding:10px 24px; border:0; border-radius:9px; font-size:13px; font-weight:600;
-            cursor:pointer; transition:transform .15s, filter .15s;
-        }
-        .ar-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
-        .ar-btn-save   { background:linear-gradient(135deg,#1D3461,#2A5298); color:#fff; }
-        .ar-btn-cancel { background:#F1F3F5; color:#374151; }
-
         /* ── Responsive ─────────────────────────────────── */
         @media(max-width:768px) {
             .ar-table thead th:nth-child(4),
@@ -286,64 +234,9 @@
     </main>
 </div>
 
-<!-- Edit / Add Modal -->
-<div class="ar-overlay" id="ar-overlay" role="dialog" aria-modal="true" aria-label="Chỉnh sửa mẫu tin nhắn">
-    <div class="ar-modal">
-        <div class="ar-modal-head">
-            <div>
-                <h2 id="ar-modal-title">Chỉnh sửa mẫu tin nhắn</h2>
-                <p id="ar-modal-subtitle">Thay đổi nội dung và cài đặt mẫu.</p>
-            </div>
-            <button class="ar-modal-close" id="ar-modal-close" aria-label="Đóng">×</button>
-        </div>
-
-        <input type="hidden" id="ar-editing-idx" value="">
-
-        <div class="ar-modal-field">
-            <label>Tiêu đề mẫu tin</label>
-            <input type="text" id="ar-f-title" placeholder="VD: Lời chào mở đầu" maxlength="100">
-        </div>
-        <div class="ar-modal-field">
-            <label>Loại mẫu tin</label>
-            <select class="ar-filter-select" id="ar-f-type" style="width:100%;height:42px;padding:0 32px 0 12px;">
-                <option>Chào mừng</option>
-                <option>Tương tác</option>
-                <option>Chăm sóc</option>
-                <option>Hành trình đơn</option>
-            </select>
-        </div>
-        <div class="ar-modal-field">
-            <label>Trường hợp sử dụng</label>
-            <input type="text" id="ar-f-trigger" placeholder="VD: Khách hàng mới (nhắn tin lần đầu tiên)" maxlength="150">
-            <p class="ar-modal-hint">Mô tả ngắn gọn khi nào tin nhắn này được gửi.</p>
-        </div>
-        <div class="ar-modal-field">
-            <label>Nội dung tin nhắn</label>
-            <textarea id="ar-f-message" rows="5" placeholder="Nhập nội dung tin nhắn tự động..."></textarea>
-            <p class="ar-modal-hint">Tin nhắn này sẽ được gửi tự động bởi hệ thống dưới tên ÉCRIN Jewelry.</p>
-        </div>
-        <div class="ar-modal-field" style="display:flex;align-items:center;gap:12px;">
-            <label class="ar-toggle" style="margin:0;" title="Bật/tắt mẫu này">
-                <input type="checkbox" id="ar-f-status">
-                <span class="ar-toggle-track"></span>
-                <span class="ar-toggle-thumb"></span>
-            </label>
-            <span style="font-size:13px;color:#374151;font-weight:600;">Kích hoạt mẫu tin nhắn này</span>
-        </div>
-
-        <div class="ar-modal-actions">
-            <span class="ar-modal-status" id="ar-modal-status"></span>
-            <button class="ar-btn ar-btn-cancel" id="ar-cancel">Hủy</button>
-            <button class="ar-btn ar-btn-save" id="ar-save">Lưu thay đổi</button>
-        </div>
-    </div>
-</div>
-
 <script>
 (() => {
     const api = <?php echo json_encode($appBaseUrl . '/api/chat/tro_chuyen_quan_tri.php', JSON_UNESCAPED_SLASHES); ?>;
-    const overlay  = document.getElementById('ar-overlay');
-    const modalStatus = document.getElementById('ar-modal-status');
 
     // ── Template data from PHP ───────────────────────────────────
     let templates = <?php echo json_encode(array_values($config['templates']), JSON_UNESCAPED_UNICODE); ?>;
@@ -364,6 +257,8 @@
             body: JSON.stringify({ action: 'save_auto_responses', responses: { templates } })
         });
     }
+
+    const nowText = () => new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 
     // ── Filter / search ───────────────────────────────────────────
     const searchInput  = document.getElementById('ar-search');
@@ -394,109 +289,40 @@
         checkbox.addEventListener('change', async () => {
             const idx = parseInt(checkbox.dataset.idx, 10);
             const newStatus = checkbox.checked ? 'active' : 'inactive';
+            const previous = {
+                status: templates[idx].status,
+                activated_at: templates[idx].activated_at,
+                updated_at: templates[idx].updated_at
+            };
             templates[idx].status = newStatus;
             if (newStatus === 'active') {
-                templates[idx].activated_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
+                templates[idx].activated_at = nowText();
             }
-            templates[idx].updated_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
+            templates[idx].updated_at = nowText();
 
             const row = checkbox.closest('tr');
             const label = row.querySelector('.ar-status-label');
-            label.textContent = newStatus === 'active' ? 'Đang hoạt động' : 'Chưa kích hoạt';
-            label.classList.toggle('is-active', newStatus === 'active');
-            row.dataset.status = newStatus;
+            const showStatus = status => {
+                label.textContent = status === 'active' ? 'Đang hoạt động' : 'Chưa kích hoạt';
+                label.classList.toggle('is-active', status === 'active');
+                row.dataset.status = status;
+            };
+            showStatus(newStatus);
 
-            try { await saveAll(); } catch (e) { console.error(e); }
+            checkbox.disabled = true;
+            try {
+                await saveAll();
+            } catch (e) {
+                Object.assign(templates[idx], previous);
+                checkbox.checked = previous.status === 'active';
+                showStatus(checkbox.checked ? 'active' : 'inactive');
+                alert('Không thể lưu mẫu: ' + e.message);
+            } finally {
+                checkbox.disabled = false;
+            }
         });
     });
 
-    // ── Open modal ────────────────────────────────────────────────
-    const typeColors = {
-        'Chào mừng':     { bg: '#E6F4FF', text: '#0958D9', dot: '#1890FF' },
-        'Hành trình đơn':{ bg: '#F9F0FF', text: '#531DAB', dot: '#722ED1' },
-        'Chăm sóc':      { bg: '#F6FFED', text: '#237804', dot: '#52C41A' },
-        'Tương tác':     { bg: '#FFF7E6', text: '#AD4E00', dot: '#FA8C16' },
-    };
-
-    function openModal(tpl, idx) {
-        document.getElementById('ar-editing-idx').value = idx !== null ? String(idx) : '';
-        document.getElementById('ar-modal-title').textContent   = idx !== null ? 'Chỉnh sửa mẫu tin nhắn' : 'Thêm mẫu tin nhắn mới';
-        document.getElementById('ar-modal-subtitle').textContent = idx !== null
-            ? (tpl.trigger_label || '')
-            : 'Điền thông tin cho mẫu tin nhắn mới.';
-        document.getElementById('ar-f-title').value   = tpl.title   || '';
-        document.getElementById('ar-f-type').value    = tpl.type    || 'Chào mừng';
-        document.getElementById('ar-f-trigger').value = tpl.trigger_label || '';
-        document.getElementById('ar-f-message').value = tpl.message || '';
-        document.getElementById('ar-f-status').checked = (tpl.status === 'active');
-        modalStatus.textContent = '';
-        modalStatus.className   = 'ar-modal-status';
-        overlay.classList.add('is-open');
-        document.getElementById('ar-f-title').focus();
-    }
-
-    document.querySelectorAll('[data-action="edit"]').forEach(btn => {
-        btn.addEventListener('click', e => {
-            e.preventDefault();
-            const idx = parseInt(btn.dataset.idx, 10);
-            openModal(templates[idx], idx);
-        });
-    });
-
-    // ── Close modal ───────────────────────────────────────────────
-    const closeModal = () => overlay.classList.remove('is-open');
-    document.getElementById('ar-modal-close').addEventListener('click', closeModal);
-    document.getElementById('ar-cancel').addEventListener('click', closeModal);
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-
-    // ── Save modal ────────────────────────────────────────────────
-    document.getElementById('ar-save').addEventListener('click', async () => {
-        const idxStr  = document.getElementById('ar-editing-idx').value;
-        const isNew   = idxStr === '';
-        const idx     = isNew ? null : parseInt(idxStr, 10);
-        const title   = document.getElementById('ar-f-title').value.trim();
-        const type    = document.getElementById('ar-f-type').value;
-        const trigger = document.getElementById('ar-f-trigger').value.trim();
-        const message = document.getElementById('ar-f-message').value.trim();
-        const status  = document.getElementById('ar-f-status').checked ? 'active' : 'inactive';
-
-        if (!title || !message) {
-            modalStatus.className   = 'ar-modal-status err';
-            modalStatus.textContent = 'Vui lòng nhập tiêu đề và nội dung.';
-            return;
-        }
-
-        const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-        const tpl = {
-            id: isNew ? 'tpl_' + Date.now() : (templates[idx].id || 'tpl_' + Date.now()),
-            title, type,
-            type_color: (typeColors[type] || {}).dot || '#1890FF',
-            trigger_label: trigger,
-            message, status,
-            updated_at: now,
-            activated_at: status === 'active' ? now : (isNew ? null : templates[idx].activated_at || null)
-        };
-
-        if (isNew) templates.push(tpl);
-        else templates[idx] = tpl;
-
-        modalStatus.className   = 'ar-modal-status';
-        modalStatus.textContent = 'Đang lưu...';
-        document.getElementById('ar-save').disabled = true;
-
-        try {
-            await saveAll();
-            modalStatus.className   = 'ar-modal-status ok';
-            modalStatus.textContent = '✔ Đã lưu thành công!';
-            setTimeout(() => { closeModal(); location.reload(); }, 900);
-        } catch (e) {
-            modalStatus.className   = 'ar-modal-status err';
-            modalStatus.textContent = 'Lỗi khi lưu: ' + e.message;
-        } finally {
-            document.getElementById('ar-save').disabled = false;
-        }
-    });
 })();
 </script>
 </body>
