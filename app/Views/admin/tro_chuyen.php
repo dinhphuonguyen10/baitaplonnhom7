@@ -129,43 +129,6 @@
             display:inline-block; padding:2px 10px; border-radius:20px;
             background:#EAF5ED; color:#3A7D55; font-size:11px; font-weight:600; margin-left:8px;
         }
-        /* Auto-response modal */
-        .ar-overlay {
-            position:fixed; inset:0; background:rgba(13,24,38,.45); z-index:900;
-            display:flex; align-items:center; justify-content:center;
-            opacity:0; transition:opacity .22s ease;
-        }
-        .ar-overlay.is-open { opacity:1; pointer-events:all; }
-        .ar-overlay:not(.is-open) { pointer-events:none; }
-        .ar-modal {
-            width:min(560px,95vw); max-height:90vh; overflow-y:auto;
-            background:#fff; border-radius:18px; box-shadow:0 20px 60px rgba(13,24,38,.22);
-            padding:32px 32px 24px; transform:translateY(24px) scale(.97);
-            transition:transform .22s ease;
-        }
-        .ar-overlay.is-open .ar-modal { transform:none; }
-        .ar-modal h2 { font-size:18px; color:var(--navy); margin:0 0 4px; }
-        .ar-modal .ar-subtitle { color:#6B7A90; font-size:13px; margin:0 0 24px; }
-        .ar-field { margin-bottom:20px; }
-        .ar-field label { display:block; font-size:12px; font-weight:700; color:#4B5563; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
-        .ar-field textarea {
-            width:100%; box-sizing:border-box; min-height:84px; padding:12px 14px;
-            border:1.5px solid #E2E6EC; border-radius:10px; font:14px 'Roboto',sans-serif;
-            line-height:1.6; color:#1E293B; resize:vertical; outline:0;
-            transition:border-color .15s;
-        }
-        .ar-field textarea:focus { border-color:#C4A45A; box-shadow:0 0 0 3px rgba(196,164,90,.12); }
-        .ar-tip { font-size:11px; color:#9CA3AF; margin-top:5px; }
-        .ar-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
-        .ar-btn {
-            padding:9px 22px; border:0; border-radius:9px; font-size:13px; font-weight:600;
-            cursor:pointer; transition:transform .15s, filter .15s;
-        }
-        .ar-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
-        .ar-btn--save { background:linear-gradient(135deg,#1D3461,#2A5298); color:#fff; }
-        .ar-btn--cancel { background:#F1F3F5; color:#374151; }
-        .ar-status { font-size:12px; margin-right:auto; padding:6px 0; }
-
         /* Slightly larger, consistent reading sizes across customer support chat. */
         .page-content .eyebrow { font-size:11px; }
         .page-content .page-subtitle { font-size:14px; }
@@ -191,16 +154,9 @@
         .chat-file-icon,
         .chat-compose-hint,
         .chat-notice { font-size:11px; }
-        .chat-compose-entry textarea,
-        .ar-field textarea { font-size:15px; }
-        .chat-action-btn,
-        .ar-btn { font-size:14px; }
-        .auto-badge,
-        .ar-field label { font-size:12px; }
-        .ar-modal h2 { font-size:20px; }
-        .ar-modal .ar-subtitle { font-size:14px; }
-        .ar-tip { font-size:12px; }
-        .ar-status { font-size:13px; }
+        .chat-compose-entry textarea { font-size:15px; }
+        .chat-action-btn { font-size:14px; }
+        .auto-badge { font-size:12px; }
     </style>
 <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/tro_chuyen.css?v=' . (int) @filemtime(APP_ROOT . '/admin/tro_chuyen.css')); ?>">
 </head>
@@ -267,6 +223,7 @@
 (() => {
     const base = <?php echo json_encode($appBaseUrl, JSON_UNESCAPED_SLASHES); ?>;
     const api = `${base}/api/chat/tro_chuyen_quan_tri.php`;
+    const csrfToken = <?php echo json_encode($csrfToken); ?>;
     const workspace = document.getElementById('admin-chat');
     const conversationList = document.getElementById('chat-conversations');
     const messagesBox = document.getElementById('chat-messages');
@@ -494,7 +451,7 @@
             && (fresh.some(item => item.sender === 'customer') || Number(conversation?.unread) > 0)) {
             await request(api, {
                 method:'POST',
-                headers:{'Content-Type':'application/json'},
+                headers:{'Content-Type':'application/json', 'X-CSRF-Token':csrfToken},
                 body:JSON.stringify({action:'mark_read', user_id:userId, last_message_id:lastCustomerMessageId})
             });
             if (selectedId !== userId) return;
@@ -572,7 +529,7 @@
                 const formData = new FormData();
                 formData.append('file', pendingFile);
                 formData.append('user_id', String(targetUserId));
-                const uploaded = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', body:formData});
+                const uploaded = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', headers:{'X-CSRF-Token':csrfToken}, body:formData});
                 clearPending();
                 notice.textContent = '';
                 if (selectedId === targetUserId) {
@@ -583,7 +540,7 @@
             if (message) {
                 const data = await request(api, {
                     method:'POST',
-                    headers:{'Content-Type':'application/json'},
+                    headers:{'Content-Type':'application/json', 'X-CSRF-Token':csrfToken},
                     body:JSON.stringify({action:'send', user_id:targetUserId, message})
                 });
                 if (selectedId === targetUserId) {
@@ -626,75 +583,6 @@
         if (!attachButton.disabled) fileInput.click();
     });
 
-
-// ─── Auto-response modal ───────────────────────────────────────────────
-const arOverlay = document.createElement('div');
-arOverlay.className = 'ar-overlay';
-arOverlay.setAttribute('role', 'dialog');
-arOverlay.setAttribute('aria-modal', 'true');
-arOverlay.setAttribute('aria-label', 'Quản lý phản hồi tự động');
-arOverlay.innerHTML = `
-  <div class="ar-modal">
-    <h2>Phản hồi tự động</h2>
-    <p class="ar-subtitle">Khi khách nhắn tin lần đầu hoặc đặt hàng xong, hệ thống tự động gửi tin theo mẫu dưới đây.</p>
-    <div class="ar-field">
-      <label>💬 Khi khách nhắn tin lần đầu</label>
-      <textarea id="ar-new-message" rows="4" placeholder="VD: Xin chào! Chúng tôi đã nhận được tin nhắn và sẽ phản hồi sớm..."></textarea>
-      <p class="ar-tip">⚠️ Chỉ gửi 1 lần cho lần nhắn đầu tiên của mỗi khách.</p>
-    </div>
-    <div class="ar-field">
-      <label>📦 Khi khách đặt hàng thành công</label>
-      <textarea id="ar-order-thankyou" rows="4" placeholder="VD: Cảm ơn bạn đã đặt hàng! Chúng tôi sẽ xử lý đơn hàng và liên hệ sớm..."></textarea>
-      <p class="ar-tip">⚠️ Gửi ngay sau khi đặt hàng thành công (chỉ áp dụng cho khách đã đăng nhập).</p>
-    </div>
-    <div class="ar-actions">
-      <span class="ar-status" id="ar-status"></span>
-      <button class="ar-btn ar-btn--cancel" id="ar-cancel">Đóng</button>
-      <button class="ar-btn ar-btn--save" id="ar-save">Lưu thay đổi</button>
-    </div>
-  </div>
-`;
-document.body.appendChild(arOverlay);
-
-const arStatus = document.getElementById('ar-status');
-
-async function openAutoConfig() {
-  arStatus.textContent = 'Đang tải...';
-  arOverlay.classList.add('is-open');
-  try {
-    const data = await request(`${api}?action=get_auto_responses`);
-    document.getElementById('ar-new-message').value = data.responses.new_message || '';
-    document.getElementById('ar-order-thankyou').value = data.responses.order_thankyou || '';
-    arStatus.textContent = '';
-  } catch (e) {
-    arStatus.textContent = 'Không thể tải mẫu.';
-  }
-}
-
-// The management button now navigates to the full template list page.
-document.getElementById('ar-cancel').addEventListener('click', () => arOverlay.classList.remove('is-open'));
-arOverlay.addEventListener('click', e => { if (e.target === arOverlay) arOverlay.classList.remove('is-open'); });
-
-document.getElementById('ar-save').addEventListener('click', async () => {
-  const responses = {
-    new_message: document.getElementById('ar-new-message').value.trim(),
-    order_thankyou: document.getElementById('ar-order-thankyou').value.trim()
-  };
-  arStatus.textContent = 'Đang lưu...';
-  document.getElementById('ar-save').disabled = true;
-  try {
-    await request(api, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'save_auto_responses', responses})});
-    arStatus.style.color = '#3A7D55';
-    arStatus.textContent = '✔ Đã lưu thành công!';
-    setTimeout(() => arOverlay.classList.remove('is-open'), 1200);
-  } catch (e) {
-    arStatus.style.color = '#A34B42';
-    arStatus.textContent = 'Lỗi khi lưu, thử lại.';
-  } finally {
-    document.getElementById('ar-save').disabled = false;
-  }
-});
-// ───────────────────────────────────────────────────────────────────────
 
     textarea.addEventListener('keydown', event => {
         if (event.key === 'Enter' && !event.shiftKey) {

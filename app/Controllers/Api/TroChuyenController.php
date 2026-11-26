@@ -21,6 +21,11 @@ use App\Services\TroChuyenService;
  */
 class TroChuyenController extends \App\Core\Controller
 {
+    /** Khóa session giữ mã CSRF của API chat quản trị. */
+    public const ADMIN_CSRF_KEY = 'admin_chat_csrf';
+
+    private const INVALID_CSRF = 'Phiên thao tác không hợp lệ. Vui lòng tải lại trang.';
+
     /** Cờ JSON của API phía quản trị và tải tệp. */
     private const ADMIN_JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
 
@@ -86,6 +91,10 @@ class TroChuyenController extends \App\Core\Controller
 
     private function handleAdminPost(): void
     {
+        if (!$this->hasValidAdminCsrf()) {
+            $this->adminJson(['status' => 'error', 'message' => self::INVALID_CSRF], 403);
+        }
+
         $payload = json_decode(Request::rawBody(), true);
         if (!is_array($payload)) {
             $this->adminJson(['status' => 'error', 'message' => 'Yêu cầu không hợp lệ.'], 400);
@@ -217,6 +226,9 @@ class TroChuyenController extends \App\Core\Controller
             $file = $this->attachments()->validateUpload(Request::file('file'));
 
             if ($sender === 'admin') {
+                if (!$this->hasValidAdminCsrf()) {
+                    throw new TroChuyenException(self::INVALID_CSRF, 403);
+                }
                 $userId = TroChuyenService::positiveInt(Request::post('user_id'));
                 if ($userId === null) {
                     throw new TroChuyenException(TroChuyenService::INVALID_CONVERSATION, 400);
@@ -274,6 +286,14 @@ class TroChuyenController extends \App\Core\Controller
     }
 
     // ───────────── Tiện ích ─────────────
+
+    /** So mã CSRF trong header X-CSRF-Token với mã trong session. */
+    private function hasValidAdminCsrf(): bool
+    {
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+
+        return Session::verifyCsrf(is_string($token) ? $token : null, self::ADMIN_CSRF_KEY);
+    }
 
     /** Bắt buộc phiên khách hàng, trả về ID khách. */
     private function requireCustomer(): int

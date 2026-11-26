@@ -360,7 +360,7 @@
     async function saveAll() {
         return request(api, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': <?php echo json_encode($csrfToken); ?> },
             body: JSON.stringify({ action: 'save_auto_responses', responses: { templates } })
         });
     }

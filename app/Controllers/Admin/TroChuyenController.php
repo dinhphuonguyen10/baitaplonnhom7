@@ -2,6 +2,8 @@
 
 namespace App\Controllers\Admin;
 
+use App\Controllers\Api\TroChuyenController as ChatApi;
+
 /**
  * Lớp TroChuyenController (quản trị) - trang admin/tro_chuyen.php: giao diện trò chuyện với khách hàng.
  * Dữ liệu hội thoại được tải qua API api/chat/tro_chuyen_quan_tri.php bằng JavaScript.
@@ -15,6 +17,8 @@ class TroChuyenController extends BaseAdminController
         if ($data['adminUsername'] === '') {
             $data['adminUsername'] = 'Nhân viên ÉCRIN';
         }
+
+        $data['csrfToken'] = $this->csrfToken(ChatApi::ADMIN_CSRF_KEY);
 
         return $data;
     }

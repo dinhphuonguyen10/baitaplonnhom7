@@ -2,6 +2,7 @@
 
 namespace App\Controllers\Admin;
 
+use App\Controllers\Api\TroChuyenController as ChatApi;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Url;
@@ -54,6 +55,7 @@ class MauTraLoiTuDongController extends BaseAdminController
             'config' => $config,
             'typeColors' => self::TYPE_COLORS,
             'templateRows' => $rows,
+            'csrfToken' => $this->csrfToken(ChatApi::ADMIN_CSRF_KEY),
         ];
     }
 
