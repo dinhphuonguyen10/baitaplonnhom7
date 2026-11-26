@@ -126,7 +126,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
                         <button type="button" id="customer-chat-preview-remove" aria-label="Bỏ ảnh">×</button>
                     </div>
                     <div class="support-chat-compose-entry">
-                        <button class="support-chat-attach" id="customer-chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 100 MB">
+                        <button class="support-chat-attach" id="customer-chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 10 MB">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m20.5 15-5-5L5 20"></path></svg>
                         </button>
                         <input id="customer-chat-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" hidden>
@@ -364,8 +364,8 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     fileInput.addEventListener('change', () => {
         const file = fileInput.files?.[0];
         if (!file) return;
-        if (file.size < 1 || file.size > 100 * 1024 * 1024) {
-            note.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 100 MB.';
+        if (file.size < 1 || file.size > 10 * 1024 * 1024) {
+            note.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 10 MB.';
             clearPending();
             return;
         }
