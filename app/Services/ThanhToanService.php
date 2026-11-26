@@ -123,8 +123,11 @@ class ThanhToanService
         if (!$order || $order['payment_method'] !== 'BANK_QR') {
             return $this->result('error', 'Không tìm thấy đơn hàng thanh toán QR.', 404);
         }
-        if (in_array($order['status'], ['Đã hủy', 'Canceled'], true)) {
+        if (in_array($order['status'], ['Đã hủy', 'Canceled', 'cancelled', 'huy'], true)) {
             return $this->result('error', 'Đơn hàng đã bị hủy.', 409);
+        }
+        if (!in_array($order['status'], ['Chờ xác nhận', 'Pending'], true)) {
+            return $this->result('error', 'Đơn hàng đã được xử lý, không thể làm mới mã QR.', 409);
         }
         if (in_array($order['payment_status'], ['Đã thanh toán', 'Chờ xác nhận thanh toán'], true)) {
             return $this->result('error', 'Đơn hàng đang chờ hoặc đã được cửa hàng xác nhận.', 409);
