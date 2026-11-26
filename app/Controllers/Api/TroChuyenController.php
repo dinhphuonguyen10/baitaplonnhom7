@@ -13,7 +13,7 @@ use App\Services\TroChuyenService;
 
 /**
  * Lớp TroChuyenController (API) - các endpoint trong api/chat/:
- *  - adminChat():          api/chat/tro_chuyen_quan_tri.php (hội thoại, tin nhắn, gửi, đánh dấu đã đọc, mẫu tự động)
+ *  - adminChat():          api/chat/tro_chuyen_quan_tri.php (hội thoại, tin nhắn, gửi, đánh dấu đã đọc, bật/tắt mẫu tự động)
  *  - customerMessages():   api/chat/khach_lay_tin_nhan.php
  *  - customerSend():       api/chat/khach_gui_tin_nhan.php
  *  - uploadAttachment():   api/chat/tai_len_tep_dinh_kem.php
@@ -82,7 +82,7 @@ class TroChuyenController extends \App\Core\Controller
             $this->adminJson(['status' => 'success', 'conversations' => $this->chat()->conversations()]);
         }
         if ($action === 'messages') {
-            $messages = $this->chat()->adminMessages(Request::query('user_id'));
+            $messages = $this->chat()->adminMessages(Request::query('user_id'), Request::query('before_id'));
             $this->adminJson(['status' => 'success', 'messages' => $messages]);
         }
 
@@ -102,18 +102,8 @@ class TroChuyenController extends \App\Core\Controller
         $action = $payload['action'] ?? '';
         $adminUsername = (string) Session::get('admin_username', Session::get('username', 'Nhân viên ÉCRIN'));
 
-        if ($action === 'save_auto_responses') {
-            $responses = $payload['responses'] ?? [];
-            if (!is_array($responses)) {
-                $this->adminJson(['status' => 'error', 'message' => 'Dữ liệu trả lời không hợp lệ.'], 400);
-            }
-            $this->autoResponses()->saveRaw($responses);
-            $this->adminJson(['status' => 'success']);
-        }
-
-        if ($action === 'auto_reply') {
-            $message = $this->chat()->adminAutoReply($payload['type'] ?? '', $payload['user_id'] ?? null, $adminUsername);
-            $this->adminJson(['status' => 'success', 'message' => $message]);
+        if ($action === 'set_template_status') {
+            $this->setTemplateStatus($payload);
         }
 
         if ($action === 'mark_read') {
@@ -129,6 +119,25 @@ class TroChuyenController extends \App\Core\Controller
         $this->adminJson(['status' => 'success', 'message' => $message]);
     }
 
+    /** Bật/tắt một mẫu tin nhắn; chỉ đổi trạng thái, không ghi đè nội dung mẫu. */
+    private function setTemplateStatus(array $payload): void
+    {
+        $templateId = $payload['template_id'] ?? null;
+        $active = $payload['active'] ?? null;
+        if (!is_string($templateId) || !is_bool($active)) {
+            $this->adminJson(['status' => 'error', 'message' => 'Dữ liệu mẫu tin nhắn không hợp lệ.'], 400);
+        }
+
+        $saved = $this->autoResponses()->setStatus($templateId, $active);
+        if ($saved === null) {
+            $this->adminJson(['status' => 'error', 'message' => 'Không tìm thấy mẫu tin nhắn.'], 404);
+        }
+        if (!$saved) {
+            $this->adminJson(['status' => 'error', 'message' => 'Không thể lưu mẫu. Kiểm tra quyền ghi của config/auto_responses.json.'], 500);
+        }
+        $this->adminJson(['status' => 'success']);
+    }
+
     // ───────────── api/chat/khach_lay_tin_nhan.php ─────────────
 
     public function customerMessages(): void
@@ -140,7 +149,7 @@ class TroChuyenController extends \App\Core\Controller
             $this->customerJson(['status' => 'error', 'message' => TroChuyenService::NOT_READY_MESSAGE], 500);
         }
 
-        $this->customerJson(['status' => 'success', 'messages' => $this->chat()->customerMessages($userId)]);
+        $this->customerJson(['status' => 'success', 'messages' => $this->chat()->customerMessages($userId, TroChuyenService::positiveInt(Request::query('after_id')) ?? 0)]);
     }
 
     // ───────────── api/chat/khach_gui_tin_nhan.php ─────────────

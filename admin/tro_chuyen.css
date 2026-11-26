@@ -61,16 +61,6 @@
 .chat-customer .chat-avatar { width: 46px; height: 46px; flex-basis: 46px; }
 .chat-customer strong { font-size: 16px; }
 .chat-customer small { margin-top: 3px; font-size: 13px; }
-.chat-live {
-    padding: 6px 13px;
-    border-radius: 999px;
-    background: #eaf7f0;
-    color: #23794f;
-    font-size: 12px;
-    font-weight: 600;
-}
-.chat-live i { background: #2fb36d; box-shadow: 0 0 0 3px rgba(47, 179, 109, .22); }
-
 .chat-messages {
     gap: 14px;
     padding: 26px 28px;

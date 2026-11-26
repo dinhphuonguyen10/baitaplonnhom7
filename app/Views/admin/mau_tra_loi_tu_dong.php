@@ -158,10 +158,9 @@
                 </div>
                 <select class="ar-filter-select" id="ar-filter-type">
                     <option value="">Tất cả loại</option>
-                    <option>Chào mừng</option>
-                    <option>Tương tác</option>
-                    <option>Chăm sóc</option>
-                    <option>Hành trình đơn</option>
+                    <?php foreach (array_unique(array_column($templateRows, 'type')) as $typeOption): ?>
+                        <option><?php echo $escape($typeOption); ?></option>
+                    <?php endforeach; ?>
                 </select>
                 <select class="ar-filter-select" id="ar-filter-status">
                     <option value="">Tất cả trạng thái</option>
@@ -208,7 +207,7 @@
                             <td>
                                 <div class="ar-status-wrap">
                                     <label class="ar-toggle" title="<?php echo $isActive ? 'Tắt' : 'Bật'; ?>">
-                                        <input type="checkbox" class="ar-toggle-input" data-idx="<?php echo $idx; ?>"
+                                        <input type="checkbox" class="ar-toggle-input" data-id="<?php echo $escape($tpl['id'] ?? ''); ?>"
                                             <?php echo $isActive ? 'checked' : ''; ?>>
                                         <span class="ar-toggle-track"></span>
                                         <span class="ar-toggle-thumb"></span>
@@ -238,9 +237,6 @@
 (() => {
     const api = <?php echo json_encode($appBaseUrl . '/api/chat/tro_chuyen_quan_tri.php', JSON_UNESCAPED_SLASHES); ?>;
 
-    // ── Template data from PHP ───────────────────────────────────
-    let templates = <?php echo json_encode(array_values($config['templates']), JSON_UNESCAPED_UNICODE); ?>;
-
     // ── Helpers ──────────────────────────────────────────────────
     const request = async (url, options) => {
         const r = await fetch(url, options);
@@ -249,16 +245,6 @@
         if (d.status !== 'success') throw new Error(d.message || 'Lỗi không xác định.');
         return d;
     };
-
-    async function saveAll() {
-        return request(api, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': <?php echo json_encode($csrfToken); ?> },
-            body: JSON.stringify({ action: 'save_auto_responses', responses: { templates } })
-        });
-    }
-
-    const nowText = () => new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 
     // ── Filter / search ───────────────────────────────────────────
     const searchInput  = document.getElementById('ar-search');
@@ -287,35 +273,26 @@
     // ── Toggle status (inline) ────────────────────────────────────
     document.querySelectorAll('.ar-toggle-input').forEach(checkbox => {
         checkbox.addEventListener('change', async () => {
-            const idx = parseInt(checkbox.dataset.idx, 10);
-            const newStatus = checkbox.checked ? 'active' : 'inactive';
-            const previous = {
-                status: templates[idx].status,
-                activated_at: templates[idx].activated_at,
-                updated_at: templates[idx].updated_at
-            };
-            templates[idx].status = newStatus;
-            if (newStatus === 'active') {
-                templates[idx].activated_at = nowText();
-            }
-            templates[idx].updated_at = nowText();
-
+            const active = checkbox.checked;
             const row = checkbox.closest('tr');
             const label = row.querySelector('.ar-status-label');
-            const showStatus = status => {
-                label.textContent = status === 'active' ? 'Đang hoạt động' : 'Chưa kích hoạt';
-                label.classList.toggle('is-active', status === 'active');
-                row.dataset.status = status;
+            const showStatus = isActive => {
+                label.textContent = isActive ? 'Đang hoạt động' : 'Chưa kích hoạt';
+                label.classList.toggle('is-active', isActive);
+                row.dataset.status = isActive ? 'active' : 'inactive';
             };
-            showStatus(newStatus);
+            showStatus(active);
 
             checkbox.disabled = true;
             try {
-                await saveAll();
+                await request(api, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': <?php echo json_encode($csrfToken); ?> },
+                    body: JSON.stringify({ action: 'set_template_status', template_id: checkbox.dataset.id, active })
+                });
             } catch (e) {
-                Object.assign(templates[idx], previous);
-                checkbox.checked = previous.status === 'active';
-                showStatus(checkbox.checked ? 'active' : 'inactive');
+                checkbox.checked = !active;
+                showStatus(!active);
                 alert('Không thể lưu mẫu: ' + e.message);
             } finally {
                 checkbox.disabled = false;

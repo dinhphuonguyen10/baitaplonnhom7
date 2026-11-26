@@ -13,6 +13,10 @@ use App\Models\SanPham;
  */
 class TroChuyenController extends BaseClientController
 {
+    /** Giờ hỗ trợ hằng ngày (giờ Việt Nam), khớp dòng "08:00 – 22:00" trên trang. */
+    private const SUPPORT_OPEN_HOUR = 8;
+    private const SUPPORT_CLOSE_HOUR = 22;
+
     /** Dữ liệu hiển thị cho trang chat của khách. */
     protected function handle(): array
     {
@@ -26,7 +30,10 @@ class TroChuyenController extends BaseClientController
             $chatProduct = $product === null ? null : ['id' => $product['id'], 'name' => $product['name']];
         }
 
+        $hour = (int) date('G');
+
         return [
+            'isSupportHours' => $hour >= self::SUPPORT_OPEN_HOUR && $hour < self::SUPPORT_CLOSE_HOUR,
             'pageTitle' => 'Chat với cửa hàng - ÉCRIN JEWELRY',
             'isCustomerLoggedIn' => $isCustomerLoggedIn,
             'chatUsername' => $username ?? 'Quý khách',
