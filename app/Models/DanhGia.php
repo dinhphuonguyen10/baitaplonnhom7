@@ -12,16 +12,6 @@ class DanhGia extends BaseModel
 
     // ───────────── Đánh giá phía khách hàng (agentB) ─────────────
 
-    /** Điều kiện SQL: người đánh giá đã có đơn giao thành công chứa sản phẩm. */
-    private const VERIFIED_PURCHASE_SQL = "EXISTS (
-           SELECT 1
-           FROM orders o
-           INNER JOIN order_items oi ON oi.order_id = o.id
-           WHERE o.user_id = r.user_id
-             AND oi.product_id = r.product_id
- AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
-       )";
-
     /** Khách đã mua sản phẩm trong một đơn đã giao thành công hay chưa. */
     public function customerPurchasedProduct(int $userId, int $productId): bool
     {
@@ -68,8 +58,8 @@ class DanhGia extends BaseModel
         );
     }
 
-    /** Tổng hợp số sao các đánh giá đã xác minh của sản phẩm. */
-    public function verifiedSummaryForProduct(int $productId): array
+    /** Tổng hợp số sao các đánh giá của sản phẩm. */
+    public function summaryForProduct(int $productId): array // hàm đếm
     {
         return $this->db->fetchOne(
             'SELECT
@@ -83,15 +73,14 @@ class DanhGia extends BaseModel
      FROM reviews r
      INNER JOIN users u ON u.id = r.user_id
      WHERE r.product_id = ?
-       AND r.rating BETWEEN 1 AND 5
-       AND ' . self::VERIFIED_PURCHASE_SQL,
+       AND r.rating BETWEEN 1 AND 5',
             [$productId],
             'i'
         ) ?? [];
     }
 
-    /** Một trang đánh giá đã xác minh của sản phẩm (kèm phản hồi admin), lọc theo số sao nếu > 0. */
-    public function verifiedPageForProduct(int $productId, int $ratingFilter, int $limit, int $offset): array
+    /** Một trang đánh giá của sản phẩm (kèm phản hồi admin), lọc theo số sao nếu > 0. */
+    public function pageForProduct(int $productId, int $ratingFilter, int $limit, int $offset): array
     {
         $sql = 'SELECT r.id, r.rating, r.comment, r.created_at, u.username,
                          rr.reply AS admin_reply, rr.admin_username AS reply_admin, rr.replied_at
@@ -99,8 +88,7 @@ class DanhGia extends BaseModel
                   INNER JOIN users u ON u.id = r.user_id
                   LEFT JOIN review_replies rr ON rr.review_id = r.id
                   WHERE r.product_id = ?
-                    AND r.rating BETWEEN 1 AND 5
-                    AND ' . self::VERIFIED_PURCHASE_SQL;
+                    AND r.rating BETWEEN 1 AND 5';
         $params = [$productId];
         if ($ratingFilter > 0) {
             $sql .= ' AND r.rating = ?';
@@ -112,14 +100,15 @@ class DanhGia extends BaseModel
 
         return $this->db->fetchAll($sql, $params, str_repeat('i', count($params)));
     }
-
+      
     // ───────────── Quản trị đánh giá (agentD2) ─────────────
 
     /**
      * Danh sách đánh giá cho trang quản trị kèm sản phẩm, khách hàng và phản hồi của cửa hàng.
-     * Lọc theo sản phẩm (>0), số sao (1-5) và từ khóa (khách hàng / sản phẩm / nội dung / phản hồi).
+     * Lọc theo sản phẩm (>0), số sao (1-5), từ khóa (khách hàng / sản phẩm / nội dung / phản hồi)
+     * và tình trạng phản hồi ('pending' = chưa phản hồi, 'replied' = đã phản hồi).
      */
-    public function findForAdmin(int $productId, int $rating, string $search): array
+    public function findForAdmin(int $productId, int $rating, string $search, string $replyStatus = ''): array
     {
         $where = [];
         $types = '';
@@ -138,15 +127,21 @@ class DanhGia extends BaseModel
         if ($search !== '') {
             $where[] = '(u.username LIKE ? OR p.name LIKE ? OR r.comment LIKE ? OR rr.reply LIKE ?)';
             $types .= 'ssss';
-            $like = '%' . $search . '%';
+            // % và _ khách gõ là ký tự thường, không phải ký tự đại diện của LIKE.
+            $like = '%' . addcslashes($search, '\\%_') . '%';
             array_push($params, $like, $like, $like, $like);
+        }
+
+        if ($replyStatus === 'pending') {
+            $where[] = 'rr.review_id IS NULL';
+        } elseif ($replyStatus === 'replied') {
+            $where[] = 'rr.review_id IS NOT NULL';
         }
 
         $sql = "SELECT r.id, r.rating, r.comment, r.created_at,
                r.product_id, p.name AS product_name, p.image AS product_image,
                r.user_id, u.username, rr.reply AS admin_reply,
-               rr.admin_username AS reply_admin, rr.replied_at,
-               (" . self::VERIFIED_PURCHASE_SQL . ") AS verified
+               rr.admin_username AS reply_admin, rr.replied_at
         FROM reviews r
         INNER JOIN users u ON u.id = r.user_id
         INNER JOIN products p ON p.id = r.product_id
@@ -159,11 +154,24 @@ class DanhGia extends BaseModel
         return $this->db->fetchAll($sql, $params, $params === [] ? null : $types);
     }
 
-    /** Số lượng đánh giá đã xác minh theo từng mức sao: [rating => total] (khớp với trang sản phẩm). */
+    /** Số đánh giá chưa được phản hồi (khớp với bộ lọc "Chưa phản hồi" của trang quản trị). */
+    public function countPendingReplyForAdmin(): int
+    {
+        return (int) $this->db->fetchValue(
+            'SELECT COUNT(*)
+             FROM reviews r
+             INNER JOIN users u ON u.id = r.user_id
+             INNER JOIN products p ON p.id = r.product_id
+             LEFT JOIN review_replies rr ON rr.review_id = r.id
+             WHERE rr.review_id IS NULL'
+        );
+    }
+
+    /** Số lượng đánh giá theo từng mức sao: [rating => total]. */
     public function countByRatingForAdmin(): array
     {
         $counts = [];
-        foreach ($this->db->fetchAll('SELECT r.rating, COUNT(*) AS total FROM reviews r WHERE ' . self::VERIFIED_PURCHASE_SQL . ' GROUP BY r.rating') as $row) {
+        foreach ($this->db->fetchAll('SELECT r.rating, COUNT(*) AS total FROM reviews r GROUP BY r.rating') as $row) {
             $counts[(int) $row['rating']] = (int) $row['total'];
         }
 

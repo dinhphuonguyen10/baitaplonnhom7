@@ -29,13 +29,15 @@ class TinNhan extends BaseModel
                 ORDER BY MAX(cm.id) DESC");
     }
 
-    /** $limit tin nhắn gần nhất của một khách hàng, sắp xếp cũ -> mới. */
-    public function latestChatViewForUser(int $userId, int $limit = 200): array
+    /** $limit tin nhắn gần nhất (hoặc ngay trước tin $beforeId) của một khách hàng, sắp xếp cũ -> mới. */
+    public function latestChatViewForUser(int $userId, int $limit = 200, ?int $beforeId = null): array
     {
+        $before = $beforeId === null ? '' : ' AND cm.id < ?';
+        $params = $beforeId === null ? [$userId, $limit] : [$userId, $beforeId, $limit];
         $rows = $this->db->fetchAll(
-            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.user_id = ? ORDER BY cm.id DESC LIMIT ?',
-            [$userId, $limit],
-            'ii'
+            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm LEFT JOIN products p ON p.id = cm.product_id WHERE cm.user_id = ?' . $before . ' ORDER BY cm.id DESC LIMIT ?',
+            $params,
+            str_repeat('i', count($params))
         );
 
         return array_reverse($rows);
@@ -177,13 +179,13 @@ class TinNhan extends BaseModel
     /** LEFT JOIN sản phẩm còn kinh doanh (sản phẩm và danh mục đang hoạt động, chưa xóa mềm). */
     private const ACTIVE_PRODUCT_JOIN = "LEFT JOIN products p ON p.id = cm.product_id AND p.is_deleted = 0 AND p.status = 'active' AND EXISTS (SELECT 1 FROM categories c WHERE c.id = p.category_id AND c.status = 'active' AND c.is_deleted = 0)";
 
-    /** Toàn bộ tin nhắn của khách (cũ -> mới), chỉ kèm thông tin sản phẩm còn kinh doanh. */
-    public function allCustomerChatViewForUser(int $userId): array
+    /** Tin nhắn của khách (cũ -> mới) có ID lớn hơn $afterId, chỉ kèm thông tin sản phẩm còn kinh doanh. */
+    public function allCustomerChatViewForUser(int $userId, int $afterId = 0): array
     {
         return $this->db->fetchAll(
-            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm ' . self::ACTIVE_PRODUCT_JOIN . ' WHERE cm.user_id = ? ORDER BY cm.created_at ASC, cm.id ASC',
-            [$userId],
-            'i'
+            'SELECT ' . self::CHAT_VIEW_COLUMNS . ' FROM chat_messages cm ' . self::ACTIVE_PRODUCT_JOIN . ' WHERE cm.user_id = ? AND cm.id > ? ORDER BY cm.created_at ASC, cm.id ASC',
+            [$userId, $afterId],
+            'ii'
         );
     }
 

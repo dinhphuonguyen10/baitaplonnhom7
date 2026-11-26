@@ -14,7 +14,7 @@ use Throwable;
  * Lớp DanhGiaService - nghiệp vụ đánh giá sản phẩm của khách hàng:
  *  - Kiểm tra ảnh tải lên (JPG/PNG/WEBP, tối đa 5 ảnh, 5 MB, 50 MP)
  *  - Gửi đánh giá mới (kèm ảnh) hoặc sửa đánh giá một lần
- *  - Tổng hợp số sao, phân trang danh sách đánh giá đã xác minh cho trang sản phẩm
+ *  - Tổng hợp số sao, phân trang danh sách đánh giá cho trang sản phẩm
  *
  * Lỗi hiển thị cho khách được ném dưới dạng DomainException.
  */
@@ -140,13 +140,13 @@ class DanhGiaService
         $submittedReviewId,
         array $imageCandidates
     ): string {
-        try {
+        try { // xác minh khách đã mua sản phẩm
             $hasPurchased = $this->reviews->customerPurchasedProduct($userId, $productId);
         } catch (RuntimeException $exception) {
             error_log($exception->getMessage());
             throw new DomainException('Chưa thể xác minh đơn hàng. Vui lòng thử lại sau.');
         }
-        if (!$hasPurchased) {
+        if (!$hasPurchased) {  // khách chưa mua sản phẩm trong đơn đã giao thành công
             throw new DomainException('Bạn chỉ có thể đánh giá sản phẩm trong đơn hàng đã giao thành công.');
         }
 
@@ -157,21 +157,21 @@ class DanhGiaService
             throw new DomainException('Chưa thể gửi đánh giá lúc này. Vui lòng thử lại sau.');
         }
 
-        $storedComment = $comment === '' ? null : $comment;
+        $storedComment = $comment === '' ? null : $comment; // lưu null nếu khách không gửi nội dung đánh giá
 
-        if ($action === 'update') {
+        if ($action === 'update') { // khách muốn sửa đánh giá (chỉ một lần)
             return $this->updateOnce($existingReview, $submittedReviewId, $userId, $productId, $rating, $storedComment, $imageCandidates);
         }
 
-        if ($existingReview) {
+        if ($existingReview) { // khách đã gửi đánh giá trước đó, không cho gửi thêm
             throw new DomainException('Bạn đã gửi đánh giá cho sản phẩm này rồi.');
         }
 
-        $this->create($userId, $productId, $rating, $storedComment, $imageCandidates);
+        $this->create($userId, $productId, $rating, $storedComment, $imageCandidates); //ham tạo đánh giá mới, lưu vào CSDL và gửi tin cảm ơn
 
         return 'Cảm ơn bạn đã chia sẻ đánh giá về sản phẩm!';
     }
-
+     // ─────────────────────────── Sửa đánh giá một lần ───────────────────────────
     private function updateOnce(
         ?array $existingReview,
         $submittedReviewId,
@@ -192,8 +192,13 @@ class DanhGiaService
         if ($imageCandidates !== []) {
             throw new DomainException('Ảnh đã gửi được giữ nguyên khi chỉnh sửa đánh giá.');
         }
-
-        try {
+        // Không đổi gì thì giữ lại lượt sửa và phản hồi của cửa hàng.
+        $currentComment = trim(str_replace("\r\n", "\n", (string) ($existingReview['comment'] ?? '')));
+        if ((int) $existingReview['rating'] === $rating && $currentComment === (string) $storedComment) {
+            throw new DomainException('Bạn chưa thay đổi gì nên lượt chỉnh sửa vẫn được giữ nguyên.');
+        }
+         // Cập nhật đánh giá trong CSDL; nếu lỗi thì ném DomainException
+        try { 
             $updated = $this->reviews->updateByCustomerOnce(
                 (int) $submittedReviewId,
                 $productId,
@@ -218,34 +223,35 @@ class DanhGiaService
 
         return 'Đã cập nhật đánh giá. Bạn không thể sửa lại lần nữa.';
     }
-
+        
+    // ─────────────────────────── Tạo đánh giá mới ───────────────────────────
     private function create(int $userId, int $productId, int $rating, ?string $storedComment, array $imageCandidates): void
     {
-        $storedImagePaths = [];
+        $storedImagePaths = []; 
         try {
-            if ($imageCandidates !== []) {
-                if (!is_dir($this->uploadDirectory)
+            if ($imageCandidates !== []) {  // khách gửi ảnh đánh giá, lưu vào thư mục uploads/reviews
+                if (!is_dir($this->uploadDirectory) 
                     && !mkdir($this->uploadDirectory, 0750, true)
-                    && !is_dir($this->uploadDirectory)) {
-                    throw new RuntimeException('Không thể tạo thư mục lưu ảnh đánh giá.');
+                    && !is_dir($this->uploadDirectory)) { 
+                    throw new RuntimeException('Không thể tạo thư mục lưu ảnh đánh giá.'); // tạo thư mục nếu chưa tồn tại, quyền 0750
                 }
-                foreach ($imageCandidates as $candidate) {
+                foreach ($imageCandidates as $candidate) { //tạo tên file ngẫu nhiên, lưu vào thư mục uploads/reviews, thêm vào mảng $storedImagePaths
                     $storedName = bin2hex(random_bytes(24)) . '.' . $candidate['extension'];
                     $storedPath = $this->uploadDirectory . DIRECTORY_SEPARATOR . $storedName;
-                    if (!move_uploaded_file($candidate['temporary_path'], $storedPath)) {
+                    if (!move_uploaded_file($candidate['temporary_path'], $storedPath)) { // di chuyển ảnh từ thư mục tạm sang thư mục uploads/reviews
                         throw new RuntimeException('Không thể lưu ảnh đánh giá.');
                     }
-                    $storedImagePaths[] = self::UPLOAD_RELATIVE_DIR . '/' . $storedName;
+                    $storedImagePaths[] = self::UPLOAD_RELATIVE_DIR . '/' . $storedName; //Đường dẫn này sẽ được sử dụng để lưu thông tin ảnh vào database.
                 }
             }
-
-            $this->db->beginTransaction();
+               // Lưu đánh giá và ảnh vào CSDL trong một transaction; nếu lỗi thì rollback và xóa ảnh đã lưu.
+            $this->db->beginTransaction(); 
             $reviewId = $this->reviews->createForCustomer($productId, $userId, $rating, $storedComment);
             foreach ($storedImagePaths as $sortOrder => $imagePath) {
                 $this->images->createForReview($reviewId, $imagePath, $sortOrder);
             }
             $this->db->commit();
-        } catch (Throwable $exception) {
+        } catch (Throwable $exception) { // nếu có lỗi thì rollback và xóa ảnh đã lưu
             $this->db->rollback();
             $this->removeStoredImages($storedImagePaths);
             if ($exception instanceof DatabaseException && (int) $exception->getCode() === 1062) {
@@ -263,7 +269,7 @@ class DanhGiaService
             error_log('Không thể gửi tin cảm ơn đánh giá: ' . $exception->getMessage());
         }
     }
-
+    // Xóa các ảnh đã lưu trong thư mục uploads/reviews nếu có lỗi xảy ra.
     private function removeStoredImages(array $storedImagePaths): void
     {
         foreach ($storedImagePaths as $imagePath) {
@@ -277,16 +283,16 @@ class DanhGiaService
     // ─────────────────────────── Khối đánh giá trên trang sản phẩm ───────────────────────────
 
     /**
-     * Dữ liệu tổng hợp + một trang đánh giá đã xác minh của sản phẩm.
+     * Dữ liệu tổng hợp + một trang đánh giá của sản phẩm.
      *
      * @param mixed $requestedRating giá trị ?rating= (đã qua FILTER_VALIDATE_INT)
      * @param mixed $requestedPage giá trị ?page= (đã qua FILTER_VALIDATE_INT)
      */
     public function productSection(int $productId, ?int $customerId, $requestedRating, $requestedPage): array
     {
-        $summary = $this->reviews->verifiedSummaryForProduct($productId);
+        $summary = $this->reviews->summaryForProduct($productId); //gọi Model lấy số liệu tổng hợp của sản phẩm.
 
-        $reviewCount = (int) ($summary['review_count'] ?? 0);
+        $reviewCount = (int) ($summary['review_count'] ?? 0);//tổng số đánh giá
         $averageRating = min(5.0, max(0.0, (float) ($summary['average_rating'] ?? 0)));
         $ratingCounts = [
             5 => (int) ($summary['five_star_count'] ?? 0),
@@ -294,11 +300,13 @@ class DanhGiaService
             3 => (int) ($summary['three_star_count'] ?? 0),
             2 => (int) ($summary['two_star_count'] ?? 0),
             1 => (int) ($summary['one_star_count'] ?? 0),
-        ];
-
+        ]; // lấy điểm trung bình, kẹp trong khoảng 0 đến 5 để không bao giờ ra giá trị lạ.
+         
         $reviewFilter = ($requestedRating !== false && $requestedRating !== null && $requestedRating >= 1 && $requestedRating <= 5)
-            ? $requestedRating
-            : 0;
+            ? $requestedRating 
+            : 0; 
+        // 0 = không lọc theo số sao, 1-5 = lọc theo số sao tương ứng
+        
         $matchingReviewCount = $reviewFilter > 0 ? $ratingCounts[$reviewFilter] : $reviewCount;
         $reviewPageCount = max(1, (int) ceil($matchingReviewCount / self::PAGE_SIZE));
         $currentReviewPage = ($requestedPage !== false && $requestedPage !== null && $requestedPage > 0)
@@ -306,7 +314,7 @@ class DanhGiaService
             : 1;
         $reviewOffset = ($currentReviewPage - 1) * self::PAGE_SIZE;
 
-        $reviewRows = $this->reviews->verifiedPageForProduct($productId, $reviewFilter, self::PAGE_SIZE, $reviewOffset);
+        $reviewRows = $this->reviews->pageForProduct($productId, $reviewFilter, self::PAGE_SIZE, $reviewOffset);
         $reviewImagesByReview = $this->images->pathsGroupedByReview(
             array_map(static fn(array $review): int => (int) $review['id'], $reviewRows)
         );
@@ -330,7 +338,7 @@ class DanhGiaService
         $paginationStart = max(1, $currentReviewPage - 2);
         $paginationEnd = min($reviewPageCount, $paginationStart + 4);
         $paginationStart = max(1, $paginationEnd - 4);
-
+        // đảm bảo luôn hiển thị 5 trang nếu có thể, và không vượt quá số trang thực tế.
         return [
             'reviewProductId' => $productId,
             'reviewCount' => $reviewCount,
@@ -349,6 +357,6 @@ class DanhGiaService
             'ownReviewVisible' => $ownReviewVisible,
             'paginationStart' => $paginationStart,
             'paginationEnd' => $paginationEnd,
-        ];
+        ]; // trả về dữ liệu cho khối đánh giá trên trang sản phẩm. gom tất cả vào một mảng trả về cho Controller.
     }
 }

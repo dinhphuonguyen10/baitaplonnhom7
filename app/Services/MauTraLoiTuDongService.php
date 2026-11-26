@@ -61,18 +61,33 @@ class MauTraLoiTuDongService
      */
     public function applyChanges(array $template, string $title, string $trigger, array $messages, bool $active): array
     {
-        $messages = array_slice(array_map(static fn($v) => trim((string) $v), $messages), 0, 2);
+        // Form gửi xuống dòng dạng CRLF; quy về LF để đếm ký tự giống trình duyệt.
+        $messages = array_slice(array_map(static fn($v) => trim(str_replace("\r\n", "\n", (string) $v)), $messages), 0, 2);
         $messages = array_pad($messages, 2, '');
         $message = $messages[0];
         if ($title === '' || $message === '') {
             throw new InvalidArgumentException('Vui lòng nhập tiêu đề và nội dung tin nhắn thứ nhất.');
         }
 
-        $now = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s');
+        foreach ($messages as $content) {
+            if (mb_strlen($content, 'UTF-8') > TroChuyenService::MAX_MESSAGE_LENGTH) {
+                throw new InvalidArgumentException('Mỗi nội dung tin nhắn tối đa 2.000 ký tự.');
+            }
+        }
+
         $template['title'] = mb_substr($title, 0, 100, 'UTF-8');
         $template['trigger_label'] = mb_substr($trigger, 0, 200, 'UTF-8');
         $template['message'] = $message;
         $template['messages'] = $messages;
+        $template = $this->withStatus($template, $active);
+
+        return $template;
+    }
+
+    /** Gán trạng thái và mốc thời gian cập nhật/kích hoạt cho mẫu. */
+    private function withStatus(array $template, bool $active): array
+    {
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s');
         $template['status'] = $active ? 'active' : 'inactive';
         $template['updated_at'] = $now;
         if ($active && empty($template['activated_at'])) {
@@ -85,25 +100,29 @@ class MauTraLoiTuDongService
         return $template;
     }
 
+    /**
+     * Bật/tắt một mẫu trên bản cấu hình mới nhất trong file.
+     *
+     * @return bool|null null nếu không có mẫu, false nếu không ghi được file
+     */
+    public function setStatus(string $templateId, bool $active): ?bool
+    {
+        $config = $this->loadConfig();
+        $index = $this->findTemplateIndex($config, $templateId);
+        if ($index === null) {
+            return null;
+        }
+        $config['templates'][$index] = $this->withStatus($config['templates'][$index], $active);
+
+        return $this->saveConfig($config);
+    }
+
     /** Ghi cấu hình (có khóa file), trả về true nếu thành công. */
     public function saveConfig(array $config): bool
     {
         $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        return $json !== false && file_put_contents($this->configPath, $json . PHP_EOL, LOCK_EX) !== false;
-    }
-
-    /** Ghi đè toàn bộ cấu hình từ trang danh sách mẫu (API save_auto_responses). */
-    public function saveRaw(array $responses): void
-    {
-        file_put_contents($this->configPath, json_encode($responses, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    }
-
-    /** Nội dung tin tự động theo cấu trúc cũ (key => message), rỗng nếu không có. */
-    public function legacyMessage(string $type): string
-    {
-        // Đọc được cả định dạng mới (templates[]) lẫn định dạng cũ (key => message).
-        return (new TuDongTraLoiService())->resolveMessage($type);
+        return $json !== false && @file_put_contents($this->configPath, $json . PHP_EOL, LOCK_EX) !== false;
     }
 
     /** Hai biến thể nội dung của mẫu (để hiển thị trong trình soạn). */

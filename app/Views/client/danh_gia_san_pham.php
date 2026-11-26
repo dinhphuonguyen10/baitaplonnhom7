@@ -5,6 +5,11 @@
 use App\Core\View;
 use App\Helpers\DinhDangTenNguoiDanhGia;
 
+// Dữ liệu vừa nhập khi gửi/sửa đánh giá bị lỗi.
+$reviewOld = is_array($reviewFlash) && is_array($reviewFlash['old'] ?? null) ? $reviewFlash['old'] : [];
+$createOld = ($reviewOld['action'] ?? '') === 'create' ? $reviewOld : [];
+$updateOld = ($reviewOld['action'] ?? '') === 'update' ? $reviewOld : [];
+
 ?>
 
 <section class="product-reviews-section" id="product-reviews" aria-labelledby="product-reviews-title">
@@ -98,7 +103,7 @@ use App\Helpers\DinhDangTenNguoiDanhGia;
                         <?php endif; ?>
                         <?php if ($adminReply !== ''): ?>
                             <div class="review-admin-reply">
-                                <strong>Phản hồi từ <?php echo View::e((string) ($review['reply_admin'] ?: 'ÉCRIN Jewelry')); ?></strong>
+                                <strong>Phản hồi từ ÉCRIN Jewelry</strong>
                                 <p><?php echo nl2br(View::e($adminReply)); ?></p>
                             </div>
                         <?php endif; ?>
@@ -152,25 +157,45 @@ use App\Helpers\DinhDangTenNguoiDanhGia;
     <div class="review-form-area">
         <?php if ($canReviewProduct && !$hasReviewedProduct): ?>
             <h3>Viết đánh giá của bạn</h3>
-            <p>Chỉ khách hàng đã nhận sản phẩm mới có thể gửi đánh giá.</p>
-            <form class="product-review-form" action="<?php echo View::e($appBaseUrl . '/client/danhgia.php'); ?>" method="post" enctype="multipart/form-data">
+            <p>Bạn đã nhận sản phẩm này, hãy chia sẻ cảm nhận của mình nhé.</p>
+            <form class="product-review-form" action="<?php echo View::e($appBaseUrl . '/client/danhgia.php?product_id=' . $reviewProductId); ?>" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="product_id" value="<?php echo $reviewProductId; ?>">
                 <input type="hidden" name="csrf_token" value="<?php echo View::e($reviewCsrfToken); ?>">
                 <fieldset class="review-star-field">
                     <legend>Mức độ hài lòng <span aria-hidden="true">*</span></legend>
                     <div class="review-star-picker">
                         <?php for ($stars = 5; $stars >= 1; $stars--): ?>
-                            <input id="review-rating-<?php echo $stars; ?>" type="radio" name="rating" value="<?php echo $stars; ?>" required>
+                            <input id="review-rating-<?php echo $stars; ?>" type="radio" name="rating" value="<?php echo $stars; ?>" required<?php echo (int) ($createOld['rating'] ?? 0) === $stars ? ' checked' : ''; ?>>
                             <label for="review-rating-<?php echo $stars; ?>" title="<?php echo $stars; ?> sao" aria-label="<?php echo $stars; ?> sao">★</label>
                         <?php endfor; ?>
                     </div>
                 </fieldset>
                 <label class="review-comment-label" for="review-comment">Chia sẻ trải nghiệm (không bắt buộc)</label>
-                <textarea id="review-comment" name="comment" rows="4" maxlength="2000" placeholder="Chất liệu, thiết kế, đóng gói hoặc trải nghiệm của bạn..."></textarea>
+                <textarea id="review-comment" name="comment" rows="4" maxlength="2000" placeholder="Chất liệu, thiết kế, đóng gói hoặc trải nghiệm của bạn..."><?php echo View::e((string) ($createOld['comment'] ?? '')); ?></textarea>
                 <label class="review-comment-label" for="review-images">Ảnh đánh giá (tối đa 5 ảnh, 5 MB mỗi ảnh)</label>
                 <input id="review-images" name="images[]" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple>
+                <p class="review-form-message" id="review-images-error" role="alert" style="color:#b3261e" hidden></p>
                 <button class="review-submit-button" type="submit">Gửi đánh giá</button>
             </form>
+            <script>
+            (function () {
+                const input = document.getElementById('review-images');
+                const message = document.getElementById('review-images-error');
+                input.addEventListener('change', function () {
+                    const files = Array.from(input.files);
+                    let error = '';
+                    if (files.length > <?php echo \App\Services\DanhGiaService::MAX_IMAGES; ?>) {
+                        error = 'Bạn chỉ có thể đính kèm tối đa 5 ảnh.';
+                    } else if (files.some(file => file.size > <?php echo \App\Services\DanhGiaService::MAX_IMAGE_BYTES; ?>)) {
+                        error = 'Mỗi ảnh phải có dung lượng tối đa 5 MB.';
+                    }
+                    // setCustomValidity khiến trình duyệt không cho gửi form khi ảnh chưa hợp lệ.
+                    input.setCustomValidity(error);
+                    message.textContent = error;
+                    message.hidden = error === '';
+                });
+            })();
+            </script>
         <?php elseif ($hasReviewedProduct && (int) $ownReview['edit_count'] < 1): ?>
             <p class="review-form-message">Bạn có thể chỉnh sửa đánh giá của mình một lần. Ảnh đã gửi sẽ được giữ nguyên.</p>
             <?php if (!$ownReviewVisible): ?>
@@ -198,12 +223,15 @@ use App\Helpers\DinhDangTenNguoiDanhGia;
 
 <?php if ($hasReviewedProduct && (int) $ownReview['edit_count'] < 1): ?>
     <dialog class="customer-review-edit-dialog" id="customer-review-edit-dialog" aria-labelledby="customer-review-edit-title">
-        <form action="<?php echo View::e($appBaseUrl . '/client/danhgia.php'); ?>" method="post">
+        <form action="<?php echo View::e($appBaseUrl . '/client/danhgia.php?product_id=' . $reviewProductId); ?>" method="post">
             <div class="customer-review-edit-header">
                 <h3 id="customer-review-edit-title">Sửa đánh giá</h3>
                 <button type="button" class="customer-review-edit-close" onclick="closeCustomerReviewEdit()" aria-label="Đóng">×</button>
             </div>
             <p class="customer-review-edit-hint">Bạn còn 1 lần chỉnh sửa. Ảnh đã gửi sẽ được giữ nguyên.</p>
+            <?php if ($updateOld !== []): ?>
+                <p role="alert" style="color:#b3261e"><?php echo View::e((string) $reviewFlash['message']); ?></p>
+            <?php endif; ?>
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="review_id" id="customer-edit-review-id">
             <input type="hidden" name="product_id" value="<?php echo $reviewProductId; ?>">
@@ -238,6 +266,14 @@ use App\Helpers\DinhDangTenNguoiDanhGia;
     function closeCustomerReviewEdit() {
         document.getElementById('customer-review-edit-dialog').close();
     }
+    <?php if ($updateOld !== []): ?>
+    // Sửa bị lỗi: mở lại hộp thoại với đúng nội dung vừa nhập.
+    openCustomerReviewEdit(<?php echo json_encode(json_encode([
+        'id' => (int) $ownReview['id'],
+        'rating' => (int) ($updateOld['rating'] ?? 0),
+        'comment' => (string) ($updateOld['comment'] ?? ''),
+    ], JSON_UNESCAPED_UNICODE), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
+    <?php endif; ?>
     </script>
 <?php endif; ?>
 

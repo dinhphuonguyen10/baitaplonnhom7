@@ -36,8 +36,24 @@ class DanhGiaController extends BaseAdminController
         $csrfToken = $this->csrfToken(self::CSRF_KEY);
 
         if (Request::isPost()) {
-            Session::set(self::NOTICE_KEY, $this->processPost());
-            $this->redirectTo('/admin/danh_gia.php');
+            $result = $this->processPost();
+            if ($result['type'] === 'error') {
+                // Giữ nội dung đang gõ để mở lại hộp thoại phản hồi.
+                $reply = Request::post('reply', '');
+                $result['old'] = [
+                    'review_id' => (int) Request::post('review_id', 0),
+                    'reply' => is_string($reply) ? $reply : '',
+                ];
+            }
+            Session::set(self::NOTICE_KEY, $result);
+            // Quay lại đúng bộ lọc đang xem (form phản hồi gửi về URL hiện tại).
+            $filters = array_filter([
+                'product_id' => (int) Request::query('product_id', 0),
+                'rating' => (int) Request::query('rating', 0),
+                'q' => trim((string) Request::query('q', '')),
+                'status' => $this->replyStatus(),
+            ]);
+            $this->redirectTo('/admin/danh_gia.php' . ($filters === [] ? '' : '?' . http_build_query($filters)));
         }
 
         $notice = null;
@@ -50,6 +66,7 @@ class DanhGiaController extends BaseAdminController
         $productFilter = (int) Request::query('product_id', 0);
         $ratingFilter = (int) Request::query('rating', 0);
         $search = trim((string) Request::query('q', ''));
+        $replyStatus = $this->replyStatus();
 
         return array_merge(
             $layout,
@@ -59,12 +76,21 @@ class DanhGiaController extends BaseAdminController
                 'productFilter' => $productFilter,
                 'ratingFilter' => $ratingFilter,
                 'search' => $search,
+                'replyStatus' => $replyStatus,
                 'products' => $this->reviews->productOptions(),
                 'fallbackImageUrl' => $this->banners->logoUrl($layout['appBaseUrl']),
             ],
-            $this->reviews->listing($productFilter, $ratingFilter, $search),
+            $this->reviews->listing($productFilter, $ratingFilter, $search, $replyStatus),
             $this->reviews->summary()
         );
+    }
+
+    /** Bộ lọc tình trạng phản hồi trên URL: 'pending', 'replied' hoặc '' (tất cả). */
+    private function replyStatus(): string
+    {
+        $status = Request::query('status', '');
+
+        return in_array($status, ['pending', 'replied'], true) ? $status : '';
     }
 
     /** @return array{type: string, message: string} */
