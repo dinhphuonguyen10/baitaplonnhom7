@@ -189,7 +189,7 @@ use App\Helpers\DinhDangSanPhamQuanTri;
                                         $imgSrc = DinhDangSanPhamQuanTri::imageUrl((string) $p['image'], $appBaseUrl);
                                     ?>
                                     <tr class="product-row"
-                                        data-name="<?php echo strtolower($escape($p['name'])); ?>"
+                                        data-name="<?php echo $escape($p['name']); ?>"
                                         data-sku="<?php echo strtolower($escape($p['sku'])); ?>"
                                         data-cat-id="<?php echo (int)$p['category_id']; ?>"
                                         data-status="<?php echo $escape($prodStatus); ?>"
@@ -315,12 +315,12 @@ use App\Helpers\DinhDangSanPhamQuanTri;
 
                 <div class="form-field">
                     <label>Giá gốc (VNĐ) (*):</label>
-                    <input type="number" name="regular_price" min="0" max="9999999999.99" step="0.01" required>
+                    <input type="number" name="regular_price" min="100000" max="9999999999.99" step="0.01" required>
                     <label for="add-promotion-price">Giá khuyến mãi (để trống nếu không có):</label>
-                    <input type="number" name="promotion_price" id="add-promotion-price" min="0" max="9999999999.99" step="0.01">
+                    <input type="number" name="promotion_price" id="add-promotion-price" min="100000" max="9999999999.99" step="0.01">
                     <label for="add-promotion-ends-at">Kết thúc khuyến mãi (không bắt buộc):</label>
                     <input type="datetime-local" name="promotion_ends_at" id="add-promotion-ends-at">
-                    <small>Giá khuyến mãi phải thấp hơn giá gốc. Hết thời hạn, giá hiển thị tự trở về giá gốc.</small>
+                    <small>Giá phải từ 100.000đ trở lên; giá khuyến mãi phải thấp hơn giá gốc. Hết thời hạn, giá hiển thị tự trở về giá gốc.</small>
                 </div>
 
                 <div class="form-field">
@@ -372,9 +372,9 @@ use App\Helpers\DinhDangSanPhamQuanTri;
                 </div>
 
                 <div class="form-field">
-                    <label>Ảnh sản phẩm:</label>
+                    <label>Ảnh sản phẩm (*):</label>
                     <input type="file" name="image_file" accept="image/*">
-                    <small>Hoặc nhập link ảnh trực tiếp:</small>
+                    <small>Bắt buộc tải ảnh lên hoặc nhập đường dẫn ảnh:</small>
                     <input type="text" name="image_url" placeholder="assets/bôngtai/bong1.jpg hoặc link URL">
                 </div>
             </div>
@@ -418,9 +418,9 @@ use App\Helpers\DinhDangSanPhamQuanTri;
 
                 <div class="form-field">
                     <label>Giá gốc (VNĐ) (*):</label>
-                    <input type="number" name="regular_price" id="edit-regular-price" min="0" max="9999999999.99" step="0.01" required>
+                    <input type="number" name="regular_price" id="edit-regular-price" min="100000" max="9999999999.99" step="0.01" required>
                     <label for="edit-promotion-price">Giá khuyến mãi (để trống nếu không có):</label>
-                    <input type="number" name="promotion_price" id="edit-promotion-price" min="0" max="9999999999.99" step="0.01">
+                    <input type="number" name="promotion_price" id="edit-promotion-price" min="100000" max="9999999999.99" step="0.01">
                     <label for="edit-promotion-ends-at">Kết thúc khuyến mãi (không bắt buộc):</label>
                     <input type="datetime-local" name="promotion_ends_at" id="edit-promotion-ends-at">
                     <div style="margin-top: 8px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
@@ -696,6 +696,19 @@ window.addEventListener('click', function(e) {
 });
 
 // TÍNH NĂNG TÌM KIẾM & LỌC DANH MỤC / TRẠNG THÁI REALTIME
+const addProductForm = document.querySelector('#addModal form');
+if (addProductForm) {
+    addProductForm.addEventListener('submit', function(event) {
+        const imageFile = this.querySelector('input[name="image_file"]');
+        const imageUrl = this.querySelector('input[name="image_url"]');
+        if ((!imageFile || imageFile.files.length === 0) && (!imageUrl || imageUrl.value.trim() === '')) {
+            event.preventDefault();
+            alert('Vui lòng tải ảnh sản phẩm lên hoặc nhập đường dẫn ảnh.');
+            imageUrl?.focus();
+        }
+    });
+}
+
 const searchInput = document.getElementById('search-input');
 const categoryFilter = document.getElementById('category-filter');
 const statusFilter = document.getElementById('status-filter');
@@ -703,14 +716,14 @@ const rows = document.querySelectorAll('.product-row');
 const noResults = document.getElementById('no-search-results');
 
 function filterProducts() {
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const query = searchInput ? searchInput.value.trim().toLocaleLowerCase('vi') : '';
     const selectedCat = categoryFilter ? categoryFilter.value : '';
     const selectedStatus = statusFilter ? statusFilter.value : '';
     let visibleCount = 0;
 
     rows.forEach(row => {
-        const name = row.getAttribute('data-name') || '';
-        const sku = row.getAttribute('data-sku') || '';
+        const name = (row.getAttribute('data-name') || '').toLocaleLowerCase('vi');
+        const sku = (row.getAttribute('data-sku') || '').toLowerCase();
         const catId = row.getAttribute('data-cat-id') || '';
         const status = row.getAttribute('data-status') || '';
         const stock = parseInt(row.getAttribute('data-stock'), 10) || 0;

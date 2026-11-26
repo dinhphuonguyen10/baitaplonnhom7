@@ -120,6 +120,10 @@ class QuanLySanPhamService
             if (!is_string($imageInput)) {
                 throw new InvalidArgumentException('Đường dẫn ảnh không hợp lệ.');
             }
+            $uploadError = is_array($imageFile) ? (int) ($imageFile['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+            if ($uploadError === UPLOAD_ERR_NO_FILE && trim($imageInput) === '') {
+                throw new InvalidArgumentException('Vui lòng tải ảnh sản phẩm lên hoặc nhập đường dẫn ảnh.');
+            }
             $product['image'] = $this->resolveProductImage($imageFile, $imageInput, $this->defaultImagePath());
 
             $productId = $this->products->createWithPricing($product);
@@ -332,6 +336,12 @@ class QuanLySanPhamService
             || (function_exists('mb_strlen') ? mb_strlen(trim($name), 'UTF-8') : strlen(trim($name))) > 255) {
             return ['error' => 'Tên sản phẩm bắt buộc và không được vượt quá 255 ký tự.'];
         }
+        $name = trim($name);
+        if (function_exists('mb_substr') && function_exists('mb_strtoupper')) {
+            $name = mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($name, 1, null, 'UTF-8');
+        } else {
+            $name = ucfirst($name);
+        }
         if (!is_string($sku)) {
             return ['error' => 'Mã SKU không hợp lệ.'];
         }
@@ -352,6 +362,9 @@ class QuanLySanPhamService
         $promotionPriceCents = trim($promotionInput) === '' ? null : self::parseMoneyCents($promotionInput);
         if ($regularPriceCents === null || ($promotionPriceCents === null && trim($promotionInput) !== '')) {
             return ['error' => 'Giá phải không âm, có tối đa 10 chữ số phần nguyên và 2 chữ số thập phân.'];
+        }
+        if ($regularPriceCents < 10000000 || ($promotionPriceCents !== null && $promotionPriceCents < 10000000)) {
+            return ['error' => 'Giá gốc và giá khuyến mãi (nếu có) phải từ 100.000đ trở lên.'];
         }
         if ($promotionPriceCents !== null && $promotionPriceCents >= $regularPriceCents) {
             return ['error' => 'Giá khuyến mãi phải nhỏ hơn giá gốc.'];
@@ -391,7 +404,7 @@ class QuanLySanPhamService
 
         return [
             'data' => [
-                'name' => trim($name),
+                'name' => $name,
                 'sku' => $sku,
                 'category_id' => $categoryId,
                 'regular_price' => self::moneyCentsToDecimal($regularPriceCents),

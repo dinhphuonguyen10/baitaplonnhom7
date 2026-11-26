@@ -264,6 +264,8 @@ class DanhMucService
             throw new InvalidArgumentException('Tên danh mục không được vượt quá 150 ký tự.');
         }
 
+        $name = mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($name, 1, null, 'UTF-8');
+
         return $name;
     }
 
