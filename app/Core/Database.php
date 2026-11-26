@@ -274,11 +274,16 @@ final class Database
 
     private function run(mysqli_stmt $stmt, string $sql): void
     {
-        if (!$stmt->execute()) {
-            $message = $stmt->error;
-            $code = $stmt->errno;
+        try {
+            if (!$stmt->execute()) {
+                $message = $stmt->error;
+                $code = $stmt->errno;
+                $stmt->close();
+                throw new DatabaseException($message, $code, $sql);
+            }
+        } catch (\mysqli_sql_exception $exception) {
             $stmt->close();
-            throw new DatabaseException($message, $code, $sql);
+            throw new DatabaseException($exception->getMessage(), (int) $exception->getCode(), $sql);
         }
     }
 

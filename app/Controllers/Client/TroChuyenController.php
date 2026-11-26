@@ -28,6 +28,7 @@ class TroChuyenController extends BaseClientController
 
         return [
             'pageTitle' => 'Chat với cửa hàng - ÉCRIN JEWELRY',
+            'bodyClass' => 'page-no-product-search',
             'isCustomerLoggedIn' => $isCustomerLoggedIn,
             'chatUsername' => $username ?? 'Quý khách',
             'chatProduct' => $chatProduct,

@@ -167,7 +167,7 @@ use App\Helpers\DinhDangDonHangQuanTri;
         /* ── Table ── */
         .om-table-wrap { overflow-x: auto; }
         .om-table {
-            width: 100%; min-width: 1050px;
+            width: 100%; min-width: 1280px;
             border-collapse: collapse;
         }
         .om-table thead { background: #f8f9fb; }
@@ -179,19 +179,41 @@ use App\Helpers\DinhDangDonHangQuanTri;
             border-bottom: 1px solid #ebeef2;
         }
         .om-table td {
-            padding: 14px 16px; vertical-align: middle;
+            padding: 18px 16px; vertical-align: top;
             border-bottom: 1px solid #f3f4f6;
             font-size: 13.5px; font-weight: 500;
             color: var(--text);
         }
+        .om-table th:last-child, .om-table td:last-child { min-width: 320px; }
         .om-table tbody tr {
             transition: background .15s;
         }
+        .om-table tbody tr[hidden] { display: none !important; }
         .om-table tbody tr:hover {
             background: #f8faff;
         }
         .om-table tbody tr:last-child td {
             border-bottom: none;
+        }
+        .om-pagination-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; padding: 13px 16px; border-top: 1px solid #ebeef2;
+        }
+        .om-pagination-bar[hidden] { display: none; }
+        .om-page-info { color: #64748b; font-size: 12px; }
+        .om-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+        .om-pagination button {
+            min-width: 34px; height: 34px; padding: 0 9px;
+            border: 1px solid #e2e8f0; border-radius: 8px;
+            background: #fff; color: #334155; font: 600 12px 'Inter', sans-serif;
+            cursor: pointer;
+        }
+        .om-pagination button:hover:not(:disabled), .om-pagination button.is-active { border-color: #1d4169; background: #1d4169; color: #fff; }
+        .om-pagination button:disabled { cursor: not-allowed; opacity: .45; }
+        .om-pagination-ellipsis { padding: 0 3px; color: #94a3b8; }
+        @media (max-width: 640px) {
+            .om-pagination-bar { align-items: flex-start; flex-direction: column; }
+            .om-pagination { flex-wrap: wrap; justify-content: flex-start; }
         }
 
         /* Order ID */
@@ -241,11 +263,12 @@ use App\Helpers\DinhDangDonHangQuanTri;
         .pay-pending { background: #fef3c7; color: #92400e; }
 
         /* ── Status Update Form (inline) ── */
-        .om-status-form {
-            display: inline-flex; align-items: center; gap: 6px;
+        form.om-status-form {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center; gap: 8px; width: 100%; margin: 0;
         }
         .om-status-select {
-            height: 32px; min-width: 148px;
+            width: 100%; height: 38px; min-width: 0;
             padding: 0 26px 0 9px;
             border: 1.5px solid #e2e8f0; border-radius: 8px;
             font: 500 12px/1 'Inter', sans-serif;
@@ -258,7 +281,7 @@ use App\Helpers\DinhDangDonHangQuanTri;
         }
         .om-status-select:focus { outline: none; border-color: #818cf8; }
         .om-btn-save {
-            height: 32px; padding: 0 12px;
+            height: 38px; min-width: 58px; padding: 0 13px;
             border: none; border-radius: 8px;
             background: linear-gradient(135deg, #0f2747, #1d4169);
             color: #fff; font: 600 11.5px/1 'Inter', sans-serif;
@@ -285,7 +308,7 @@ use App\Helpers\DinhDangDonHangQuanTri;
 
         /* ── Order Detail Modal ── */
         .om-detail-button {
-            display: inline-flex; align-items: center; gap: 6px;
+            display: flex; width: 100%; justify-content: center; align-items: center; gap: 6px;
             padding: 7px 13px; border: 0; border-radius: 8px;
             font-size: 12px; font-weight: 700;
             color: #4f46e5; background: #eef2ff;
@@ -352,12 +375,14 @@ use App\Helpers\DinhDangDonHangQuanTri;
 
         /* ── Action Cell ── */
         .om-actions-cell {
-            display: flex; flex-direction: column; gap: 8px;
-            min-width: 220px;
+            display: flex; flex-direction: column; align-items: stretch; gap: 9px;
+            width: 100%; min-width: 0;
         }
         .om-action-row {
-            display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+            display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 24px;
         }
+        .om-action-row form { margin: 0; }
+        .om-action-row .om-btn-cod { max-width: 100%; height: auto; min-height: 34px; line-height: 1.35; white-space: normal; text-align: left; }
 
         /* ── Animations ── */
         @keyframes omSlideDown {
@@ -634,7 +659,7 @@ use App\Helpers\DinhDangDonHangQuanTri;
                                 <td>
                                     <div class="om-actions-cell">
                                         <!-- Cập nhật trạng thái đơn -->
-                                        <form method="post" class="om-action-row">
+                                        <form method="post" class="om-action-row om-status-form">
                                             <input type="hidden" name="csrf_token" value="<?php echo $escape($ordersCsrf); ?>">
                                             <input type="hidden" name="action" value="update_status">
                                             <input type="hidden" name="order_id" value="<?php echo (int) $o['id']; ?>">
@@ -712,8 +737,13 @@ use App\Helpers\DinhDangDonHangQuanTri;
                             </tr>
                         <?php endforeach; ?>
                         <?php endif; ?>
+                        <tr id="om-no-filter-results" hidden><td class="om-empty" colspan="8">Không tìm thấy đơn hàng phù hợp.</td></tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="om-pagination-bar" id="om-pagination-bar" hidden>
+                    <span class="om-page-info" id="om-page-info" aria-live="polite"></span>
+                    <nav class="om-pagination" id="om-pagination" aria-label="Phân trang đơn hàng"></nav>
                 </div>
             </div>
         </section>
@@ -732,26 +762,91 @@ use App\Helpers\DinhDangDonHangQuanTri;
     const omFilterStatus = document.getElementById('om-filter-status');
     const omFilterPayment = document.getElementById('om-filter-payment');
     const omRows = Array.from(document.querySelectorAll('#om-tbody tr[data-order-id]'));
+    const omPaginationBar = document.getElementById('om-pagination-bar');
+    const omPagination = document.getElementById('om-pagination');
+    const omPageInfo = document.getElementById('om-page-info');
+    const omNoFilterResults = document.getElementById('om-no-filter-results');
+    const omPageSize = 10;
+    let omFilteredRows = [...omRows];
+    let omCurrentPage = 1;
+
+    function renderOrderPagination() {
+        const totalPages = Math.ceil(omFilteredRows.length / omPageSize);
+        omCurrentPage = Math.min(omCurrentPage, Math.max(totalPages, 1));
+        const start = (omCurrentPage - 1) * omPageSize;
+        const end = Math.min(start + omPageSize, omFilteredRows.length);
+
+        omRows.forEach(row => {
+            const index = omFilteredRows.indexOf(row);
+            row.hidden = index < start || index >= end;
+        });
+        omNoFilterResults.hidden = omRows.length === 0 || omFilteredRows.length > 0;
+        omPaginationBar.hidden = totalPages <= 1;
+        omPageInfo.textContent = omFilteredRows.length === 0
+            ? 'Không có đơn hàng phù hợp'
+            : `Hiển thị ${start + 1}–${end} trong ${omFilteredRows.length} đơn`;
+        omPagination.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        const addPageButton = (label, page, disabled = false, active = false, ariaLabel = label) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            button.disabled = disabled;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-label', ariaLabel);
+            if (active) button.setAttribute('aria-current', 'page');
+            button.addEventListener('click', () => {
+                omCurrentPage = page;
+                renderOrderPagination();
+            });
+            omPagination.appendChild(button);
+        };
+
+        const addEllipsis = () => {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'om-pagination-ellipsis';
+            ellipsis.textContent = '…';
+            omPagination.appendChild(ellipsis);
+        };
+
+        addPageButton('‹', omCurrentPage - 1, omCurrentPage === 1, false, 'Trang trước');
+        if (totalPages <= 7) {
+            for (let page = 1; page <= totalPages; page += 1) {
+                addPageButton(String(page), page, false, page === omCurrentPage, `Trang ${page}`);
+            }
+        } else {
+            addPageButton('1', 1, false, omCurrentPage === 1, 'Trang 1');
+            if (omCurrentPage > 3) addEllipsis();
+            const firstPage = Math.max(2, omCurrentPage - 1);
+            const lastPage = Math.min(totalPages - 1, omCurrentPage + 1);
+            for (let page = firstPage; page <= lastPage; page += 1) {
+                addPageButton(String(page), page, false, page === omCurrentPage, `Trang ${page}`);
+            }
+            if (omCurrentPage < totalPages - 2) addEllipsis();
+            addPageButton(String(totalPages), totalPages, false, omCurrentPage === totalPages, `Trang ${totalPages}`);
+        }
+        addPageButton('›', omCurrentPage + 1, omCurrentPage === totalPages, false, 'Trang sau');
+    }
 
     function filterOrders() {
         const q = omSearch.value.trim().toLocaleLowerCase();
         const st = omFilterStatus.value;
         const pay = omFilterPayment.value;
-        let visible = 0;
-
-        omRows.forEach(row => {
+        omFilteredRows = omRows.filter(row => {
             const matchQ = row.dataset.search.toLocaleLowerCase().includes(q);
             const matchSt = st === '' || row.dataset.status === st;
             const matchPay = pay === '' || row.dataset.payment === pay;
-            const show = matchQ && matchSt && matchPay;
-            row.hidden = !show;
-            if (show) visible++;
+            return matchQ && matchSt && matchPay;
         });
+        omCurrentPage = 1;
+        renderOrderPagination();
     }
 
     omSearch.addEventListener('input', filterOrders);
     omFilterStatus.addEventListener('change', filterOrders);
     omFilterPayment.addEventListener('change', filterOrders);
+    filterOrders();
 
     /* ═══ Card click → filter shortcut ═══ */
     document.querySelectorAll('.om-stat').forEach(card => {

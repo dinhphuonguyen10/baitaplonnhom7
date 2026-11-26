@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Cửa hàng - ÉCRIN Jewelry</title>
+    <title>Quản lý hệ thống cửa hàng - ÉCRIN Jewelry</title>
     <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/style.css'); ?>">
     <style>
         .page-content { padding-top: 18px; }
@@ -33,6 +33,7 @@
         .store-preview-pagination button:hover:not(:disabled), .store-preview-pagination button.is-active { border-color: var(--navy); background: var(--navy); color: #fff; }
         .store-preview-pagination button:disabled { cursor: not-allowed; opacity: .45; }
         .store-btn { display: block; width: 100%; padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; cursor: pointer; text-align: left; font: inherit; transition: .2s; }
+        .store-btn[hidden] { display: none !important; }
         .store-btn:hover, .store-btn.active { border-color: #B09060; background: #FBF8F3; }
         .store-btn h3 { margin: 0 0 4px; color: var(--navy); font-size: 13px; }
         .store-btn p  { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
@@ -48,11 +49,18 @@
         /* Management table */
         .mgmt-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
         .mgmt-panel h2 { margin: 0 0 16px; font-size: 1.1rem; color: var(--navy); }
+        .store-form-title { margin: 18px 0 12px; color: var(--navy); font-size: 15px; }
         .mgmt-actions { display: flex; gap: 10px; margin-bottom: 16px; }
         .mgmt-actions button { padding: 9px 16px; border: 0; border-radius: 7px; background: var(--navy); color: #fff; font: 600 13px inherit; cursor: pointer; }
+        .store-table-search { width: min(100%, 420px); margin: 0 0 12px; }
+        .store-table-search label { display: block; margin-bottom: 6px; color: #526173; font-size: 12px; font-weight: 700; }
+        .store-table-search input { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #d5dbe2; border-radius: 8px; font: inherit; }
+        .store-table-scroll { max-height: 520px; overflow: auto; overscroll-behavior: contain; border-bottom: 1px solid var(--line); }
         .mgmt-table { width: 100%; border-collapse: collapse; }
         .mgmt-table th, .mgmt-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
         .mgmt-table th { color: #34495e; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; background: #eef2f6; font-weight: 800; }
+        .mgmt-table thead th { position: sticky; top: 0; z-index: 1; }
+        .mgmt-table tbody tr[hidden] { display: none !important; }
         .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
         .status-active { background: #EDF6F1; color: #027a48; }
         .mgmt-table button { padding: 7px 13px; border: 1px solid #9aa8b8; border-radius: 6px; background: #536b82; color: #fff; font: 700 12px inherit; cursor: pointer; font-size: 12px; }
@@ -62,12 +70,19 @@
         .mgmt-table .delete-store { width: 38px; padding: 7px 0; background: #b42318; border-color: #b42318; font-size: 16px; line-height: 1; }
         .mgmt-table .delete-store:hover { background: #8f1d14; border-color: #8f1d14; }
         .mgmt-table tr.editing { background: #eef6ff; box-shadow: inset 4px 0 #b09060; }
-        .mgmt-form { display: grid; grid-template-columns: 1.2fr 2fr 1fr 1fr .8fr auto; gap: 10px; margin-bottom: 18px; }
+        .mgmt-form { display: grid; grid-template-columns: 1.2fr 2fr 1fr 1fr 1fr 1fr auto; gap: 10px; margin-bottom: 22px; align-items: end; }
         .mgmt-form input, .mgmt-form select { min-width: 0; padding: 9px 10px; border: 1px solid #d5dbe2; border-radius: 7px; font: inherit; }
         .mgmt-form button { padding: 9px 14px; border: 0; border-radius: 7px; background: #102a43; color: #fff; font-weight: 700; cursor: pointer; }
+        .mgmt-form > input:not([type="hidden"]), .mgmt-form > select, .mgmt-form > button { height: 48px; align-self: end; box-sizing: border-box; }
+        .store-form-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; color: #526173; font-size: 12px; font-weight: 700; }
+        .store-form-field input, .store-form-field select { width: 100%; height: 48px; box-sizing: border-box; }
         .mgmt-form.editing { padding: 12px; border: 2px solid #b09060; border-radius: 9px; background: #fffaf2; }
         .mgmt-form .cancel-edit { background: #718096; }
-        @media (max-width: 1000px) { .mgmt-form { grid-template-columns: repeat(2, 1fr); } }
+        .store-hours-fields { grid-column: span 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; }
+        .store-time-field { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; color: #526173; font-size: 12px; font-weight: 700; }
+        .store-time-field input { width: 100%; min-width: 0; height: 48px; box-sizing: border-box; }
+        .mgmt-form input[type="hidden"] { display: none; }
+        @media (max-width: 1000px) { .mgmt-form { grid-template-columns: repeat(2, 1fr); } .store-hours-fields { grid-column: 1 / -1; } }
         @media (max-width: 820px) { .store-container-admin { grid-template-columns: 1fr; } .store-sidebar-admin { border-right: 0; border-bottom: 1px solid var(--line); } }
     </style>
 </head>
@@ -76,7 +91,7 @@
     <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
     <main class="main-content">
         <header class="topbar">
-            <div class="breadcrumb">Trang chủ <span>/</span> <strong>Cửa hàng</strong></div>
+            <div class="breadcrumb">Trang chủ <span>/</span> <strong>Quản lý hệ thống cửa hàng</strong></div>
             <div class="admin-profile">
                 <div class="avatar"><?php echo $isManager ? 'QL' : 'NV'; ?></div>
                 <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small><?php echo $escape($roleLabel); ?></small></div>
@@ -84,7 +99,7 @@
         </header>
         <section class="page-content">
             <div class="welcome-row"><div>
-                <h1>Hệ thống cửa hàng</h1>
+                <h1>Quản lý hệ thống cửa hàng</h1>
                 <p class="page-subtitle">Xem và quản lý thông tin các cửa hàng ÉCRIN Jewelry.</p>
             </div></div>
 
@@ -141,22 +156,31 @@
             <!-- Tab: Quản lý -->
             <div id="tab-manage" hidden>
                 <div class="mgmt-panel">
-                    <h2>Danh sách cửa hàng</h2>
+                    <h2>Quản lý cửa hàng</h2>
                     <?php if ($error !== ''): ?><p class="notice error"><?php echo $escape($error); ?></p><?php endif; ?>
                     <?php if ($success !== ''): ?><p class="notice success"><?php echo $escape($success); ?></p><?php endif; ?>
+                    <div class="store-table-search">
+                        <label for="store-table-search-input">Tìm theo tên cửa hàng hoặc địa chỉ</label>
+                        <input type="search" id="store-table-search-input" placeholder="Ví dụ: Cầu Giấy, Nguyễn Huệ">
+                    </div>
+                    <h3 class="store-form-title" id="store-form-title">Thêm cửa hàng</h3>
                     <form method="post" class="mgmt-form" id="store-form">
                         <input type="hidden" name="csrf_token" value="<?php echo $escape($csrfToken); ?>">
                         <input type="hidden" name="action" value="save">
                         <input type="hidden" name="id" id="store-id" value="">
-                        <input type="text" name="name" id="store-name" placeholder="Tên cửa hàng" required>
-                        <input type="text" name="address" id="store-address" placeholder="Địa chỉ" required>
-                        <input type="text" name="phone" id="store-phone" placeholder="Điện thoại">
-                        <input type="text" name="hours" id="store-hours" value="08:00 - 22:00" placeholder="Giờ mở cửa">
-                        <select name="status" id="store-status"><option value="active">Hoạt động</option><option value="inactive">Tạm đóng</option></select>
-                        <button type="submit" id="store-submit">+ Thêm</button>
+                        <label class="store-form-field" for="store-name">Tên cửa hàng<input type="text" name="name" id="store-name" required></label>
+                        <label class="store-form-field" for="store-address">Địa chỉ<input type="text" name="address" id="store-address" required></label>
+                        <label class="store-form-field" for="store-phone">Điện thoại<input type="text" name="phone" id="store-phone"></label>
+                        <div class="store-hours-fields">
+                            <label class="store-time-field">Mở cửa<input type="time" id="store-open-time" value="08:00" required></label>
+                            <label class="store-time-field">Đóng cửa<input type="time" id="store-close-time" value="22:00" required></label>
+                        </div>
+                        <input type="hidden" name="hours" id="store-hours" value="08:00 - 22:00">
+                        <label class="store-form-field" for="store-status">Trạng thái<select name="status" id="store-status"><option value="active">Hoạt động</option><option value="inactive">Tạm đóng</option></select></label>
+                        <button type="submit" id="store-submit">Thêm</button>
                         <button type="button" class="cancel-edit" id="cancel-edit" hidden>Hủy</button>
                     </form>
-                    <div style="overflow-x:auto">
+                    <div class="store-table-scroll" aria-label="Danh sách cửa hàng có thể cuộn">
                         <table class="mgmt-table">
                             <thead>
                                 <tr><th>#</th><th>Tên cửa hàng</th><th>Địa chỉ</th><th>Điện thoại</th><th>Giờ mở cửa</th><th>Trạng thái</th><th>Thao tác</th></tr>
@@ -181,6 +205,7 @@
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <tr id="store-table-empty" hidden><td colspan="7" style="padding:18px;text-align:center;color:#667085;">Không tìm thấy cửa hàng phù hợp.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -197,6 +222,26 @@ function switchTab(tab, btn) {
     btn.classList.add('active');
 }
 
+const storeForm = document.getElementById('store-form');
+const storeHoursInput = document.getElementById('store-hours');
+const storeOpenTime = document.getElementById('store-open-time');
+const storeCloseTime = document.getElementById('store-close-time');
+
+function syncStoreHours() {
+    storeHoursInput.value = `${storeOpenTime.value} - ${storeCloseTime.value}`;
+}
+
+function setStoreHours(value) {
+    const match = String(value || '').match(/(\d{2}:\d{2})\s*[-–—]\s*(\d{2}:\d{2})/);
+    storeOpenTime.value = match ? match[1] : '08:00';
+    storeCloseTime.value = match ? match[2] : '22:00';
+    syncStoreHours();
+}
+
+storeOpenTime.addEventListener('input', syncStoreHours);
+storeCloseTime.addEventListener('input', syncStoreHours);
+storeForm.addEventListener('submit', syncStoreHours);
+
 // Store map interaction
 const storeBtns = document.querySelectorAll('.store-btn');
 const searchInput = document.getElementById('store-search');
@@ -206,6 +251,34 @@ const storePagination = document.getElementById('store-preview-pagination');
 const storesPerPage = 8;
 let filteredStoreBtns = Array.from(storeBtns);
 let currentStorePage = 1;
+
+function normalizeStoreSearch(value) {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .toLocaleLowerCase('vi')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+const storeTableSearchInput = document.getElementById('store-table-search-input');
+const storeTableRows = Array.from(document.querySelectorAll('.mgmt-table tbody tr:not(#store-table-empty)'));
+const storeTableEmpty = document.getElementById('store-table-empty');
+
+storeTableSearchInput.addEventListener('input', () => {
+    const query = normalizeStoreSearch(storeTableSearchInput.value);
+    let visibleCount = 0;
+
+    storeTableRows.forEach(row => {
+        const searchableText = `${row.cells[1]?.textContent || ''} ${row.cells[2]?.textContent || ''}`;
+        const matches = normalizeStoreSearch(searchableText).includes(query);
+        row.hidden = !matches;
+        if (matches) visibleCount += 1;
+    });
+
+    storeTableEmpty.hidden = visibleCount > 0;
+});
 
 storeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -221,8 +294,11 @@ storeBtns.forEach(btn => {
 });
 
 searchInput.addEventListener('input', () => {
-    const q = searchInput.value.trim().toLocaleLowerCase('vi');
-    filteredStoreBtns = Array.from(storeBtns).filter(btn => btn.textContent.toLocaleLowerCase('vi').includes(q));
+    const q = normalizeStoreSearch(searchInput.value);
+    filteredStoreBtns = Array.from(storeBtns).filter(btn => {
+        const searchableText = [btn.dataset.name, btn.dataset.address, btn.dataset.phone, btn.dataset.hours].join(' ');
+        return normalizeStoreSearch(searchableText).includes(q);
+    });
     currentStorePage = 1;
     renderAdminStores();
 });
@@ -278,12 +354,13 @@ document.querySelectorAll('.edit-store').forEach(button => {
         document.querySelectorAll('.mgmt-table tr.editing').forEach(row => row.classList.remove('editing'));
         button.closest('tr').classList.add('editing');
         document.getElementById('store-form').classList.add('editing');
+        document.getElementById('store-form-title').textContent = 'Chỉnh sửa cửa hàng';
         document.getElementById('cancel-edit').hidden = false;
         document.getElementById('store-id').value = button.dataset.id;
         document.getElementById('store-name').value = button.dataset.name;
         document.getElementById('store-address').value = button.dataset.address;
         document.getElementById('store-phone').value = button.dataset.phone;
-        document.getElementById('store-hours').value = button.dataset.hours;
+        setStoreHours(button.dataset.hours);
         document.getElementById('store-status').value = button.dataset.status;
         document.getElementById('store-submit').textContent = 'Lưu thay đổi';
         document.getElementById('store-name').focus();
@@ -293,8 +370,9 @@ document.querySelectorAll('.edit-store').forEach(button => {
 document.getElementById('cancel-edit').addEventListener('click', () => {
     document.getElementById('store-form').reset();
     document.getElementById('store-id').value = '';
-    document.getElementById('store-hours').value = '08:00 - 22:00';
-    document.getElementById('store-submit').textContent = '+ Thêm';
+    setStoreHours('08:00 - 22:00');
+    document.getElementById('store-form-title').textContent = 'Thêm cửa hàng';
+    document.getElementById('store-submit').textContent = 'Thêm';
     document.getElementById('cancel-edit').hidden = true;
     document.getElementById('store-form').classList.remove('editing');
     document.querySelectorAll('.mgmt-table tr.editing').forEach(row => row.classList.remove('editing'));

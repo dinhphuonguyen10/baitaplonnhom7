@@ -52,6 +52,10 @@ section, main {
     gap: 16px;
 }
 
+.page-no-product-search .header .search-wrapper {
+    display: none;
+}
+
 .sticky-header-wrapper {
     position: fixed;
     top: 0;

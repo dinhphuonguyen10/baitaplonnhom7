@@ -26,7 +26,7 @@ abstract class BaseAdminController extends \App\Core\Controller
         ['icon' => '▤', 'label' => 'Đơn hàng & Thanh toán',         'href' => '/admin/don_hang.php',    'file' => 'don_hang.php'],
         ['icon' => '☏', 'label' => 'Quản lý chat',                 'href' => '/admin/tro_chuyen.php',      'file' => 'tro_chuyen.php'],
         ['icon' => '▥', 'label' => 'Báo cáo và thống kê',          'href' => '/admin/bao_cao.php',   'file' => 'bao_cao.php', 'manager_only' => true],
-        ['icon' => '⌖', 'label' => 'Cửa hàng',                     'href' => '/admin/cua_hang.php',    'file' => 'cua_hang.php', 'manager_only' => true],
+        ['icon' => '⌖', 'label' => 'Quản lý hệ thống cửa hàng',    'href' => '/admin/cua_hang.php',    'file' => 'cua_hang.php', 'manager_only' => true],
         ['icon' => '⌂', 'label' => 'Về cửa hàng chính',           'href' => '/index.php',           'file' => 'storefront-home'],
     ];
 
