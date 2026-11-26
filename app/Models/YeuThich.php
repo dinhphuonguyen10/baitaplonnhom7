@@ -130,14 +130,6 @@ class YeuThich extends BaseModel
                 FROM reviews r
                 INNER JOIN users reviewer ON reviewer.id = r.user_id
                 WHERE r.rating BETWEEN 1 AND 5
-                  AND EXISTS (
-                      SELECT 1
-                      FROM orders o
-                      INNER JOIN order_items reviewed_item ON reviewed_item.order_id = o.id
-                      WHERE o.user_id = r.user_id
-                        AND reviewed_item.product_id = r.product_id
-                        AND o.status IN ('Đã giao hàng', 'Đã giao', 'Hoàn thành')
-                  )
                 GROUP BY r.product_id
             ) review_stats ON review_stats.product_id = p.id
             WHERE w.user_id = ? AND p.is_deleted = 0 AND p.status = 'active'
