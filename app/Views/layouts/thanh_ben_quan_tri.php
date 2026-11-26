@@ -20,34 +20,3 @@
         <a href="<?php echo $escape($appBaseUrl . '/admin/dang_xuat.php'); ?>" class="logout"><span>⇥</span> Đăng xuất</a>
     </div>
 </aside>
-<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-<script>
-// Điện thoại/tablet: thêm nút ☰ vào topbar để mở/đóng sidebar (CSS ẩn sidebar ở ≤820px).
-(function () {
-    function init() {
-        var sidebar = document.getElementById('sidebar');
-        var topbar = document.querySelector('.topbar');
-        var backdrop = document.getElementById('sidebar-backdrop');
-        if (!sidebar || !topbar || !backdrop) return;
-
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'menu-toggle';
-        btn.setAttribute('aria-label', 'Mở menu');
-        btn.setAttribute('aria-controls', 'sidebar');
-        btn.textContent = '☰';
-        topbar.insertBefore(btn, topbar.firstChild);
-
-        function setOpen(open) {
-            sidebar.classList.toggle('is-open', open);
-            backdrop.classList.toggle('is-open', open);
-            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        }
-        btn.addEventListener('click', function () { setOpen(!sidebar.classList.contains('is-open')); });
-        backdrop.addEventListener('click', function () { setOpen(false); });
-        sidebar.addEventListener('click', function (e) { if (e.target.closest('a')) setOpen(false); });
-        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-})();
-</script>
