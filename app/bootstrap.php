@@ -8,16 +8,20 @@
  * Mọi file trang/API chỉ cần: require_once __DIR__ . '/<...>/app/bootstrap.php';
  */
 
-declare(strict_types=1);
-
+declare(strict_types=1); // Bật chế độ kiểm tra kiểu dữ liệu nghiêm ngặt
+// Định nghĩa hằng số APP_ROOT và VIEW_PATH để sử dụng trong toàn bộ ứng dụng
 if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname(__DIR__));
 }
 
-if (!defined('VIEW_PATH')) {
+if (!defined('VIEW_PATH')) { 
     define('VIEW_PATH', __DIR__ . '/Views');
 }
 
+// Dùng giờ Việt Nam cho mọi phép tính ngày giờ, không phụ thuộc cấu hình php.ini của máy chủ
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
+//đăng ký bộ tự động nạp file
 spl_autoload_register(static function (string $class): void {
     $prefix = 'App\\';
     if (strncmp($class, $prefix, strlen($prefix)) !== 0) {

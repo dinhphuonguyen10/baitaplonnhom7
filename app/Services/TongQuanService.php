@@ -21,20 +21,12 @@ class TongQuanService
         'custom' => 'Tùy chọn ngày',
     ];
 
-    private const COMPLETED_STATUSES_SQL = "('Đã giao hàng','Đã giao','Hoàn thành')";
-    private const CANCELLED_STATUSES_SQL = "('Đã hủy','Canceled','cancelled','huy')";
+    /** Số ngày tối đa của khoảng tùy chọn. */
+    private const MAX_CUSTOM_DAYS = 366;
 
-    private const LEGACY_STATUS_MAP = [
-        'Đang xử lý' => 'Đã xác nhận',
-        'Chuẩn bị đơn hàng' => 'Đang chuẩn bị hàng',
-        'Đang chuẩn bị' => 'Đang chuẩn bị hàng',
-        'Đang vận chuyển' => 'Đang giao hàng',
-        'Đang giao' => 'Đang giao hàng',
-        'Đã giao' => 'Đã giao hàng',
-        'Canceled' => 'Đã hủy',
-        'cancelled' => 'Đã hủy',
-        'huy' => 'Đã hủy',
-    ];
+    private const COMPLETED_STATUSES_SQL = "('Đã giao hàng','Đã giao','Hoàn thành')";
+
+    private const CANCELLED_STATUSES_SQL = "('Đã hủy','Canceled','cancelled','huy')";
 
     private Database $db;
 
@@ -46,7 +38,7 @@ class TongQuanService
     /**
      * Xác định kỳ thống kê từ tham số period/from/to.
      *
-     * @return array{period: string, periodStart: DateTimeImmutable, periodEnd: DateTimeImmutable}
+     * @return array{period: string, periodStart: DateTimeImmutable, periodEnd: DateTimeImmutable, error: string}
      */
     public function resolvePeriod(string $period, string $startInput, string $endInput, ?DateTimeImmutable $today = null): array
     {
@@ -57,6 +49,7 @@ class TongQuanService
 
         $periodStart = $today->modify('first day of this month');
         $periodEnd = $today;
+        $error = '';
 
         if ($period === 'today') {
             $periodStart = $today;
@@ -74,20 +67,51 @@ class TongQuanService
         } elseif ($period === 'custom') {
             $parsedStart = DateTimeImmutable::createFromFormat('!Y-m-d', $startInput);
             $parsedEnd = DateTimeImmutable::createFromFormat('!Y-m-d', $endInput);
-            if ($parsedStart && $parsedEnd
-                && $parsedStart->format('Y-m-d') === $startInput
-                && $parsedEnd->format('Y-m-d') === $endInput
-                && $parsedStart <= $parsedEnd) {
+            if (!$parsedStart || !$parsedEnd
+                || $parsedStart->format('Y-m-d') !== $startInput
+                || $parsedEnd->format('Y-m-d') !== $endInput) {
+                $error = 'Vui lòng nhập đầy đủ Từ ngày và Đến ngày hợp lệ.';
+            } elseif ($parsedStart > $parsedEnd) {
+                $error = 'Từ ngày không được sau Đến ngày.';
+            } elseif ($parsedStart->diff($parsedEnd)->days >= self::MAX_CUSTOM_DAYS) {
+                $error = 'Khoảng thời gian tùy chọn tối đa ' . self::MAX_CUSTOM_DAYS . ' ngày.';
+            }
+
+            if ($error === '') {
                 $periodStart = $parsedStart;
                 $periodEnd = $parsedEnd;
             } else {
                 $period = 'this_month';
-                $periodStart = $today->modify('first day of this month');
-                $periodEnd = $today;
+                $error .= ' Đang hiển thị số liệu của tháng này.';
             }
         }
 
-        return ['period' => $period, 'periodStart' => $periodStart, 'periodEnd' => $periodEnd];
+        return ['period' => $period, 'periodStart' => $periodStart, 'periodEnd' => $periodEnd, 'error' => $error];
+    }
+
+    /**
+     * Kỳ so sánh. "Tháng này" so với cùng số ngày đầu tháng trước, "Tháng trước" so với trọn tháng
+     * liền trước nữa; các kỳ còn lại so với khoảng liền trước có cùng độ dài.
+     *
+     * @return array{0: DateTimeImmutable, 1: DateTimeImmutable} [ngày đầu, ngày cuối (tính cả ngày này)]
+     */
+    public function previousPeriod(string $period, DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        if ($period === 'this_month' || $period === 'last_month') {
+            $previousStart = $start->modify('first day of last month');
+            $previousEnd = $previousStart->modify('last day of this month');
+            if ($period === 'this_month') {
+                // Tháng trước có thể ngắn hơn (VD: ngày 31/03 chỉ so đến 28/02).
+                $sameDay = $previousStart->modify('+' . ((int) $end->format('j') - 1) . ' days');
+                $previousEnd = min($sameDay, $previousEnd);
+            }
+
+            return [$previousStart, $previousEnd];
+        }
+
+        $days = (int) $start->diff($end)->days + 1;
+
+        return [$start->modify('-' . $days . ' days'), $start->modify('-1 day')];
     }
 
     /** Tổng hợp toàn bộ dữ liệu cho trang Tổng quan. */
@@ -109,11 +133,10 @@ class TongQuanService
         $stats = array_merge($stats, $this->itemsSold($rangeStart, $rangeEnd));
 
         $periodDays = (int) $periodStart->diff($periodEndExclusive)->days;
-        $previousPeriodEndExclusive = $periodStart;
-        $previousPeriodStart = $periodStart->modify('-' . $periodDays . ' days');
+        [$previousPeriodStart, $previousPeriodEnd] = $this->previousPeriod($period, $periodStart, $periodEnd);
         $previousRangeStart = $previousPeriodStart->format('Y-m-d 00:00:00');
-        $previousRangeEnd = $previousPeriodEndExclusive->format('Y-m-d 00:00:00');
-        $comparisonPeriodLabel = $previousPeriodStart->format('d/m/Y') . ' - ' . $previousPeriodEndExclusive->modify('-1 day')->format('d/m/Y');
+        $previousRangeEnd = $previousPeriodEnd->modify('+1 day')->format('Y-m-d 00:00:00');
+        $comparisonPeriodLabel = $previousPeriodStart->format('d/m/Y') . ' - ' . $previousPeriodEnd->format('d/m/Y');
 
         $previousStats = array_merge(['revenue' => 0, 'orders' => 0], $this->orderStats($previousRangeStart, $previousRangeEnd, false));
 
@@ -156,7 +179,7 @@ class TongQuanService
             'comparisonPeriodLabel' => $comparisonPeriodLabel,
             'averageOrder' => $averageOrder,
             'comparisonNotes' => $comparisonNotes,
-            'statusCounts' => $this->statusCounts($rangeStart, $rangeEnd),
+            'periodError' => $resolved['error'],
             'recentOrders' => $this->recentOrders(),
             'topProducts' => $this->topProducts($rangeStart, $rangeEnd),
             'chartDays' => $chartDays,
@@ -165,7 +188,7 @@ class TongQuanService
         ];
     }
 
-    /** Doanh thu (đơn đã giao), số đơn và (tùy chọn) số đơn hoàn thành trong khoảng thời gian. */
+    /** Doanh thu (đơn đã giao), số đơn chưa hủy và (tùy chọn) số đơn hoàn thành trong khoảng thời gian. */
     private function orderStats(string $start, string $end, bool $withCompleted): array
     {
         $completedColumn = $withCompleted
@@ -175,7 +198,7 @@ class TongQuanService
         return $this->db->fetchOne(
             "SELECT
         COALESCE(SUM(CASE WHEN status IN " . self::COMPLETED_STATUSES_SQL . " THEN total_price ELSE 0 END), 0) AS revenue,
-        COUNT(*) AS orders{$completedColumn}
+        COALESCE(SUM(status NOT IN " . self::CANCELLED_STATUSES_SQL . "), 0) AS orders{$completedColumn}
      FROM orders
      WHERE created_at >= ? AND created_at < ?",
             [$start, $end],
@@ -183,7 +206,7 @@ class TongQuanService
         ) ?? [];
     }
 
-    /** Tổng số lượng sản phẩm đã bán (trừ đơn hủy). */
+    /** Tổng số lượng sản phẩm đã bán (đơn đã giao hoặc hoàn thành, giống trang Báo cáo). */
     private function itemsSold(string $start, string $end): array
     {
         return $this->db->fetchOne(
@@ -191,38 +214,10 @@ class TongQuanService
      FROM order_items oi
      JOIN orders o ON o.id = oi.order_id
      WHERE o.created_at >= ? AND o.created_at < ?
-       AND o.status NOT IN " . self::CANCELLED_STATUSES_SQL,
+       AND o.status IN " . self::COMPLETED_STATUSES_SQL,
             [$start, $end],
             'ss'
         ) ?? [];
-    }
-
-    /** Số đơn theo trạng thái (đã chuẩn hóa trạng thái cũ). */
-    private function statusCounts(string $start, string $end): array
-    {
-        $statusCounts = [
-            'Chờ xác nhận' => 0,
-            'Đã xác nhận' => 0,
-            'Đang chuẩn bị hàng' => 0,
-            'Đang giao hàng' => 0,
-            'Đã giao hàng' => 0,
-            'Hoàn thành' => 0,
-            'Đã hủy' => 0,
-        ];
-        $rows = $this->db->fetchAll(
-            'SELECT status, COUNT(*) AS order_count FROM orders WHERE created_at >= ? AND created_at < ? GROUP BY status',
-            [$start, $end],
-            'ss'
-        );
-        foreach ($rows as $row) {
-            $status = (string) $row['status'];
-            $normalizedStatus = self::LEGACY_STATUS_MAP[$status] ?? $status;
-            if (isset($statusCounts[$normalizedStatus])) {
-                $statusCounts[$normalizedStatus] += (int) $row['order_count'];
-            }
-        }
-
-        return $statusCounts;
     }
 
     /** 5 đơn hàng mới nhất. */
@@ -245,7 +240,7 @@ class TongQuanService
      JOIN orders o ON o.id = oi.order_id
      LEFT JOIN products p ON p.id = oi.product_id
      WHERE o.created_at >= ? AND o.created_at < ?
-       AND o.status NOT IN " . self::CANCELLED_STATUSES_SQL . "
+       AND o.status IN " . self::COMPLETED_STATUSES_SQL . "
      GROUP BY oi.product_name
      ORDER BY quantity_sold DESC
      LIMIT 3",
@@ -294,11 +289,13 @@ class TongQuanService
     /** Định dạng số tiền rút gọn: 1,2t / 15tr / 500k / 900đ. */
     public static function formatCompact(float $value): string
     {
+        // Giữ tối đa 2 số lẻ và bỏ số 0 thừa: 5tr, 1,25tr, 2,5tr.
+        $short = static fn(float $number): string => rtrim(rtrim(number_format($number, 2, ',', '.'), '0'), ',');
         if ($value >= 1000000000) {
-            return number_format($value / 1000000000, 1, ',', '.') . 't';
+            return $short($value / 1000000000) . 't';
         }
         if ($value >= 1000000) {
-            return number_format($value / 1000000, 0, ',', '.') . 'tr';
+            return $short($value / 1000000) . 'tr';
         }
         if ($value >= 1000) {
             return number_format($value / 1000, 0, ',', '.') . 'k';
