@@ -12,13 +12,16 @@ use Throwable;
 
 /**
  * Lớp TroChuyenService - nghiệp vụ chat giữa khách hàng và cửa hàng:
- * tải hội thoại, gửi tin nhắn văn bản, đánh dấu đã đọc, tin trả lời tự động.
+ * tải hội thoại, gửi tin nhắn văn bản, đánh dấu đã đọc, lời chào đầu ngày.
  * Lỗi nghiệp vụ được ném ra dưới dạng TroChuyenException (kèm mã HTTP và thông báo tiếng Việt).
  */
 class TroChuyenService
 {
     /** Độ dài tối đa của một tin nhắn văn bản. */
     public const MAX_MESSAGE_LENGTH = 2000;
+
+    /** Số tin mỗi lần tải ở trang quản trị. */
+    public const ADMIN_PAGE_SIZE = 200;
 
     public const NOT_READY_MESSAGE = 'Chưa thể chuẩn bị khu vực chat. Vui lòng thử lại sau.';
     public const INVALID_CONVERSATION = 'Cuộc trò chuyện không hợp lệ.';
@@ -27,18 +30,15 @@ class TroChuyenService
     private Database $db;
     private TinNhan $messages;
     private TuDongTraLoiService $autoReply;
-    private MauTraLoiTuDongService $autoResponses;
 
     public function __construct(
         ?Database $db = null,
         ?TinNhan $messages = null,
-        ?TuDongTraLoiService $autoReply = null,
-        ?MauTraLoiTuDongService $autoResponses = null
+        ?TuDongTraLoiService $autoReply = null
     ) {
         $this->db = $db ?? Database::getInstance();
         $this->messages = $messages ?? new TinNhan($this->db);
         $this->autoReply = $autoReply ?? new TuDongTraLoiService($this->db);
-        $this->autoResponses = $autoResponses ?? new MauTraLoiTuDongService();
     }
 
     /** Đảm bảo bảng chat_messages sẵn sàng. */
@@ -66,7 +66,7 @@ class TroChuyenService
         }
     }
 
-    public function adminMessages($userId): array
+    public function adminMessages($userId, $beforeId = null): array
     {
         $userId = self::positiveInt($userId);
         if ($userId === null) {
@@ -74,7 +74,7 @@ class TroChuyenService
         }
 
         try {
-            return $this->messages->latestChatViewForUser($userId, 200);
+            return $this->messages->latestChatViewForUser($userId, self::ADMIN_PAGE_SIZE, self::positiveInt($beforeId));
         } catch (Throwable $e) {
             throw new TroChuyenException('Không thể tải tin nhắn.', 500);
         }
@@ -92,39 +92,6 @@ class TroChuyenService
             $this->messages->markCustomerMessagesRead($userId, $lastMessageId);
         } catch (Throwable $e) {
             throw new TroChuyenException('Không thể cập nhật trạng thái đã đọc.', 500);
-        }
-    }
-
-    /**
-     * Gửi tin trả lời tự động theo cấu hình kiểu cũ (key => message).
-     *
-     * @return array|null tin nhắn vừa tạo
-     */
-    public function adminAutoReply($type, $userId, string $adminUsername): ?array
-    {
-        $userId = self::positiveInt($userId);
-        if (!$type || $userId === null) {
-            throw new TroChuyenException('Tham số không hợp lệ.', 400);
-        }
-        if ($this->customerUsername($userId) === null) {
-            throw new TroChuyenException('Không tìm thấy khách hàng này.', 404);
-        }
-
-        $messageText = $this->autoResponses->legacyMessage((string) $type);
-        if (!$messageText) {
-            throw new TroChuyenException('Tin nhắn tự động không được cấu hình.', 400);
-        }
-
-        try {
-            $messageId = $this->messages->createTextMessage((int) $userId, $adminUsername, 'admin', $messageText);
-        } catch (Throwable $e) {
-            throw new TroChuyenException('Không thể gửi tin tự động.', 500);
-        }
-
-        try {
-            return $this->messages->findChatView($messageId);
-        } catch (Throwable $e) {
-            return [];
         }
     }
 
@@ -178,9 +145,9 @@ class TroChuyenService
 
     // ───────────── Phía khách hàng ─────────────
 
-    public function customerMessages(int $userId): array
+    public function customerMessages(int $userId, int $afterId = 0): array
     {
-        return $this->messages->allCustomerChatViewForUser($userId);
+        return $this->messages->allCustomerChatViewForUser($userId, $afterId);
     }
 
     /** Kiểm tra nội dung tin nhắn khách gửi, trả về nội dung đã trim. */

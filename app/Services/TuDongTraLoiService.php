@@ -56,6 +56,22 @@ class TuDongTraLoiService
         return trim((string) ($config[$type] ?? ''));
     }
 
+    /** Thay biến {{Name}} bằng họ tên khách (không có thì dùng tên đăng nhập). */
+    public function personalize(string $message, int $userId): string
+    {
+        if (strpos($message, '{{Name}}') === false) {
+            return $message;
+        }
+
+        $user = $this->db->fetchOne('SELECT full_name, username FROM users WHERE id = ?', [$userId], 'i');
+        $name = trim((string) ($user['full_name'] ?? ''));
+        if ($name === '') {
+            $name = trim((string) ($user['username'] ?? ''));
+        }
+
+        return str_replace('{{Name}}', $name === '' ? 'bạn' : $name, $message);
+    }
+
     /** Gửi tin nhắn tự động cho khách hàng $userId theo mẫu $type. */
     public function send(int $userId, string $type): void
     {
@@ -69,6 +85,7 @@ class TuDongTraLoiService
         }
 
         try {
+            $message = $this->personalize($message, $userId);
             $this->db->execute(
                 "INSERT INTO chat_messages (user_id, username, sender, message_type, message)
                  VALUES (?, ?, 'admin', 'text', ?)",

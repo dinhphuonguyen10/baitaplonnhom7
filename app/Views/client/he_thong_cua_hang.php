@@ -78,6 +78,10 @@ include VIEW_PATH . '/layouts/dau_trang.php';
             transition: background 0.2s ease, border-color 0.2s ease;
         }
 
+        .store-item[hidden] {
+            display: none !important;
+        }
+
         .store-item:hover,
         .store-item.active {
             border-color: var(--gold);
@@ -259,6 +263,16 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         let filteredStoreItems = [...storeItems];
         let currentStorePage = 1;
 
+        function normalizeStoreSearch(value) {
+            return String(value ?? '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .toLocaleLowerCase('vi')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
         storeItems.forEach(item => {
             item.addEventListener('click', () => {
                 const store = stores.find(location => Number(location.id) === Number(item.dataset.id));
@@ -339,8 +353,13 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         }
 
         searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim().toLocaleLowerCase('vi');
-            filteredStoreItems = storeItems.filter(item => item.textContent.toLocaleLowerCase('vi').includes(query));
+            const query = normalizeStoreSearch(searchInput.value);
+            filteredStoreItems = storeItems.filter(item => {
+                const store = stores.find(location => Number(location.id) === Number(item.dataset.id));
+                if (!store) return false;
+                const searchableText = [store.name, store.address, store.phone, store.hours].join(' ');
+                return normalizeStoreSearch(searchableText).includes(query);
+            });
             currentStorePage = 1;
             renderStores();
         });

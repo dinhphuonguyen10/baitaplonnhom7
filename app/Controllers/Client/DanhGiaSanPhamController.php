@@ -35,16 +35,34 @@ class DanhGiaSanPhamController extends BaseClientController
             exit('Phương thức không được hỗ trợ.');
         }
 
-        $productIdInput = Request::post('product_id');
+        // Khi request vượt post_max_size, PHP bỏ hết $_POST nên mã sản phẩm được gửi kèm trên URL.
+        $productIdInput = Request::post('product_id', Request::query('product_id'));
         $productId = is_scalar($productIdInput) ? filter_var($productIdInput, FILTER_VALIDATE_INT) : false;
         $productId = ($productId !== false && $productId !== null && $productId > 0) ? $productId : 0;
+
+        if ($_POST === [] && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+            $this->redirectWithMessage($productId, 'error', 'Ảnh tải lên quá lớn. Mỗi ảnh tối đa 5 MB, tối đa 5 ảnh.');
+        }
 
         try {
             $message = $this->processSubmission($productId);
             $this->redirectWithMessage($productId, 'success', $message);
         } catch (DomainException $e) {
-            $this->redirectWithMessage($productId, 'error', $e->getMessage());
+            $this->redirectWithMessage($productId, 'error', $e->getMessage(), $this->submittedInput());
         }
+    }
+
+    /** Số sao và nội dung khách vừa nhập, để điền lại form khi gửi lỗi (ảnh phải chọn lại). */
+    private function submittedInput(): array
+    {
+        $rating = Request::post('rating');
+        $comment = Request::post('comment');
+
+        return [
+            'action' => Request::post('action') === 'update' ? 'update' : 'create',
+            'rating' => is_scalar($rating) ? (int) $rating : 0,
+            'comment' => is_string($comment) ? mb_substr($comment, 0, 2000, 'UTF-8') : '',
+        ];
     }
 
     /** Kiểm tra dữ liệu form và gửi cho DanhGiaService; trả về thông báo thành công. */
@@ -75,7 +93,8 @@ class DanhGiaSanPhamController extends BaseClientController
         if (!is_string($comment)) {
             throw new DomainException('Nội dung đánh giá không hợp lệ.');
         }
-        $comment = trim($comment);
+        // Quy xuống dòng CRLF của form về LF để đếm ký tự giống trình duyệt.
+        $comment = trim(str_replace("\r\n", "\n", $comment));
         if (mb_strlen($comment, 'UTF-8') > 2000) {
             throw new DomainException('Nội dung đánh giá không được vượt quá 2.000 ký tự.');
         }
@@ -93,9 +112,9 @@ class DanhGiaSanPhamController extends BaseClientController
         );
     }
 
-    private function redirectWithMessage(int $productId, string $type, string $message): void
+    private function redirectWithMessage(int $productId, string $type, string $message, array $old = []): void
     {
-        Session::set(self::FLASH_KEY, ['type' => $type, 'message' => $message]);
+        Session::set(self::FLASH_KEY, ['type' => $type, 'message' => $message, 'old' => $old]);
         if ($productId <= 0) {
             Response::redirect('../index.php');
         }

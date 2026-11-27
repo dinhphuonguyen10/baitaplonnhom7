@@ -2,6 +2,7 @@
 
 namespace App\Controllers\Admin;
 
+use App\Controllers\Api\TroChuyenController as ChatApi;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Url;
@@ -54,6 +55,7 @@ class MauTraLoiTuDongController extends BaseAdminController
             'config' => $config,
             'typeColors' => self::TYPE_COLORS,
             'templateRows' => $rows,
+            'csrfToken' => $this->csrfToken(ChatApi::ADMIN_CSRF_KEY),
         ];
     }
 
@@ -73,6 +75,10 @@ class MauTraLoiTuDongController extends BaseAdminController
         $error = '';
         if (Request::isPost() && $template !== null) {
             try {
+                $token = Request::post('csrf_token');
+                if (!$this->verifyCsrf(is_string($token) ? $token : null, ChatApi::ADMIN_CSRF_KEY)) {
+                    throw new InvalidArgumentException('Phiên thao tác không hợp lệ. Vui lòng tải lại trang.');
+                }
                 $updated = $this->service->applyChanges(
                     $template,
                     trim((string) Request::post('title', '')),
@@ -92,6 +98,7 @@ class MauTraLoiTuDongController extends BaseAdminController
         }
 
         return $this->layout() + [
+            'csrfToken' => $this->csrfToken(ChatApi::ADMIN_CSRF_KEY),
             'templateId' => $templateId,
             'template' => $template,
             'error' => $error,

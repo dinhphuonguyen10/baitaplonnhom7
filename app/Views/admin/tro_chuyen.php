@@ -49,8 +49,8 @@
         .chat-customer strong,.chat-customer small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .chat-customer strong { color:var(--navy); font-size:14px; }
         .chat-customer small { margin-top:4px; color:#98A2AF; font-size:11px; }
-        .chat-live { color:#718198; font-size:11px; white-space:nowrap; }
-        .chat-live i { display:inline-block; width:7px; height:7px; margin-right:5px; border-radius:50%; background:#6FA58C; }
+        .chat-older { align-self:center; flex:0 0 auto; padding:6px 14px; border:1px solid var(--line); border-radius:20px; background:#fff; color:var(--navy); font-size:12px; cursor:pointer; }
+        .chat-older:disabled { opacity:.6; cursor:wait; }
         .chat-messages { display:flex; min-height:0; flex:1; flex-direction:column; gap:12px; overflow-y:auto; padding:22px; background:#F7F7F5; }
         .chat-thread-empty[hidden],.chat-messages[hidden] { display:none !important; }
         .chat-day { align-self:center; padding:5px 10px; border-radius:20px; background:#ECEBE7; color:#7E8790; font-size:10px; }
@@ -86,27 +86,12 @@
         .chat-send { display:grid; width:38px; height:38px; flex:0 0 38px; padding:0; place-items:center; border:0; border-radius:50%; background:var(--navy); color:#fff; cursor:pointer; box-shadow:0 2px 6px rgba(16,35,56,.16); transition:background .18s ease,transform .18s ease; }
         .chat-send svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
         .chat-send:hover { background:var(--navy-soft); transform:translateY(-1px); }
-.auto-button {
-  background: linear-gradient(135deg, #6A5ACD, #8A2BE2);
-  border: none;
-  border-radius: 8px;
-  padding: 0 12px;
-  font-weight: 600;
-  margin-left: 8px;
-  color: #fff;
-  cursor: pointer;
-  transition: background .18s ease, transform .18s ease;
-}
-.auto-button:hover {
-  background: linear-gradient(135deg, #7B68EE, #9370DB);
-  transform: translateY(-1px);
-}
         .chat-send:disabled { background:var(--navy); cursor:wait; }
         .chat-notice { min-height:16px; margin:0 0 5px; color:#A34B42; font-size:11px; }
         .chat-notice:empty { display:none; }
         .chat-loading { padding:22px; color:var(--muted); font-size:13px; text-align:center; }
         @media(max-width:900px) { .chat-workspace { height:calc(100vh - 200px); min-height:420px; grid-template-columns:260px minmax(0,1fr); } .page-content { padding-right:20px; padding-left:20px; } }
-        @media(max-width:680px) { .chat-workspace { position:relative; height:calc(100vh - 205px); min-height:520px; grid-template-columns:1fr; } .chat-inbox { border-right:0; } .chat-workspace.has-selection .chat-inbox { display:none; } .chat-workspace:not(.has-selection) .chat-thread { display:none; } .chat-workspace.has-selection .chat-thread { position:absolute; inset:0; } .chat-thread-head { min-height:65px; padding:10px 14px; } .chat-back { display:inline-flex !important; } .chat-messages { padding:16px 12px; } .chat-bubble { max-width:88%; } .chat-compose { padding:10px; } .chat-compose-hint { display:none; } .chat-live { display:none; } }
+        @media(max-width:680px) { .chat-workspace { position:relative; height:calc(100vh - 205px); min-height:520px; grid-template-columns:1fr; } .chat-inbox { border-right:0; } .chat-workspace.has-selection .chat-inbox { display:none; } .chat-workspace:not(.has-selection) .chat-thread { display:none; } .chat-workspace.has-selection .chat-thread { position:absolute; inset:0; } .chat-thread-head { min-height:65px; padding:10px 14px; } .chat-back { display:inline-flex !important; } .chat-messages { padding:16px 12px; } .chat-bubble { max-width:88%; } .chat-compose { padding:10px; } .chat-compose-hint { display:none; } }
         .chat-back { display:none; border:0; background:transparent; color:var(--navy); font-size:20px; cursor:pointer; }
         .welcome-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
         .chat-actions-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -125,47 +110,6 @@
         .chat-action-btn--secondary {
             background:var(--navy);
         }
-        .auto-badge {
-            display:inline-block; padding:2px 10px; border-radius:20px;
-            background:#EAF5ED; color:#3A7D55; font-size:11px; font-weight:600; margin-left:8px;
-        }
-        /* Auto-response modal */
-        .ar-overlay {
-            position:fixed; inset:0; background:rgba(13,24,38,.45); z-index:900;
-            display:flex; align-items:center; justify-content:center;
-            opacity:0; transition:opacity .22s ease;
-        }
-        .ar-overlay.is-open { opacity:1; pointer-events:all; }
-        .ar-overlay:not(.is-open) { pointer-events:none; }
-        .ar-modal {
-            width:min(560px,95vw); max-height:90vh; overflow-y:auto;
-            background:#fff; border-radius:18px; box-shadow:0 20px 60px rgba(13,24,38,.22);
-            padding:32px 32px 24px; transform:translateY(24px) scale(.97);
-            transition:transform .22s ease;
-        }
-        .ar-overlay.is-open .ar-modal { transform:none; }
-        .ar-modal h2 { font-size:18px; color:var(--navy); margin:0 0 4px; }
-        .ar-modal .ar-subtitle { color:#6B7A90; font-size:13px; margin:0 0 24px; }
-        .ar-field { margin-bottom:20px; }
-        .ar-field label { display:block; font-size:12px; font-weight:700; color:#4B5563; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
-        .ar-field textarea {
-            width:100%; box-sizing:border-box; min-height:84px; padding:12px 14px;
-            border:1.5px solid #E2E6EC; border-radius:10px; font:14px 'Roboto',sans-serif;
-            line-height:1.6; color:#1E293B; resize:vertical; outline:0;
-            transition:border-color .15s;
-        }
-        .ar-field textarea:focus { border-color:#C4A45A; box-shadow:0 0 0 3px rgba(196,164,90,.12); }
-        .ar-tip { font-size:11px; color:#9CA3AF; margin-top:5px; }
-        .ar-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
-        .ar-btn {
-            padding:9px 22px; border:0; border-radius:9px; font-size:13px; font-weight:600;
-            cursor:pointer; transition:transform .15s, filter .15s;
-        }
-        .ar-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
-        .ar-btn--save { background:linear-gradient(135deg,#1D3461,#2A5298); color:#fff; }
-        .ar-btn--cancel { background:#F1F3F5; color:#374151; }
-        .ar-status { font-size:12px; margin-right:auto; padding:6px 0; }
-
         /* Slightly larger, consistent reading sizes across customer support chat. */
         .page-content .eyebrow { font-size:11px; }
         .page-content .page-subtitle { font-size:14px; }
@@ -177,8 +121,7 @@
         .chat-conversation { font-size:15px; }
         .chat-conversation-name { font-size:14px; }
         .chat-conversation-time,
-        .chat-customer small,
-        .chat-live { font-size:12px; }
+        .chat-customer small { font-size:12px; }
         .chat-conversation-preview { font-size:13px; }
         .chat-unread { font-size:12px; }
         .chat-customer strong { font-size:15px; }
@@ -191,16 +134,8 @@
         .chat-file-icon,
         .chat-compose-hint,
         .chat-notice { font-size:11px; }
-        .chat-compose-entry textarea,
-        .ar-field textarea { font-size:15px; }
-        .chat-action-btn,
-        .ar-btn { font-size:14px; }
-        .auto-badge,
-        .ar-field label { font-size:12px; }
-        .ar-modal h2 { font-size:20px; }
-        .ar-modal .ar-subtitle { font-size:14px; }
-        .ar-tip { font-size:12px; }
-        .ar-status { font-size:13px; }
+        .chat-compose-entry textarea { font-size:15px; }
+        .chat-action-btn { font-size:14px; }
     </style>
 <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/tro_chuyen.css?v=' . (int) @filemtime(APP_ROOT . '/admin/tro_chuyen.css')); ?>">
 </head>
@@ -233,7 +168,6 @@
                 <section class="chat-thread" aria-label="Nội dung hội thoại">
                     <header class="chat-thread-head">
                         <div class="chat-customer"><button type="button" class="chat-back" id="chat-back" aria-label="Quay lại danh sách">‹</button><div class="chat-avatar" id="thread-avatar">E</div><div><strong id="thread-name">Chọn một hội thoại</strong><small id="thread-status">Tin nhắn được cập nhật tự động</small></div></div>
-                        <span class="chat-live"><i></i>Đang hoạt động</span>
                     </header>
                     <div class="chat-thread-empty" id="thread-empty">Chọn khách hàng trong hộp thư để xem và trả lời tin nhắn.</div>
                     <div class="chat-messages" id="chat-messages" hidden aria-live="polite"></div>
@@ -245,7 +179,7 @@
                             <button type="button" id="chat-preview-remove" aria-label="Bỏ ảnh">×</button>
                         </div>
                         <div class="chat-compose-entry">
-                            <button class="chat-attach" id="chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 100 MB" disabled>
+                            <button class="chat-attach" id="chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 10 MB" disabled>
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m20.5 15-5-5L5 20"></path></svg>
                             </button>
                             <input id="chat-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" hidden disabled>
@@ -267,6 +201,7 @@
 (() => {
     const base = <?php echo json_encode($appBaseUrl, JSON_UNESCAPED_SLASHES); ?>;
     const api = `${base}/api/chat/tro_chuyen_quan_tri.php`;
+    const csrfToken = <?php echo json_encode($csrfToken); ?>;
     const workspace = document.getElementById('admin-chat');
     const conversationList = document.getElementById('chat-conversations');
     const messagesBox = document.getElementById('chat-messages');
@@ -279,7 +214,10 @@
     const search = document.getElementById('chat-search');
     let conversations = [];
     let selectedId = null;
-    let latestMessageId = 0;
+    const pageSize = <?php echo \App\Services\TroChuyenService::ADMIN_PAGE_SIZE; ?>;
+    const renderedIds = new Set();
+    const drafts = new Map();
+    let historyLoaded = false;
     let sending = false;
     let pendingFile = null;
     let previewUrl = null;
@@ -310,6 +248,8 @@
         const date = new Date(String(value).replace(' ', 'T'));
         return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('vi-VN');
     };
+    const isToday = value => new Date(String(value).replace(' ', 'T')).toDateString() === new Date().toDateString();
+    const messageTime = value => isToday(value) ? timeLabel(value) : `${dateLabel(value)} ${timeLabel(value)}`.trim();
     const request = async (url, options) => {
         const response = await fetch(url, options);
         const data = await response.json().catch(() => null);
@@ -347,7 +287,7 @@
             name.textContent = item.username || 'Khách hàng';
             const time = document.createElement('span');
             time.className = 'chat-conversation-time';
-            time.textContent = timeLabel(item.last_at);
+            time.textContent = isToday(item.last_at) ? timeLabel(item.last_at) : dateLabel(item.last_at);
             const unreadCount = Number(item.unread);
             if (unreadCount > 0 && Number(item.user_id) !== selectedId) {
                 const unread = document.createElement('span');
@@ -370,8 +310,8 @@
 
     function appendMessage(message) {
         const id = Number(message.id);
-        if (!id || id <= latestMessageId) return false;
-        latestMessageId = id;
+        if (!id || renderedIds.has(id)) return false;
+        renderedIds.add(id);
         const bubble = document.createElement('article');
         bubble.className = `chat-bubble${message.sender === 'admin' ? ' is-admin' : ''}`;
         bubble.dataset.messageId = String(id);
@@ -411,10 +351,37 @@
         appendProductCard(bubble, message);
         const time = document.createElement('small');
         time.className = 'chat-bubble-time';
-        time.textContent = timeLabel(message.created_at);
+        time.textContent = messageTime(message.created_at);
         bubble.append(time);
-        messagesBox.append(bubble);
+        // Chèn đúng thứ tự ID: tin của khách có thể về sau tin nhân viên vừa gửi.
+        const next = Array.from(messagesBox.querySelectorAll('[data-message-id]')).find(item => Number(item.dataset.messageId) > id);
+        messagesBox.insertBefore(bubble, next ?? null);
         return true;
+    }
+
+    function showOlderButton() {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'chat-older';
+        button.textContent = 'Xem tin nhắn cũ hơn';
+        button.addEventListener('click', async () => {
+            const userId = selectedId;
+            button.disabled = true;
+            try {
+                const oldestId = Array.from(renderedIds).reduce((lowest, id) => Math.min(lowest, id), Infinity);
+                const data = await request(`${api}?action=messages&user_id=${encodeURIComponent(userId)}&before_id=${oldestId}`);
+                if (selectedId !== userId) return;
+                const previousHeight = messagesBox.scrollHeight;
+                data.messages.forEach(appendMessage);
+                messagesBox.scrollTop += messagesBox.scrollHeight - previousHeight;
+                if (data.messages.length < pageSize) button.remove();
+            } catch (error) {
+                notice.textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        });
+        messagesBox.prepend(button);
     }
 
     function appendMessageText(container, value) {
@@ -482,8 +449,12 @@
         const nearBottom = messagesBox.scrollHeight - messagesBox.scrollTop - messagesBox.clientHeight < 90;
         const data = await request(`${api}?action=messages&user_id=${encodeURIComponent(userId)}`);
         if (selectedId !== userId) return;
-        const fresh = data.messages.filter(item => Number(item.id) > latestMessageId);
+        const fresh = data.messages.filter(item => !renderedIds.has(Number(item.id)));
         fresh.forEach(appendMessage);
+        if (!historyLoaded) {
+            historyLoaded = true;
+            if (data.messages.length >= pageSize) showOlderButton();
+        }
         if (!keepPosition || nearBottom) messagesBox.scrollTop = messagesBox.scrollHeight;
         const lastCustomerMessageId = data.messages.reduce(
             (lastId, item) => item.sender === 'customer' ? Math.max(lastId, Number(item.id)) : lastId,
@@ -494,7 +465,7 @@
             && (fresh.some(item => item.sender === 'customer') || Number(conversation?.unread) > 0)) {
             await request(api, {
                 method:'POST',
-                headers:{'Content-Type':'application/json'},
+                headers:{'Content-Type':'application/json', 'X-CSRF-Token':csrfToken},
                 body:JSON.stringify({action:'mark_read', user_id:userId, last_message_id:lastCustomerMessageId})
             });
             if (selectedId !== userId) return;
@@ -504,8 +475,12 @@
     }
 
     async function selectConversation(userId) {
+        // Giữ riêng bản nháp từng khách để không gửi nhầm người.
+        if (selectedId) drafts.set(selectedId, textarea.value);
         selectedId = userId;
-        latestMessageId = 0;
+        textarea.value = drafts.get(userId) ?? '';
+        renderedIds.clear();
+        historyLoaded = false;
         const conversation = conversations.find(item => Number(item.user_id) === userId);
         document.getElementById('thread-name').textContent = conversation?.username || 'Khách hàng';
         document.getElementById('thread-avatar').textContent = initials(conversation?.username);
@@ -536,6 +511,7 @@
             renderConversations();
             if (selectedId && !conversations.some(item => Number(item.user_id) === selectedId)) {
                 selectedId = null;
+                textarea.value = '';
                 workspace.classList.remove('has-selection');
                 emptyState.hidden = false;
                 messagesBox.hidden = true;
@@ -572,7 +548,7 @@
                 const formData = new FormData();
                 formData.append('file', pendingFile);
                 formData.append('user_id', String(targetUserId));
-                const uploaded = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', body:formData});
+                const uploaded = await request(`${base}/api/chat/tai_len_tep_dinh_kem.php`, {method:'POST', headers:{'X-CSRF-Token':csrfToken}, body:formData});
                 clearPending();
                 notice.textContent = '';
                 if (selectedId === targetUserId) {
@@ -583,9 +559,10 @@
             if (message) {
                 const data = await request(api, {
                     method:'POST',
-                    headers:{'Content-Type':'application/json'},
+                    headers:{'Content-Type':'application/json', 'X-CSRF-Token':csrfToken},
                     body:JSON.stringify({action:'send', user_id:targetUserId, message})
                 });
+                drafts.delete(targetUserId);
                 if (selectedId === targetUserId) {
                     appendMessage(data.message);
                     messagesBox.scrollTop = messagesBox.scrollHeight;
@@ -607,8 +584,8 @@
     fileInput.addEventListener('change', () => {
         const file = fileInput.files?.[0];
         if (!file || !selectedId) return;
-        if (file.size < 1 || file.size > 100 * 1024 * 1024) {
-            notice.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 100 MB.';
+        if (file.size < 1 || file.size > 10 * 1024 * 1024) {
+            notice.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 10 MB.';
             clearPending();
             return;
         }
@@ -626,75 +603,6 @@
         if (!attachButton.disabled) fileInput.click();
     });
 
-
-// ─── Auto-response modal ───────────────────────────────────────────────
-const arOverlay = document.createElement('div');
-arOverlay.className = 'ar-overlay';
-arOverlay.setAttribute('role', 'dialog');
-arOverlay.setAttribute('aria-modal', 'true');
-arOverlay.setAttribute('aria-label', 'Quản lý phản hồi tự động');
-arOverlay.innerHTML = `
-  <div class="ar-modal">
-    <h2>Phản hồi tự động</h2>
-    <p class="ar-subtitle">Khi khách nhắn tin lần đầu hoặc đặt hàng xong, hệ thống tự động gửi tin theo mẫu dưới đây.</p>
-    <div class="ar-field">
-      <label>💬 Khi khách nhắn tin lần đầu</label>
-      <textarea id="ar-new-message" rows="4" placeholder="VD: Xin chào! Chúng tôi đã nhận được tin nhắn và sẽ phản hồi sớm..."></textarea>
-      <p class="ar-tip">⚠️ Chỉ gửi 1 lần cho lần nhắn đầu tiên của mỗi khách.</p>
-    </div>
-    <div class="ar-field">
-      <label>📦 Khi khách đặt hàng thành công</label>
-      <textarea id="ar-order-thankyou" rows="4" placeholder="VD: Cảm ơn bạn đã đặt hàng! Chúng tôi sẽ xử lý đơn hàng và liên hệ sớm..."></textarea>
-      <p class="ar-tip">⚠️ Gửi ngay sau khi đặt hàng thành công (chỉ áp dụng cho khách đã đăng nhập).</p>
-    </div>
-    <div class="ar-actions">
-      <span class="ar-status" id="ar-status"></span>
-      <button class="ar-btn ar-btn--cancel" id="ar-cancel">Đóng</button>
-      <button class="ar-btn ar-btn--save" id="ar-save">Lưu thay đổi</button>
-    </div>
-  </div>
-`;
-document.body.appendChild(arOverlay);
-
-const arStatus = document.getElementById('ar-status');
-
-async function openAutoConfig() {
-  arStatus.textContent = 'Đang tải...';
-  arOverlay.classList.add('is-open');
-  try {
-    const data = await request(`${api}?action=get_auto_responses`);
-    document.getElementById('ar-new-message').value = data.responses.new_message || '';
-    document.getElementById('ar-order-thankyou').value = data.responses.order_thankyou || '';
-    arStatus.textContent = '';
-  } catch (e) {
-    arStatus.textContent = 'Không thể tải mẫu.';
-  }
-}
-
-// The management button now navigates to the full template list page.
-document.getElementById('ar-cancel').addEventListener('click', () => arOverlay.classList.remove('is-open'));
-arOverlay.addEventListener('click', e => { if (e.target === arOverlay) arOverlay.classList.remove('is-open'); });
-
-document.getElementById('ar-save').addEventListener('click', async () => {
-  const responses = {
-    new_message: document.getElementById('ar-new-message').value.trim(),
-    order_thankyou: document.getElementById('ar-order-thankyou').value.trim()
-  };
-  arStatus.textContent = 'Đang lưu...';
-  document.getElementById('ar-save').disabled = true;
-  try {
-    await request(api, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'save_auto_responses', responses})});
-    arStatus.style.color = '#3A7D55';
-    arStatus.textContent = '✔ Đã lưu thành công!';
-    setTimeout(() => arOverlay.classList.remove('is-open'), 1200);
-  } catch (e) {
-    arStatus.style.color = '#A34B42';
-    arStatus.textContent = 'Lỗi khi lưu, thử lại.';
-  } finally {
-    document.getElementById('ar-save').disabled = false;
-  }
-});
-// ───────────────────────────────────────────────────────────────────────
 
     textarea.addEventListener('keydown', event => {
         if (event.key === 'Enter' && !event.shiftKey) {

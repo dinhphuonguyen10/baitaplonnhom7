@@ -50,7 +50,6 @@ return [
     '/admin/don_hang.php' => [Admin\DonHangController::class, 'index'],
     '/admin/tai_khoan.php' => [Admin\TaiKhoanController::class, 'index'],
     '/admin/cua_hang.php' => [Admin\CuaHangController::class, 'index'],
-    '/admin/anh_bia.php' => [Admin\AnhBiaController::class, 'index'],
     '/admin/tro_chuyen.php' => [Admin\TroChuyenController::class, 'index'],
     '/admin/mau_tra_loi_tu_dong.php' => [Admin\MauTraLoiTuDongController::class, 'index'],
     '/admin/sua_mau_tra_loi_tu_dong.php' => [Admin\MauTraLoiTuDongController::class, 'edit'],

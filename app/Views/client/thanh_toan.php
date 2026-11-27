@@ -611,6 +611,9 @@ use App\Core\View;
                 </div>
 
                 <div class="demo-payment-actions" id="payment-actions">
+                    <button class="demo-payment-failure" id="refresh-payment-qr" type="button">
+                        Đổi mã QR
+                    </button>
                     <button class="demo-payment-failure" type="button" onclick="reportVietQrPayment('failed')">
                         Thanh toán thất bại
                     </button>
@@ -694,6 +697,8 @@ function renderPaymentQr(payload) {
 async function refreshVietQr() {
     if (paymentQrRefreshing) return false;
     paymentQrRefreshing = true;
+    const refreshButton = document.getElementById('refresh-payment-qr');
+    if (refreshButton) refreshButton.disabled = true;
     setPaymentMessage('Đang làm mới mã chuyển khoản', 'Vui lòng chờ trong giây lát.');
 
     try {
@@ -727,6 +732,7 @@ async function refreshVietQr() {
         return false;
     } finally {
         paymentQrRefreshing = false;
+        if (refreshButton) refreshButton.disabled = false;
     }
 }
 
@@ -835,6 +841,10 @@ if (paymentQrPayload) {
         renderPaymentQr(paymentQrPayload);
     } catch (error) {
         setPaymentMessage('Không hiển thị được mã QR', error.message, true);
+    }
+    const refreshButton = document.getElementById('refresh-payment-qr');
+    if (refreshButton) {
+        refreshButton.addEventListener('click', () => refreshVietQr());
     }
     updatePaymentQrCountdown();
     window.setInterval(updatePaymentQrCountdown, 1000);

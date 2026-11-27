@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="<?php echo $escape($appBaseUrl . '/admin/style.css'); ?>">
     <style>
         .review-panel { margin: 20px 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
-        .review-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .review-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
         .review-stat { padding: 14px 16px; border-radius: 9px; background: #f5f7fa; }
         .review-stat span { display: block; color: var(--muted); font-size: 12px; }
         .review-stat strong { display: block; margin-top: 5px; color: var(--navy); font-size: 22px; }
@@ -37,8 +37,6 @@
         .review-reply-action:hover { background: #2a5298; box-shadow: 0 3px 8px rgba(29, 52, 97, .18); transform: translateY(-1px); }
         .review-reply-action:focus-visible { outline: 3px solid rgba(181, 140, 84, .38); outline-offset: 2px; }
         .review-reply-action:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(29, 52, 97, .18); }
-        .verified-badge { display: inline-block; margin-top: 5px; padding: 3px 8px; border-radius: 20px; background: #ecfdf3; color: #027a48; font-size: 11px; font-weight: 700; }
-        .unverified-badge { background: #f3f4f6; color: #667085; }
         .review-actions { display: flex; gap: 6px; white-space: nowrap; }
         .review-actions button { border: 0; border-radius: 6px; padding: 7px 9px; cursor: pointer; font-weight: 700; }
         .review-empty { padding: 24px; color: var(--muted); text-align: center; }
@@ -49,6 +47,10 @@
         .edit-dialog label { display: block; margin-top: 12px; font-weight: 700; }
         .edit-dialog select, .edit-dialog textarea { width: 100%; margin-top: 6px; padding: 9px; border: 1px solid #cbd5e1; border-radius: 7px; }
         .edit-dialog textarea { min-height: 130px; resize: vertical; }
+        .reply-target { max-height: 160px; overflow-y: auto; padding: 10px 12px; border-radius: 8px; background: #f5f7fa; overflow-wrap: anywhere; }
+        .reply-target p { margin: 6px 0 0; white-space: pre-line; }
+        .reply-error { margin: 0 0 10px; color: #b3261e; }
+        a.review-stat { color: inherit; text-decoration: none; }
         .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
         .dialog-actions button { border: 0; border-radius: 7px; padding: 9px 13px; font-weight: 700; cursor: pointer; }
         .dialog-save { background: var(--navy); color: #fff; }
@@ -74,7 +76,6 @@
             <div class="welcome-row">
                 <div>
                     <h1>Quản lý đánh giá sản phẩm</h1>
-                    <p class="page-subtitle">Kiểm duyệt nội dung đánh giá và theo dõi mức hài lòng của khách hàng.</p>
                 </div>
             </div>
 
@@ -87,8 +88,9 @@
             <section class="review-panel" aria-labelledby="reviews-title">
                 <div class="review-summary">
                     <div class="review-stat"><span>Tổng đánh giá</span><strong><?php echo $totalReviews; ?></strong></div>
-                    <div class="review-stat"><span>Điểm trung bình</span><strong><?php echo number_format($averageRating, 1, '.', ''); ?>/5</strong></div>
+                    <div class="review-stat"><span>Điểm trung bình</span><strong><?php echo number_format($averageRating, 1, ',', '.'); ?>/5</strong></div>
                     <div class="review-stat"><span>5 sao</span><strong><?php echo $reviewCountByRating[5]; ?></strong></div>
+                    <a class="review-stat" href="<?php echo $escape($appBaseUrl . '/admin/danh_gia.php?status=pending'); ?>"><span>Chưa phản hồi</span><strong><?php echo $pendingReplyCount; ?></strong></a>
                 </div>
 
                 <form class="review-toolbar" method="get" action="<?php echo $escape($appBaseUrl . '/admin/danh_gia.php'); ?>">
@@ -106,6 +108,11 @@
                         <?php for ($rating = 5; $rating >= 1; $rating--): ?>
                             <option value="<?php echo $rating; ?>"<?php echo $ratingFilter === $rating ? ' selected' : ''; ?>><?php echo $rating; ?> sao</option>
                         <?php endfor; ?>
+                    </select>
+                    <select name="status" aria-label="Lọc theo tình trạng phản hồi">
+                        <option value="">Tất cả phản hồi</option>
+                        <option value="pending"<?php echo $replyStatus === 'pending' ? ' selected' : ''; ?>>Chưa phản hồi</option>
+                        <option value="replied"<?php echo $replyStatus === 'replied' ? ' selected' : ''; ?>>Đã phản hồi</option>
                     </select>
                     <button type="submit">Lọc</button>
                 </form>
@@ -149,10 +156,6 @@
                                     </td>
                                     <td>
                                         <?php echo $escape($review['username']); ?>
-                                        <br>
-                                        <span class="verified-badge<?php echo empty($review['verified']) ? ' unverified-badge' : ''; ?>">
-                                            <?php echo empty($review['verified']) ? 'Chưa xác minh' : 'Đã mua hàng'; ?>
-                                        </span>
                                     </td>
                                     <td><span class="review-stars"><?php echo str_repeat('★', $rating) . str_repeat('☆', 5 - $rating); ?></span></td>
                                     <td><div class="review-comment"><?php echo $escape((string) ($review['comment'] ?? 'Không có nội dung')); ?></div></td>
@@ -182,10 +185,14 @@
                                     </td>
                                     <td><?php echo $date ? $escape(date('d/m/Y H:i', $date)) : 'Không rõ'; ?></td>
                                     <td>
-                                        <button type="button" class="review-reply-action" onclick='openReviewReply(<?php echo json_encode([
+                                        <button type="button" class="review-reply-action" data-review-id="<?php echo $reviewId; ?>" onclick='openReviewReply(<?php echo json_encode([
                                             'id' => $reviewId,
                                             'reply' => (string) ($review['admin_reply'] ?? ''),
-                                        ], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'><?php echo empty($review['admin_reply']) ? 'Trả lời' : 'Sửa trả lời'; ?></button>
+                                            'customer' => (string) $review['username'],
+                                            'product' => (string) $review['product_name'],
+                                            'stars' => str_repeat('★', $rating) . str_repeat('☆', 5 - $rating),
+                                            'comment' => (string) ($review['comment'] ?? 'Không có nội dung'),
+                                        ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'><?php echo empty($review['admin_reply']) ? 'Trả lời' : 'Sửa trả lời'; ?></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -201,6 +208,12 @@
 <dialog class="edit-dialog" id="review-reply-dialog">
     <form method="post">
         <h3>Phản hồi đánh giá</h3>
+        <p class="reply-error" id="reply-error" role="alert" hidden></p>
+        <div class="reply-target">
+            <strong id="reply-target-title"></strong>
+            <div class="review-stars" id="reply-target-stars"></div>
+            <p id="reply-target-comment"></p>
+        </div>
         <input type="hidden" name="csrf_token" value="<?php echo $escape($csrfToken); ?>">
         <input type="hidden" name="action" value="reply">
         <input type="hidden" name="review_id" id="reply-review-id">
@@ -217,11 +230,27 @@
 function openReviewReply(review) {
     document.getElementById('reply-review-id').value = String(review.id);
     document.getElementById('review-reply-text').value = review.reply || '';
+    document.getElementById('reply-target-title').textContent = `${review.customer} · ${review.product}`;
+    document.getElementById('reply-target-stars').textContent = review.stars;
+    document.getElementById('reply-target-comment').textContent = review.comment;
+    document.getElementById('reply-error').hidden = true;
     document.getElementById('review-reply-dialog').showModal();
 }
 function closeReviewReply() {
     document.getElementById('review-reply-dialog').close();
 }
+<?php if (is_array($notice) && is_array($notice['old'] ?? null)): ?>
+(() => {
+    const old = <?php echo json_encode($notice['old'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+    const button = document.querySelector(`[data-review-id="${Number(old.review_id)}"]`);
+    if (!button) return;
+    button.click();
+    document.getElementById('review-reply-text').value = old.reply;
+    const error = document.getElementById('reply-error');
+    error.textContent = <?php echo json_encode((string) $notice['message'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+    error.hidden = false;
+})();
+<?php endif; ?>
 </script>
 </body>
 </html>

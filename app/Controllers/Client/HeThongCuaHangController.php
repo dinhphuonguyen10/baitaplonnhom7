@@ -24,6 +24,7 @@ class HeThongCuaHangController extends BaseClientController
 
         return [
             'pageTitle' => 'Hệ thống cửa hàng - ÉCRIN JEWELRY',
+            'bodyClass' => 'page-no-product-search',
             'clientStores' => $clientStores,
             'firstClientStore' => $clientStores[0] ?? self::EMPTY_STORE,
         ];

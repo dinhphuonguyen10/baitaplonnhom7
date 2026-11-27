@@ -42,7 +42,8 @@ class QuanLyDanhGiaService
      */
     public function reply(int $reviewId, string $reply, string $adminName): string
     {
-        $reply = trim($reply);
+        // Form gửi xuống dòng dạng CRLF; quy về LF để đếm ký tự giống trình duyệt.
+        $reply = trim(str_replace("\r\n", "\n", $reply));
         if ($reply === '') {
             throw new InvalidArgumentException('Vui lòng nhập nội dung phản hồi.');
         }
@@ -81,17 +82,14 @@ class QuanLyDanhGiaService
      *
      * @return array{reviews: array, reviewImagesByReview: array, reviewsError: string}
      */
-    public function listing(int $productFilter, int $ratingFilter, string $search): array
+    public function listing(int $productFilter, int $ratingFilter, string $search, string $replyStatus = ''): array
     {
         $reviews = [];
         $reviewImagesByReview = [];
         $reviewsError = '';
 
         try {
-            foreach ($this->reviews->findForAdmin($productFilter, $ratingFilter, $search) as $row) {
-                $row['verified'] = (bool) $row['verified'];
-                $reviews[] = $row;
-            }
+            $reviews = $this->reviews->findForAdmin($productFilter, $ratingFilter, $search, $replyStatus);
         } catch (Throwable $exception) {
             error_log('Admin review list failed: ' . $exception->getMessage());
             $reviews = [];
@@ -118,7 +116,7 @@ class QuanLyDanhGiaService
     /**
      * Thống kê toàn bộ đánh giá.
      *
-     * @return array{totalReviews: int, averageRating: float, reviewCountByRating: array<int, int>}
+     * @return array{totalReviews: int, averageRating: float, reviewCountByRating: array<int, int>, pendingReplyCount: int}
      */
     public function summary(): array
     {
@@ -138,6 +136,7 @@ class QuanLyDanhGiaService
             'totalReviews' => $totalReviews,
             'averageRating' => $totalReviews > 0 ? $ratingSum / $totalReviews : 0.0,
             'reviewCountByRating' => $reviewCountByRating,
+            'pendingReplyCount' => $this->reviews->countPendingReplyForAdmin(),
         ];
     }
 }

@@ -34,6 +34,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     .support-chat-agent small { margin-top:4px; color:#8995A4; font-size:13px; }
     .support-chat-online { color:#718198; font-size:12px; white-space:nowrap; }
     .support-chat-online i { display:inline-block; width:7px; height:7px; margin-right:5px; border-radius:50%; background:#6FA58C; }
+    .support-chat-online.is-offline i { background:#B0B7C0; }
     .support-chat-messages { display:flex; min-height:0; flex:1; flex-direction:column; gap:12px; overflow-y:auto; overscroll-behavior:contain; padding:23px; background:linear-gradient(#FBFAF8,#F7F6F3); }
     .support-chat-welcome { align-self:center; max-width:340px; margin:auto; padding:21px 22px; border:1px solid #EAE5DA; border-radius:15px; background:#fff; color:#66717D; text-align:center; box-shadow:0 5px 20px rgba(16,35,56,.04); }
     .support-chat-welcome-icon { display:grid; width:43px; height:43px; margin:0 auto 12px; place-items:center; border-radius:50%; background:#F5F0E5; color:#9B835D; font-size:21px; }
@@ -111,8 +112,8 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         </aside>
         <section class="support-chat-panel">
             <header class="support-chat-top">
-                <div class="support-chat-agent"><span class="support-chat-agent-avatar">✧</span><span><strong>Chăm sóc khách hàng ÉCRIN</strong><small>Chúng tôi thường phản hồi sớm</small></span></div>
-                <span class="support-chat-online"><i></i>Đang trực tuyến</span>
+                <div class="support-chat-agent"><span class="support-chat-agent-avatar">✧</span><span><strong>Chăm sóc khách hàng ÉCRIN</strong><small><?php echo $isSupportHours ? 'Chúng tôi thường phản hồi sớm' : 'Chúng tôi sẽ phản hồi trong giờ hỗ trợ'; ?></small></span></div>
+                <span class="support-chat-online<?php echo $isSupportHours ? '' : ' is-offline'; ?>"><i></i><?php echo $isSupportHours ? 'Trong giờ hỗ trợ' : 'Ngoài giờ hỗ trợ'; ?></span>
             </header>
             <?php if ($isCustomerLoggedIn): ?>
                 <div class="support-chat-messages" id="customer-chat-messages" aria-live="polite">
@@ -126,7 +127,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
                         <button type="button" id="customer-chat-preview-remove" aria-label="Bỏ ảnh">×</button>
                     </div>
                     <div class="support-chat-compose-entry">
-                        <button class="support-chat-attach" id="customer-chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 100 MB">
+                        <button class="support-chat-attach" id="customer-chat-attach" type="button" aria-label="Tải ảnh" title="Tải ảnh · tối đa 10 MB">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m20.5 15-5-5L5 20"></path></svg>
                         </button>
                         <input id="customer-chat-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp" hidden>
@@ -169,7 +170,8 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     const previewRemove = document.getElementById('customer-chat-preview-remove');
     const api = `${base}/api/chat`;
     let sharedProduct = <?php echo json_encode($chatProduct, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-    let latestId = 0;
+    const renderedIds = new Set();
+    let syncedId = 0; // ID lớn nhất đã nhận từ máy chủ qua tải định kỳ (không tính tin vừa gửi)
     let sending = false;
 
     if (sharedProduct && !input.value.trim()) {
@@ -186,13 +188,17 @@ include VIEW_PATH . '/layouts/dau_trang.php';
 
     const timeLabel = value => {
         const date = new Date(String(value).replace(' ', 'T'));
-        return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'});
+        if (Number.isNaN(date.getTime())) return '';
+        const time = date.toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'});
+        return date.toDateString() === new Date().toDateString() ? time : `${date.toLocaleDateString('vi-VN')} ${time}`;
     };
     async function request(url, options) {
         const response = await fetch(url, options);
         const data = await response.json().catch(() => null);
         if (!data) throw new Error('Máy chủ trả về phản hồi không hợp lệ.');
-        if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Không thể kết nối máy chủ.');
+        if (!response.ok || data.status !== 'success') {
+            throw Object.assign(new Error(data.message || 'Không thể kết nối máy chủ.'), {status: response.status});
+        }
         return data;
     }
     function appendMessageText(container, value) {
@@ -254,8 +260,8 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     }
     function renderMessage(message) {
         const id = Number(message.id);
-        if (!id || id <= latestId) return false;
-        latestId = id;
+        if (!id || renderedIds.has(id)) return false;
+        renderedIds.add(id);
         welcome.hidden = true;
         const bubble = document.createElement('article');
         bubble.className = `support-chat-bubble${message.sender === 'customer' ? ' is-customer' : ''}`;
@@ -295,13 +301,15 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         const time = document.createElement('time');
         time.textContent = timeLabel(message.created_at);
         bubble.append(time);
-        messagesBox.append(bubble);
+        const next = Array.from(messagesBox.querySelectorAll('[data-message-id]')).find(item => Number(item.dataset.messageId) > id);
+        messagesBox.insertBefore(bubble, next ?? null);
         return true;
     }
     async function loadMessages() {
         const nearBottom = messagesBox.scrollHeight - messagesBox.scrollTop - messagesBox.clientHeight < 90;
-        const data = await request(`${api}/khach_lay_tin_nhan.php`);
+        const data = await request(`${api}/khach_lay_tin_nhan.php?after_id=${syncedId}`);
         data.messages.forEach(renderMessage);
+        syncedId = data.messages.reduce((highest, item) => Math.max(highest, Number(item.id)), syncedId);
         if (nearBottom) messagesBox.scrollTop = messagesBox.scrollHeight;
     }
     let pendingFile = null;
@@ -340,11 +348,21 @@ include VIEW_PATH . '/layouts/dau_trang.php';
                 note.textContent = '';
             }
             if (message) {
-                const data = await request(`${api}/khach_gui_tin_nhan.php`, {
-                    method:'POST',
-                    headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({message, product_id:sharedProduct ? Number(sharedProduct.id) : null})
-                });
+                let data;
+                try {
+                    data = await request(`${api}/khach_gui_tin_nhan.php`, {
+                        method:'POST',
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({message, product_id:sharedProduct ? Number(sharedProduct.id) : null})
+                    });
+                } catch (error) {
+                    // 404 khi đang kèm sản phẩm: sản phẩm không còn bán, bỏ đính kèm để gửi lại được.
+                    if (sharedProduct && error.status === 404) {
+                        sharedProduct = null;
+                        throw new Error(`${error.message} Bấm gửi lại để gửi tin không kèm sản phẩm.`);
+                    }
+                    throw error;
+                }
                 renderMessage(data.message);
                 input.value = '';
                 sharedProduct = null;
@@ -364,8 +382,8 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     fileInput.addEventListener('change', () => {
         const file = fileInput.files?.[0];
         if (!file) return;
-        if (file.size < 1 || file.size > 100 * 1024 * 1024) {
-            note.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 100 MB.';
+        if (file.size < 1 || file.size > 10 * 1024 * 1024) {
+            note.textContent = 'Ảnh phải có dung lượng từ 1 byte đến 10 MB.';
             clearPending();
             return;
         }
@@ -385,8 +403,19 @@ include VIEW_PATH . '/layouts/dau_trang.php';
             form.requestSubmit();
         }
     });
-    loadMessages().catch(error => { note.textContent = error.message; });
-    window.setInterval(() => loadMessages().catch(error => { note.textContent = error.message; }), 4000);
+    let loadError = '';
+    const refresh = () => loadMessages().then(() => {
+        // Tải lại được thì xóa thông báo lỗi tải trước đó (giữ nguyên các thông báo khác).
+        if (loadError && note.textContent === loadError) note.textContent = '';
+        loadError = '';
+    }).catch(error => {
+        loadError = error.message;
+        note.textContent = loadError;
+    });
+    refresh();
+    // Không gọi máy chủ khi khách đang ở tab khác; quay lại thì tải ngay.
+    window.setInterval(() => { if (!document.hidden) refresh(); }, 4000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 })();
 </script>
 <?php endif; ?>

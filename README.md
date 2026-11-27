@@ -18,7 +18,7 @@ Baitaplon/
 │   ├── san_pham.php, danh_muc.php         # Quản lý sản phẩm, danh mục
 │   ├── don_hang.php, thanh_toan.php       # Quản lý đơn hàng (thanh_toan.php chuyển hướng về don_hang.php)
 │   ├── tai_khoan.php, cua_hang.php        # Quản lý tài khoản nhân viên, cửa hàng
-│   ├── tro_chuyen.php, anh_bia.php        # Quản lý chat, banner trang chủ
+│   ├── tro_chuyen.php                     # Quản lý chat
 │   ├── bao_cao.php, danh_gia.php          # Báo cáo thống kê, đánh giá sản phẩm
 │   ├── mau_tra_loi_tu_dong.php            # Mẫu trả lời tự động (sua_mau_tra_loi_tu_dong.php để sửa)
 │   ├── style.css                          #  CSS quản trị

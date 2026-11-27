@@ -19,6 +19,7 @@
         .period-filter button { min-height: 39px; padding: 0 14px; border: 1px solid var(--navy); border-radius: 7px; background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; }
         .period-filter .reset-period { display: inline-flex; min-height: 39px; align-items: center; padding: 0 14px; border: 1px solid #dce2e9; border-radius: 7px; color: var(--navy); background: #fff; font-weight: 600; }
         .period-comparison { margin: 8px 0 0; color: #718198; font-size: 12px; }
+        .period-error { margin: 8px 0 0; color: #c14d46; font-size: 13px; font-weight: 600; }
         .business-panel, .orders-panel, .best-panel, .revenue-panel { border: 1px solid #ebedf1; border-radius: 12px; background: #fff; box-shadow: var(--shadow); }
         .business-panel { margin-bottom: 18px; padding: 20px 20px 18px; }
         .business-panel h2, .orders-panel h2, .best-panel h2, .revenue-panel h2 { margin: 0; color: var(--navy); font-size: 18px; }
@@ -95,7 +96,7 @@
             <div class="welcome-row">
                 <div>
                     <h1>Tổng quan</h1>
-                    <p class="page-subtitle">Chào mừng trở lại! Đây là tình hình kinh doanh của ÉCRIN hôm nay.</p>
+                    <p class="page-subtitle">Chào mừng trở lại! Đây là tình hình kinh doanh của ÉCRIN.</p>
                 </div>
                 <form method="get" class="period-filter">
                     <div class="period-field">
@@ -121,6 +122,9 @@
                     <button type="submit">Áp dụng</button>
                     <a class="reset-period" href="<?php echo $escape($appBaseUrl . '/admin/index.php'); ?>">Đặt lại</a>
                 </form>
+                <?php if ($periodError !== ''): ?>
+                    <p class="period-error" role="alert"><?php echo $escape($periodError); ?></p>
+                <?php endif; ?>
                 <p class="period-comparison">So với kỳ trước: <?php echo $escape($comparisonPeriodLabel); ?></p>
             </div>
 
@@ -132,15 +136,15 @@
                         <strong class="business-value"><?php echo $escape($formatCompact((float) $stats['revenue'])); ?></strong>
                     </article>
                     <article class="business-card">
-                        <span class="business-label">Tổng đơn<?php if ($comparisonNotes['orders']['text'] !== ''): ?><span class="business-comparison <?php echo $escape($comparisonNotes['orders']['class']); ?>"><?php echo $escape($comparisonNotes['orders']['text']); ?></span><?php endif; ?></span>
+                        <span class="business-label">Tổng đơn <span title="Không tính đơn đã hủy">ⓘ</span><?php if ($comparisonNotes['orders']['text'] !== ''): ?><span class="business-comparison <?php echo $escape($comparisonNotes['orders']['class']); ?>"><?php echo $escape($comparisonNotes['orders']['text']); ?></span><?php endif; ?></span>
                         <strong class="business-value"><?php echo number_format((int) $stats['orders']); ?></strong>
                     </article>
                     <article class="business-card">
                         <span class="business-label">Giá trị trung bình đơn</span>
-                        <strong class="business-value"><?php echo $escape(number_format($averageOrder / 1000000, 2, '.', '')); ?>tr</strong>
+                        <strong class="business-value"><?php echo $escape($formatCompact((float) $averageOrder)); ?></strong>
                     </article>
                     <article class="business-card">
-                        <span class="business-label">Số lượng hàng bán <span title="Tổng số sản phẩm đã bán">ⓘ</span></span>
+                        <span class="business-label">Số lượng hàng bán <span title="Tổng số sản phẩm trong các đơn đã giao hoặc hoàn thành">ⓘ</span></span>
                         <strong class="business-value"><?php echo number_format((int) $stats['items_sold']); ?></strong>
                     </article>
                 </div>
