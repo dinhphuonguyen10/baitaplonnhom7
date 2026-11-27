@@ -175,24 +175,78 @@ $updateOld = ($reviewOld['action'] ?? '') === 'update' ? $reviewOld : [];
                 <label class="review-comment-label" for="review-images">Ảnh đánh giá (tối đa 5 ảnh, 5 MB mỗi ảnh)</label>
                 <input id="review-images" name="images[]" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple>
                 <p class="review-form-message" id="review-images-error" role="alert" style="color:#b3261e" hidden></p>
+                <div class="review-image-preview" id="review-images-preview" aria-live="polite"></div>
                 <button class="review-submit-button" type="submit">Gửi đánh giá</button>
             </form>
             <script>
             (function () {
                 const input = document.getElementById('review-images');
                 const message = document.getElementById('review-images-error');
+                const preview = document.getElementById('review-images-preview');
+                const maxImages = <?php echo \App\Services\DanhGiaService::MAX_IMAGES; ?>;
+                const maxBytes = <?php echo \App\Services\DanhGiaService::MAX_IMAGE_BYTES; ?>;
+                let selected = [];
+
+                function showError(text) {
+                    message.textContent = text;
+                    message.hidden = text === '';
+                }
+
+                // Ghi danh sách đã chọn ngược lại vào ô file để form gửi đúng các ảnh đang hiển thị.
+                function syncInput() {
+                    const transfer = new DataTransfer();
+                    selected.forEach(item => transfer.items.add(item.file));
+                    input.files = transfer.files;
+                }
+
+                function render() {
+                    preview.replaceChildren(...selected.map(function (item) {
+                        const figure = document.createElement('div');
+                        figure.className = 'review-image-preview-item';
+                        const image = document.createElement('img');
+                        image.src = item.url;
+                        image.alt = item.file.name;
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'review-image-remove';
+                        remove.textContent = '×';
+                        remove.title = 'Xóa ảnh';
+                        remove.setAttribute('aria-label', 'Xóa ảnh ' + item.file.name);
+                        remove.addEventListener('click', function () {
+                            URL.revokeObjectURL(item.url);
+                            selected = selected.filter(other => other !== item);
+                            syncInput();
+                            showError('');
+                            render();
+                        });
+                        figure.append(image, remove);
+                        return figure;
+                    }));
+                }
+
+                // Mỗi lần chọn sẽ cộng thêm ảnh, không thay thế các ảnh đã chọn trước đó.
                 input.addEventListener('change', function () {
-                    const files = Array.from(input.files);
                     let error = '';
-                    if (files.length > <?php echo \App\Services\DanhGiaService::MAX_IMAGES; ?>) {
-                        error = 'Bạn chỉ có thể đính kèm tối đa 5 ảnh.';
-                    } else if (files.some(file => file.size > <?php echo \App\Services\DanhGiaService::MAX_IMAGE_BYTES; ?>)) {
-                        error = 'Mỗi ảnh phải có dung lượng tối đa 5 MB.';
-                    }
-                    // setCustomValidity khiến trình duyệt không cho gửi form khi ảnh chưa hợp lệ.
-                    input.setCustomValidity(error);
-                    message.textContent = error;
-                    message.hidden = error === '';
+                    Array.from(input.files).forEach(function (file) {
+                        const duplicated = selected.some(item => item.file.name === file.name
+                            && item.file.size === file.size
+                            && item.file.lastModified === file.lastModified);
+                        if (duplicated) {
+                            return;
+                        }
+                        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                            error = 'Chỉ nhận ảnh JPG, PNG hoặc WEBP.';
+                        } else if (file.size > maxBytes) {
+                            error = 'Mỗi ảnh phải có dung lượng tối đa 5 MB.';
+                        } else if (selected.length >= maxImages) {
+                            error = 'Bạn chỉ có thể đính kèm tối đa ' + maxImages + ' ảnh.';
+                        } else {
+                            selected.push({ file: file, url: URL.createObjectURL(file) });
+                        }
+                    });
+                    syncInput();
+                    showError(error);
+                    render();
                 });
             })();
             </script>

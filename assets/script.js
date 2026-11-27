@@ -3036,13 +3036,14 @@ function initCategoryFilters() {
     // Lắng nghe thay đổi các checkbox
     [inStockCb, discountCb, giftCb].forEach(cb => {
         if (cb) {
-            cb.addEventListener('change', applyFiltersAndSort);
+            // Không truyền thẳng hàm vì tham số đầu là số trang, không phải đối tượng sự kiện.
+            cb.addEventListener('change', () => applyFiltersAndSort(1));
         }
     });
 
     // Nút Áp dụng khoảng giá
     if (applyBtn) {
-        applyBtn.addEventListener('click', applyFiltersAndSort);
+        applyBtn.addEventListener('click', () => applyFiltersAndSort(1));
     }
 
     // Đưa toàn bộ bộ lọc về trạng thái ban đầu
