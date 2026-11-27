@@ -200,6 +200,19 @@ use App\Helpers\DinhDangSanPhamQuanTri;
                                         <td class="prod-name-cell">
                                             <div class="prod-name"><?php echo $escape($p['name']); ?></div>
                                             <small style="color: #64748b;">SKU: <?php echo $escape($p['sku']); ?></small>
+                                            <?php if (!empty($p['home_featured']) || !empty($p['home_suggest']) || !empty($p['home_new'])): ?>
+                                                <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+                                                    <?php if (!empty($p['home_featured'])): ?>
+                                                        <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #fef08a; color: #854d0e; font-weight: 600;">⭐ Bán chạy</span>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($p['home_suggest'])): ?>
+                                                        <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #e0e7ff; color: #3730a3; font-weight: 600;">💡 Gợi ý</span>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($p['home_new'])): ?>
+                                                        <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #dcfce7; color: #166534; font-weight: 600;">🆕 Mới</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endif; ?>
                                             <?php if (!empty($p['description'])): ?>
                                                 <div class="prod-desc-preview" title="<?php echo $escape($p['description']); ?>"><?php echo $escape($p['description']); ?></div>
                                             <?php endif; ?>

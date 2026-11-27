@@ -200,6 +200,17 @@ class DanhSachSanPhamService
         return ['new' => $newestRows, 'featured' => $bestSellingRows, 'suggest' => $suggestionRows];
     }
 
+    /** IDs shown in the general homepage sections, for the admin product list. */
+    public function homepageSectionIds(): array
+    {
+        $sections = $this->homepageSections(null);
+
+        return array_map(
+            static fn(array $rows): array => array_map(static fn(array $row): int => (int) $row['id'], $rows),
+            $sections
+        );
+    }
+
     /** Đọc giá lọc tùy chọn; trả về int, null (không lọc) hoặc mảng lỗi [status, body]. */
     private function optionalPrice(array $query, string $key)
     {

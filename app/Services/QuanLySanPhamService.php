@@ -45,6 +45,7 @@ class QuanLySanPhamService
 
     private SanPham $products;
     private DanhMuc $categories;
+    private DanhSachSanPhamService $catalog;
     private TaiAnhLenService $uploader;
     private AnhBiaService $banners;
     private Database $db;
@@ -54,10 +55,12 @@ class QuanLySanPhamService
         ?SanPham $products = null,
         ?DanhMuc $categories = null,
         ?TaiAnhLenService $uploader = null,
-        ?AnhBiaService $banners = null
+        ?AnhBiaService $banners = null,
+        ?DanhSachSanPhamService $catalog = null
     ) {
         $this->products = $products ?? new SanPham();
         $this->categories = $categories ?? new DanhMuc();
+        $this->catalog = $catalog ?? new DanhSachSanPhamService();
         $this->uploader = $uploader ?? new TaiAnhLenService();
         $this->banners = $banners ?? new AnhBiaService($this->uploader);
         $this->db = $this->products->getDb();
@@ -68,11 +71,27 @@ class QuanLySanPhamService
     /** Dữ liệu danh sách cho trang quản trị theo chế độ xem 'active' | 'trash'. */
     public function listing(string $view): array
     {
+        $products = $this->products->findDetailsForAdmin($view === 'trash');
+        $sectionIds = $view === 'trash' ? [] : $this->catalog->homepageSectionIds();
+        $sectionProducts = [];
+        foreach ($sectionIds as $section => $ids) {
+            foreach ($ids as $id) {
+                $sectionProducts[$id][$section] = true;
+            }
+        }
+        foreach ($products as &$product) {
+            $sections = $sectionProducts[(int) $product['id']] ?? [];
+            $product['home_new'] = isset($sections['new']);
+            $product['home_featured'] = isset($sections['featured']);
+            $product['home_suggest'] = isset($sections['suggest']);
+        }
+        unset($product);
+
         return [
             'countActive' => $this->products->countByDeletedFlag(0),
             'countTrash' => $this->products->countByDeletedFlag(1),
             'categories' => $this->categories->findActiveIdNameForAdmin(),
-            'products' => $this->products->findDetailsForAdmin($view === 'trash'),
+            'products' => $products,
         ];
     }
 
