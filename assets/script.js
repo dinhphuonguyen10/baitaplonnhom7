@@ -3583,7 +3583,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     addPulseAnimation();
     initStickyHeader();
     initSlideshow();
-    await initWishlist();
+    // Không await: sản phẩm không phải chờ danh sách yêu thích; initWishlist tự tô tim khi tải xong.
+    initWishlist();
     initComboSlider();
     initScrollToTop();
     initProductDetailsNavigation();

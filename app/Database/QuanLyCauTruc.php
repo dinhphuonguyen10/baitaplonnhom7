@@ -26,6 +26,44 @@ class QuanLyCauTruc
     }
 
     /**
+     * Chỉ chạy migrate() khi file này thay đổi (việc đồng bộ tốn khoảng 0,3 giây mỗi lần).
+     * Dấu đã đồng bộ nằm trong bảng schema_state; xóa bảng này để buộc đồng bộ lại.
+     *
+     * @return bool true nếu bảng orders tồn tại
+     */
+    public function migrateIfChanged(): bool
+    {
+        $version = (string) md5_file(__FILE__);
+
+        try {
+            $result = $this->conn->query('SELECT version FROM schema_state WHERE id = 1');
+            $row = $result ? $result->fetch_assoc() : null;
+            if ($row && $row['version'] === $version) {
+                return true;
+            }
+        } catch (mysqli_sql_exception $exception) {
+            // Chưa có bảng schema_state: đồng bộ rồi tạo ở bước dưới.
+        }
+
+        $hasOrders = $this->migrate();
+
+        // Database chưa có bảng orders thì không đánh dấu, để lần sau đồng bộ tiếp.
+        if ($hasOrders) {
+            try {
+                $this->conn->query('CREATE TABLE IF NOT EXISTS schema_state (
+                    id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+                    version CHAR(32) NOT NULL
+                ) ENGINE=InnoDB');
+                $this->conn->query("REPLACE INTO schema_state (id, version) VALUES (1, '{$version}')");
+            } catch (mysqli_sql_exception $exception) {
+                error_log('Không thể lưu phiên bản cấu trúc CSDL: ' . $exception->getMessage());
+            }
+        }
+
+        return $hasOrders;
+    }
+
+    /**
      * Chạy toàn bộ các bước đồng bộ cấu trúc chung:
      * đơn hàng (tiền, tồn kho, lịch sử trạng thái), đánh giá, cửa hàng, danh mục (mã, xóa mềm),
      * sản phẩm (vòng đời, SKU, khuyến mãi, lịch sử giá), VIEW view_product_details, FUNCTION, TRIGGER.

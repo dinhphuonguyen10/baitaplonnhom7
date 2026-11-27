@@ -1,6 +1,9 @@
 CREATE DATABASE IF NOT EXISTS `baitaplon` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `baitaplon`;
 
+-- Xóa dấu đồng bộ cấu trúc để web kiểm tra lại sau khi nhập file này.
+DROP TABLE IF EXISTS `schema_state`;
+
 SET @OLD_CHARACTER_SET_CLIENT = @@CHARACTER_SET_CLIENT;
 SET @OLD_CHARACTER_SET_RESULTS = @@CHARACTER_SET_RESULTS;
 SET @OLD_COLLATION_CONNECTION = @@COLLATION_CONNECTION;

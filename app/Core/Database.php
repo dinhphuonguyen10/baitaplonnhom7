@@ -52,14 +52,14 @@ final class Database
     }
 
     /**
-     * Lấy thể hiện duy nhất của Database. Lần đầu khởi tạo sẽ tự đồng bộ cấu trúc CSDL.
+     * Lấy thể hiện duy nhất của Database. Tự đồng bộ cấu trúc CSDL khi code cấu trúc thay đổi.
      */
     public static function getInstance(): self
     {
         if (self::$instance === null) {
             $config = require APP_ROOT . '/config/database.php';
             self::$instance = new self(is_array($config) ? $config : []);
-            $hasOrders = (new QuanLyCauTruc(self::$instance))->migrate();
+            $hasOrders = (new QuanLyCauTruc(self::$instance))->migrateIfChanged();
 
             // Mỗi request web tự hủy các đơn đã hết thời gian giữ tồn kho (CLI dùng scripts/het_han_giu_ton_kho.php).
             if ($hasOrders && PHP_SAPI !== 'cli') {
