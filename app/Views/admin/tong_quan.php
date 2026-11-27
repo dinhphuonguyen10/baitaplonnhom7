@@ -86,7 +86,7 @@
     <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
     <main class="main-content">
         <header class="topbar">
-            <div class="breadcrumb">Trang chủ <span>/</span> <strong>Tổng quan</strong></div>
+            <div class="breadcrumb"><strong>Tổng quan</strong></div>
             <div class="admin-profile">
                 <div class="avatar"><?php echo $isManager ? 'QL' : 'NV'; ?></div>
                 <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small><?php echo $escape($roleLabel); ?></small></div>

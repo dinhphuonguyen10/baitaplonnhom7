@@ -94,7 +94,7 @@ if ($reportView === 'list'):
         <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
         <main class="main-content">
             <header class="topbar">
-                <div class="breadcrumb">Trang chủ <span>/</span> <strong>Báo cáo và thống kê</strong></div>
+                <div class="breadcrumb"><a href="<?php echo $escape($appBaseUrl . '/admin/index.php'); ?>">Tổng quan</a> <span>/</span> <strong>Báo cáo và thống kê</strong></div>
                 <div class="admin-profile">
                     <div class="avatar">QL</div>
                     <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small>Quản lý</small></div>
@@ -413,7 +413,7 @@ elseif ($reportView === 'customer'):
         <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
         <main class="main-content">
             <header class="topbar">
-                <div class="breadcrumb">Trang chủ <span>/</span> <a href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>">Báo cáo</a> <span>/</span> <strong><?php echo $escape($customerTitle); ?></strong></div>
+                <div class="breadcrumb"><a href="<?php echo $escape($appBaseUrl . '/admin/index.php'); ?>">Tổng quan</a> <span>/</span> <a href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>">Báo cáo</a> <span>/</span> <strong><?php echo $escape($customerTitle); ?></strong></div>
                 <div class="admin-profile">
                     <div class="avatar">QL</div>
                     <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small>Quản lý</small></div>
@@ -638,7 +638,7 @@ elseif ($reportView === 'exported'):
         <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
         <main class="main-content">
             <header class="topbar">
-                <div class="breadcrumb">Trang chủ <span>/</span> <a href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>">Báo cáo</a> <span>/</span> <strong><?php echo $escape($exportedEntry['name']); ?></strong></div>
+                <div class="breadcrumb"><a href="<?php echo $escape($appBaseUrl . '/admin/index.php'); ?>">Tổng quan</a> <span>/</span> <a href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>">Báo cáo</a> <span>/</span> <strong><?php echo $escape($exportedEntry['name']); ?></strong></div>
                 <div class="admin-profile">
                     <div class="avatar">QL</div>
                     <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small>Quản lý</small></div>
@@ -830,7 +830,7 @@ else:
     <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
     <main class="main-content">
         <header class="topbar">
-            <div class="breadcrumb">Trang chủ <span>/</span> <a href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>">Báo cáo</a> <span>/</span> <strong><?php echo $escape($salesTitle); ?></strong></div>
+            <div class="breadcrumb"><a href="<?php echo $escape($appBaseUrl . '/admin/index.php'); ?>">Tổng quan</a> <span>/</span> <a href="<?php echo $escape($appBaseUrl . '/admin/bao_cao.php'); ?>">Báo cáo</a> <span>/</span> <strong><?php echo $escape($salesTitle); ?></strong></div>
             <div class="admin-profile">
                 <div class="avatar">QL</div>
                 <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small>Quản lý</small></div>

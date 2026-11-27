@@ -144,7 +144,7 @@
     <?php include VIEW_PATH . '/layouts/thanh_ben_quan_tri.php'; ?>
     <main class="main-content">
         <header class="topbar">
-            <div class="breadcrumb">Trang chủ <span>/</span> <strong>Quản lý chat</strong></div>
+            <div class="breadcrumb"><a href="<?php echo $escape($appBaseUrl . '/admin/index.php'); ?>">Tổng quan</a> <span>/</span> <strong>Quản lý chat</strong></div>
             <div class="admin-profile">
                 <div class="avatar"><?php echo $isManager ? 'QL' : 'NV'; ?></div>
                 <div class="admin-info"><strong><?php echo $escape($adminUsername); ?></strong><small><?php echo $escape($roleLabel); ?></small></div>
