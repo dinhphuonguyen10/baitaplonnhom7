@@ -185,7 +185,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         const bytes = Number(value) || 0;
         return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
-
+// Format thời gian hiển thị trong chat
     const timeLabel = value => {
         const date = new Date(String(value).replace(' ', 'T'));
         if (Number.isNaN(date.getTime())) return '';
@@ -329,6 +329,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
         input.disabled = busy;
         previewRemove.disabled = busy;
     }
+    // Gửi tin nhắn và/hoặc tệp đính kèm
     form.addEventListener('submit', async event => {
         event.preventDefault();
         const message = input.value.trim();
@@ -411,6 +412,7 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     }).catch(error => {
         loadError = error.message;
         note.textContent = loadError;
+    
     });
     refresh();
     // Không gọi máy chủ khi khách đang ở tab khác; quay lại thì tải ngay.
