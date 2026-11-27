@@ -137,4 +137,13 @@ include VIEW_PATH . '/layouts/dau_trang.php';
     </div>
 </main>
 
+<script>
+// Điện thoại: bấm tiêu đề để mở/đóng bộ lọc (CSS chỉ thu gọn ở màn hình ≤768px).
+(function () {
+    var sidebar = document.querySelector('.filter-sidebar');
+    var header = sidebar && sidebar.querySelector('.filter-header');
+    if (header) header.addEventListener('click', function () { sidebar.classList.toggle('is-open'); });
+})();
+</script>
+
 <?php include VIEW_PATH . '/layouts/chan_trang.php'; ?>

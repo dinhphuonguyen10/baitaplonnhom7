@@ -25,6 +25,9 @@ use App\Core\View;
         <!-- HEADER -->
         <header class="header">
 
+        <!-- Nút mở menu trên điện thoại -->
+        <button type="button" class="nav-toggle" aria-label="Mở menu" aria-controls="main-menu" aria-expanded="false">☰</button>
+
         <!-- Logo ảnh -->
         <div class="logo">
             <a href="<?php echo View::e($appBaseUrl . '/index.php'); ?>" aria-label="Écrin Jewelry - Trang chủ">
@@ -76,7 +79,7 @@ use App\Core\View;
     </header>
 
     <!-- MENU -->
-    <nav class="menu" aria-label="Điều hướng chính">
+    <nav class="menu" id="main-menu" aria-label="Điều hướng chính">
         <a href="<?php echo View::e($appBaseUrl . '/index.php'); ?>"<?php echo $navCurrentPage === 'index.php' ? ' class="is-active" aria-current="page"' : ''; ?>>Trang chủ</a>
         <div class="dropdown">
             <a href="javascript:void(0)" class="dropdown-toggle<?php echo in_array($navCurrentPage, $navCategoryPages, true) ? ' is-active' : ''; ?>"<?php echo in_array($navCurrentPage, $navCategoryPages, true) ? ' aria-current="page"' : ''; ?>>Danh mục sản phẩm ▾</a>
@@ -103,3 +106,22 @@ use App\Core\View;
     </nav>
     </div>
     <div class="sticky-header-spacer" aria-hidden="true"></div>
+    <script>
+    // Điện thoại: nút ☰ mở/đóng menu điều hướng (CSS chỉ hiện nút ở màn hình ≤768px).
+    (function () {
+        var btn = document.querySelector('.nav-toggle');
+        var menu = document.getElementById('main-menu');
+        if (!btn || !menu) return;
+
+        function setOpen(open) {
+            menu.classList.toggle('is-open', open);
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.textContent = open ? '✕' : '☰';
+        }
+        btn.addEventListener('click', function () { setOpen(!menu.classList.contains('is-open')); });
+        document.addEventListener('click', function (e) {
+            if (!menu.contains(e.target) && !btn.contains(e.target)) setOpen(false);
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+    })();
+    </script>
