@@ -98,118 +98,32 @@ include VIEW_PATH . '/layouts/dau_trang.php';
             <a href="?page=<?php echo min($totalPages, $currentPage + 1); ?>" class="pagination-btn pagination-next <?php echo $currentPage >= $totalPages ? 'disabled' : ''; ?>" aria-label="Trang sau">›</a>
         </nav>
     <?php endif; ?>
-    <div id="guest-wishlist-pagination"></div>
-
     <!-- KHUNG TRỐNG (NẾU CHƯA CÓ SẢN PHẨM YÊU THÍCH) -->
     <div class="empty-wishlist" id="empty-wishlist" style="<?php echo empty($wishlistItems) ? 'display: block;' : 'display: none;'; ?>">
         <div class="empty-wishlist-icon">♡</div>
         <h3>Danh sách yêu thích đang trống</h3>
-        <p>Hãy nhấn vào biểu tượng trái tim trên các món trang sức bạn yêu thích để dễ dàng lưu lại và xem lại bất cứ lúc nào!</p>
-        <a href="<?php echo $escape($appBaseUrl . '/index.php'); ?>" class="btn-explore-wishlist">Khám phá bộ sưu tập ÉCRIN</a>
+        <p><?php echo $userId > 0
+            ? 'Hãy nhấn vào biểu tượng trái tim trên các món trang sức bạn yêu thích để dễ dàng lưu lại và xem lại bất cứ lúc nào!'
+            : 'Vui lòng đăng nhập để lưu và xem danh sách sản phẩm yêu thích.'; ?></p>
+        <?php if ($userId > 0): ?>
+            <a href="<?php echo $escape($appBaseUrl . '/index.php'); ?>" class="btn-explore-wishlist">Khám phá bộ sưu tập ÉCRIN</a>
+        <?php else: ?>
+            <a href="#" class="btn-explore-wishlist login-trigger">Đăng nhập tài khoản</a>
+        <?php endif; ?>
     </div>
 </main>
 
 <script>
-// Script chuyên biệt cho trang Wishlist: cập nhật real-time khi khách thả tim / bỏ tim
-document.addEventListener('DOMContentLoaded', async () => {
-    // Nếu khách vãng lai, tải danh sách yêu thích từ localStorage
-    const customer = typeof getCurrentCustomer === 'function' ? getCurrentCustomer() : null;
+// Khách chưa đăng nhập không có danh sách yêu thích tạm trên trình duyệt.
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof getCurrentCustomer === 'function' && getCurrentCustomer()) return;
+    localStorage.removeItem('ecrin_wishlist');
     const container = document.getElementById('wishlist-products-container');
     const emptyBox = document.getElementById('empty-wishlist');
     const badge = document.getElementById('wishlist-total-badge');
-
-    if (!customer) {
-        let localIds = [];
-        try {
-            localIds = JSON.parse(localStorage.getItem('ecrin_wishlist') || '[]');
-        } catch {}
-
-        if (localIds.length > 0) {
-            try {
-                // Tải tất cả sản phẩm và lọc theo localIds
-                const res = await fetch(window.APP_BASE_URL + '/api/catalog/lay_san_pham.php');
-                const products = await res.json();
-                const favProducts = products.filter(p => localIds.includes(Number(p.id)));
-
-                if (favProducts.length > 0) {
-                    emptyBox.style.display = 'none';
-                    badge.textContent = favProducts.length + ' sản phẩm';
-
-                    // Phân trang Client-side cho khách vãng lai (15 sản phẩm = 5 dòng)
-                    const WISHLIST_PER_PAGE = 15;
-                    const urlParams = new URLSearchParams(window.location.search);
-                    let guestPage = parseInt(urlParams.get('page'), 10) || 1;
-                    const totalGuestPages = Math.ceil(favProducts.length / WISHLIST_PER_PAGE);
-                    if (guestPage > totalGuestPages) guestPage = totalGuestPages;
-                    if (guestPage < 1) guestPage = 1;
-
-                    const startIdx = (guestPage - 1) * WISHLIST_PER_PAGE;
-                    const pagedProducts = favProducts.slice(startIdx, startIdx + WISHLIST_PER_PAGE);
-
-                    container.innerHTML = pagedProducts.map(p => {
-                        const priceSaleRaw = (typeof p.price_sale_raw !== 'undefined') ? p.price_sale_raw : parsePrice(p.price_sale);
-                        const hasDiscount = Boolean((p.discount && p.discount.trim() !== '') || (p.price_original_raw > p.price_sale_raw));
-                        const stock = Number(p.stock) || 0;
-                        const sold = Number(p.sold_count) || 0;
-                        const priceSaleFormatted = typeof p.price_sale === 'string' && p.price_sale.includes('.') ? p.price_sale : formatPrice(p.price_sale);
-                        const priceOriginalFormatted = p.price_original ? (typeof p.price_original === 'string' && p.price_original.includes('.') ? p.price_original : formatPrice(p.price_original)) : '';
-                        const priceOriginalHTML = p.price_original && p.price_original_raw > priceSaleRaw ? `<span class="price-original">${priceOriginalFormatted}<sup>đ</sup></span>` : '';
-                        const badgeHTML = hasDiscount ? `<span class="product-badge">${p.discount || 'ƯU ĐÃI'}</span>` : '';
-                        const metaHTML = renderProductMeta(sold);
-
-                        return `
-                            <div class="product-card" data-db-id="${p.id}" data-stock="${stock}" data-detail-url="${window.APP_BASE_URL}/client/san_pham.php?id=${encodeURIComponent(p.id)}" role="link" tabindex="0">
-                                <div class="product-image-wrap">
-                                    ${badgeHTML}
-                                    <button class="wishlist-btn active" data-product-id="${p.id}" title="Bỏ yêu thích">♥</button>
-                                    <img src="${typeof getProductImageUrl === 'function' ? getProductImageUrl(p.image) : p.image}" alt="${p.name}" class="product-image" onerror="this.onerror=null;this.src='${window.APP_BASE_URL || ''}/assets/banner/logo.png'">
-                                </div>
-                                <div class="product-info">
-                                    <h3>${p.name}</h3>
-                                    <div class="product-price">
-                                        <span class="price-sale">${priceSaleFormatted}<sup>đ</sup></span>
-                                        ${priceOriginalHTML}
-                                    </div>
-                                    ${metaHTML}
-                                    ${renderProductRating(p)}
-                                    <div class="product-purchase-controls">
-                                        ${typeof getProductQuantityControlMarkup === 'function' ? getProductQuantityControlMarkup(stock, p.name) : ''}
-                                        <div class="product-card-actions">
-                                            <button type="button" class="add-to-cart"${stock <= 0 ? ' disabled' : ''}>${stock <= 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ'}</button>
-                                            <button type="button" class="buy-now"${stock <= 0 ? ' disabled' : ''}>Mua ngay</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-
-                    // Render phân trang cho khách vãng lai nếu > 1 trang
-                    const guestPagEl = document.getElementById('guest-wishlist-pagination');
-                    if (guestPagEl && totalGuestPages > 1) {
-                        let pagHtml = '<nav class="pagination-controls" aria-label="Phân trang sản phẩm yêu thích">';
-                        pagHtml += `<a href="?page=${Math.max(1, guestPage - 1)}" class="pagination-btn pagination-prev ${guestPage <= 1 ? 'disabled' : ''}">‹</a>`;
-                        for (let p = 1; p <= totalGuestPages; p++) {
-                            pagHtml += `<a href="?page=${p}" class="pagination-btn ${p === guestPage ? 'active' : ''}">${p}</a>`;
-                        }
-                        pagHtml += `<a href="?page=${Math.min(totalGuestPages, guestPage + 1)}" class="pagination-btn pagination-next ${guestPage >= totalGuestPages ? 'disabled' : ''}">›</a>`;
-                        pagHtml += '</nav>';
-                        guestPagEl.innerHTML = pagHtml;
-                    }
-                } else {
-                    container.innerHTML = '';
-                    emptyBox.style.display = 'block';
-                    badge.textContent = '0 sản phẩm';
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        } else {
-            container.innerHTML = '';
-            emptyBox.style.display = 'block';
-            badge.textContent = '0 sản phẩm';
-        }
-    }
+    if (container) container.innerHTML = '';
+    if (emptyBox) emptyBox.style.display = 'block';
+    if (badge) badge.textContent = '0 sản phẩm';
 });
 </script>
 

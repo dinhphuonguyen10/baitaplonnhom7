@@ -3519,11 +3519,10 @@ async function initWishlist() {
             console.warn('Could not load wishlist from server:', e);
         }
     } else {
-        // Guest: load from localStorage
-        const localRaw = localStorage.getItem('ecrin_wishlist');
-        const localIds = localRaw ? JSON.parse(localRaw) : [];
-        wishlistIds = new Set(localIds.map(Number));
-        updateWishlistBadge(wishlistIds.size);
+        // Guests cannot keep favorites; account favorites are fetched again after login.
+        localStorage.removeItem('ecrin_wishlist');
+        wishlistIds = new Set();
+        updateWishlistBadge(0);
     }
 
     // Highlight all heart buttons already on page
@@ -3542,51 +3541,38 @@ async function initWishlist() {
         const productId = Number(btn.dataset.productId);
         if (!productId) return;
 
+        if (!getCurrentCustomer()) {
+            promptCustomerLogin();
+            return;
+        }
+
         // Pop animation
         btn.classList.add('animating');
         setTimeout(() => btn.classList.remove('animating'), 400);
 
-        if (getCurrentCustomer()) {
-            // Server toggle
-            fetch(appUrl('/api/catalog/yeu_thich.php'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'toggle', product_id: productId })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    if (data.favorited) wishlistIds.add(productId);
-                    else wishlistIds.delete(productId);
-                    updateWishlistBtns(productId, data.favorited);
-                    updateWishlistBadge(data.count);
-                    showToast(data.message);
-                    saveWishlistToLocal();
-                    handleWishlistPageRemoval(productId, data.favorited);
-                } else if (data.require_login) {
-                    promptCustomerLogin();
-                } else {
-                    showToast(data.message || 'Có lỗi xảy ra!');
-                }
-            })
-            .catch(() => showToast('Lỗi kết nối. Vui lòng thử lại!'));
-        } else {
-            // Guest: toggle in localStorage
-            let isFav = false;
-            if (wishlistIds.has(productId)) {
-                wishlistIds.delete(productId);
-                showToast('Đã bỏ yêu thích');
-                isFav = false;
+        // Favorite changes are stored by the server account only.
+        fetch(appUrl('/api/catalog/yeu_thich.php'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'toggle', product_id: productId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (data.favorited) wishlistIds.add(productId);
+                else wishlistIds.delete(productId);
+                updateWishlistBtns(productId, data.favorited);
+                updateWishlistBadge(data.count);
+                showToast(data.message);
+                saveWishlistToLocal();
+                handleWishlistPageRemoval(productId, data.favorited);
+            } else if (data.require_login) {
+                promptCustomerLogin();
             } else {
-                wishlistIds.add(productId);
-                showToast('❤️ Đã lưu vào danh sách yêu thích!');
-                isFav = true;
+                showToast(data.message || 'Có lỗi xảy ra!');
             }
-            updateWishlistBtns(productId, isFav);
-            updateWishlistBadge(wishlistIds.size);
-            saveWishlistToLocal();
-            handleWishlistPageRemoval(productId, isFav);
-        }
+        })
+        .catch(() => showToast('Lỗi kết nối. Vui lòng thử lại!'));
     });
 }
 

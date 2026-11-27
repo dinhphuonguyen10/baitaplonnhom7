@@ -189,7 +189,7 @@ use App\Helpers\DinhDangSanPhamQuanTri;
                                         $imgSrc = DinhDangSanPhamQuanTri::imageUrl((string) $p['image'], $appBaseUrl);
                                     ?>
                                     <tr class="product-row"
-                                        data-name="<?php echo strtolower($escape($p['name'])); ?>"
+                                        data-name="<?php echo $escape($p['name']); ?>"
                                         data-sku="<?php echo strtolower($escape($p['sku'])); ?>"
                                         data-cat-id="<?php echo (int)$p['category_id']; ?>"
                                         data-status="<?php echo $escape($prodStatus); ?>"
@@ -200,17 +200,19 @@ use App\Helpers\DinhDangSanPhamQuanTri;
                                         <td class="prod-name-cell">
                                             <div class="prod-name"><?php echo $escape($p['name']); ?></div>
                                             <small style="color: #64748b;">SKU: <?php echo $escape($p['sku']); ?></small>
-                                            <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
-                                                <?php if (!empty($p['is_featured'])): ?>
-                                                    <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #fef08a; color: #854d0e; font-weight: 600;">⭐ Nổi bật</span>
-                                                <?php endif; ?>
-                                                <?php if (!empty($p['is_suggested'])): ?>
-                                                    <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #e0e7ff; color: #3730a3; font-weight: 600;">💡 Gợi ý</span>
-                                                <?php endif; ?>
-                                                <?php if (!empty($p['is_new'])): ?>
-                                                    <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #dcfce7; color: #166534; font-weight: 600;">🆕 Mới</span>
-                                                <?php endif; ?>
-                                            </div>
+                                            <?php if (!empty($p['home_featured']) || !empty($p['home_suggest']) || !empty($p['home_new'])): ?>
+                                                <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+                                                    <?php if (!empty($p['home_featured'])): ?>
+                                                        <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #fef08a; color: #854d0e; font-weight: 600;">⭐ Bán chạy</span>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($p['home_suggest'])): ?>
+                                                        <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #e0e7ff; color: #3730a3; font-weight: 600;">💡 Gợi ý</span>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($p['home_new'])): ?>
+                                                        <span style="display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: #dcfce7; color: #166534; font-weight: 600;">🆕 Mới</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endif; ?>
                                             <?php if (!empty($p['description'])): ?>
                                                 <div class="prod-desc-preview" title="<?php echo $escape($p['description']); ?>"><?php echo $escape($p['description']); ?></div>
                                             <?php endif; ?>
@@ -315,12 +317,12 @@ use App\Helpers\DinhDangSanPhamQuanTri;
 
                 <div class="form-field">
                     <label>Giá gốc (VNĐ) (*):</label>
-                    <input type="number" name="regular_price" min="0" max="9999999999.99" step="0.01" required>
+                    <input type="number" name="regular_price" min="100000" max="9999999999.99" step="0.01" required>
                     <label for="add-promotion-price">Giá khuyến mãi (để trống nếu không có):</label>
-                    <input type="number" name="promotion_price" id="add-promotion-price" min="0" max="9999999999.99" step="0.01">
+                    <input type="number" name="promotion_price" id="add-promotion-price" min="100000" max="9999999999.99" step="0.01">
                     <label for="add-promotion-ends-at">Kết thúc khuyến mãi (không bắt buộc):</label>
                     <input type="datetime-local" name="promotion_ends_at" id="add-promotion-ends-at">
-                    <small>Giá khuyến mãi phải thấp hơn giá gốc. Hết thời hạn, giá hiển thị tự trở về giá gốc.</small>
+                    <small>Giá phải từ 100.000đ trở lên; giá khuyến mãi phải thấp hơn giá gốc. Hết thời hạn, giá hiển thị tự trở về giá gốc.</small>
                 </div>
 
                 <div class="form-field">
@@ -354,27 +356,9 @@ use App\Helpers\DinhDangSanPhamQuanTri;
                 </div>
 
                 <div class="form-field">
-                    <label>Phân loại hiển thị trang chủ:</label>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 4px;">
-                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
-                            <input type="checkbox" name="is_featured" value="1">
-                            <span>⭐ Sản phẩm nổi bật</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
-                            <input type="checkbox" name="is_suggested" value="1">
-                            <span>💡 Gợi ý cho bạn</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
-                            <input type="checkbox" name="is_new" value="1" checked>
-                            <span>🆕 Sản phẩm mới</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-field">
-                    <label>Ảnh sản phẩm:</label>
+                    <label>Ảnh sản phẩm (*):</label>
                     <input type="file" name="image_file" accept="image/*">
-                    <small>Hoặc nhập link ảnh trực tiếp:</small>
+                    <small>Bắt buộc tải ảnh lên hoặc nhập đường dẫn ảnh:</small>
                     <input type="text" name="image_url" placeholder="assets/bôngtai/bong1.jpg hoặc link URL">
                 </div>
             </div>
@@ -418,9 +402,9 @@ use App\Helpers\DinhDangSanPhamQuanTri;
 
                 <div class="form-field">
                     <label>Giá gốc (VNĐ) (*):</label>
-                    <input type="number" name="regular_price" id="edit-regular-price" min="0" max="9999999999.99" step="0.01" required>
+                    <input type="number" name="regular_price" id="edit-regular-price" min="100000" max="9999999999.99" step="0.01" required>
                     <label for="edit-promotion-price">Giá khuyến mãi (để trống nếu không có):</label>
-                    <input type="number" name="promotion_price" id="edit-promotion-price" min="0" max="9999999999.99" step="0.01">
+                    <input type="number" name="promotion_price" id="edit-promotion-price" min="100000" max="9999999999.99" step="0.01">
                     <label for="edit-promotion-ends-at">Kết thúc khuyến mãi (không bắt buộc):</label>
                     <input type="datetime-local" name="promotion_ends_at" id="edit-promotion-ends-at">
                     <div style="margin-top: 8px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
@@ -478,24 +462,6 @@ use App\Helpers\DinhDangSanPhamQuanTri;
                         <option value="inactive">🟠 Ngừng kinh doanh (Không cho đặt mua, giữ lịch sử)</option>
                         <option value="hidden">⚪ Bị ẩn (Ẩn khỏi toàn bộ giao diện Client)</option>
                     </select>
-                </div>
-
-                <div class="form-field">
-                    <label>Phân loại hiển thị trang chủ:</label>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 4px;">
-                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
-                            <input type="checkbox" name="is_featured" id="edit-is-featured" value="1">
-                            <span>⭐ Sản phẩm nổi bật</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
-                            <input type="checkbox" name="is_suggested" id="edit-is-suggested" value="1">
-                            <span>💡 Gợi ý cho bạn</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; font-size: 13px;">
-                            <input type="checkbox" name="is_new" id="edit-is-new" value="1">
-                            <span>🆕 Sản phẩm mới</span>
-                        </label>
-                    </div>
                 </div>
 
                 <div class="form-field">
@@ -587,9 +553,6 @@ function openEditModal(prod, imgSrc) {
     document.getElementById('edit-stock').value       = prod.stock;
     document.getElementById('edit-status').value      = prod.status || 'active';
     document.getElementById('edit-description').value = prod.description || descTemplates[prod.category_id] || '';
-    document.getElementById('edit-is-featured').checked  = parseInt(prod.is_featured, 10) === 1;
-    document.getElementById('edit-is-suggested').checked = parseInt(prod.is_suggested, 10) === 1;
-    document.getElementById('edit-is-new').checked       = parseInt(prod.is_new, 10) === 1;
     originalStock = parseInt(prod.stock, 10) || 0;
 
     const origPrice = parseFloat(prod.price_original) || 0;
@@ -696,6 +659,19 @@ window.addEventListener('click', function(e) {
 });
 
 // TÍNH NĂNG TÌM KIẾM & LỌC DANH MỤC / TRẠNG THÁI REALTIME
+const addProductForm = document.querySelector('#addModal form');
+if (addProductForm) {
+    addProductForm.addEventListener('submit', function(event) {
+        const imageFile = this.querySelector('input[name="image_file"]');
+        const imageUrl = this.querySelector('input[name="image_url"]');
+        if ((!imageFile || imageFile.files.length === 0) && (!imageUrl || imageUrl.value.trim() === '')) {
+            event.preventDefault();
+            alert('Vui lòng tải ảnh sản phẩm lên hoặc nhập đường dẫn ảnh.');
+            imageUrl?.focus();
+        }
+    });
+}
+
 const searchInput = document.getElementById('search-input');
 const categoryFilter = document.getElementById('category-filter');
 const statusFilter = document.getElementById('status-filter');
@@ -703,14 +679,14 @@ const rows = document.querySelectorAll('.product-row');
 const noResults = document.getElementById('no-search-results');
 
 function filterProducts() {
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const query = searchInput ? searchInput.value.trim().toLocaleLowerCase('vi') : '';
     const selectedCat = categoryFilter ? categoryFilter.value : '';
     const selectedStatus = statusFilter ? statusFilter.value : '';
     let visibleCount = 0;
 
     rows.forEach(row => {
-        const name = row.getAttribute('data-name') || '';
-        const sku = row.getAttribute('data-sku') || '';
+        const name = (row.getAttribute('data-name') || '').toLocaleLowerCase('vi');
+        const sku = (row.getAttribute('data-sku') || '').toLowerCase();
         const catId = row.getAttribute('data-cat-id') || '';
         const status = row.getAttribute('data-status') || '';
         const stock = parseInt(row.getAttribute('data-stock'), 10) || 0;
